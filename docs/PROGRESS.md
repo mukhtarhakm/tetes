@@ -6,7 +6,7 @@ Perbarui di akhir setiap sesi.
 
 | Sprint | Fokus | Spec | Status | Catatan |
 |---|---|---|---|---|
-| 1 | Fondasi, login lokal, biometrik, navigasi | 00, 01 | Sedang jalan | Langkah 1 dan 2 Fitur 00 selesai: proyek berjalan, tema, dan komponen dasar |
+| 1 | Fondasi, login lokal, biometrik, navigasi | 00, 01 | Sedang jalan | Langkah 1-3 Fitur 00 selesai: proyek, tema, komponen dasar, router, dan bottom navigation |
 | 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Belum mulai | |
 | 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Belum mulai | |
 | 4 | Jurnal | 04 | Belum mulai | |
@@ -18,7 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-18: Fitur 00 Langkah 2 selesai. Tema Plus Jakarta Sans, token UI, komponen dasar, dan layar contoh sudah dibuat; `flutter analyze` bersih. Berikutnya: Langkah 3, router dan bottom navigation.
+2026-10-18: Fitur 00 Langkah 3 selesai. Navigator bawaan, `IndexedStack`, dan bottom navigation empat tab sudah dibuat; `flutter analyze` bersih. Berikutnya: Langkah 4, database dan migrasi. Riverpod dan struktur folder Langkah 5 dikerjakan terpisah setelah Langkah 4.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)

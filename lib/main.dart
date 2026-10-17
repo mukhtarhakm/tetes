@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'app/foundation_preview_screen.dart';
+import 'app/router/app_routes.dart';
 import 'app/theme/app_theme.dart';
 
 void main() {
@@ -17,7 +17,8 @@ class MyApp extends StatelessWidget {
       title: 'Tetes',
       theme: AppTheme.light,
       themeMode: ThemeMode.light,
-      home: const FoundationPreviewScreen(),
+      initialRoute: AppRoutes.home,
+      routes: AppRouter.routes,
     );
   }
 }
