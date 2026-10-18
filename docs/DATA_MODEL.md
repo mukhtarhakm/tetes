@@ -206,7 +206,7 @@ Hal yang disimpan di luar database:
 | Field | Aturan |
 |---|---|
 | `username` | 3-30 karakter, huruf kecil, angka, titik, garis bawah. Unik |
-| password | Minimal 8 karakter |
+| password | 8 sampai 128 karakter |
 | `dose_g` | 5 sampai 60 |
 | `ratio` | 10 sampai 20 |
 | `water_temp_c` | 80 sampai 100 |
@@ -341,9 +341,9 @@ Semua tabel: **aktifkan Row Level Security tanpa membuat policy apa pun.** Hanya
 CREATE TABLE users (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   username       text NOT NULL UNIQUE,
-  password_hash  text NOT NULL,           -- base64, hasil PBKDF2-HMAC-SHA256
-  salt           text NOT NULL,           -- base64, acak per pengguna
-  iterations     integer NOT NULL,        -- tentukan dari rekomendasi terbaru, perlu dicek
+  password_hash  text NOT NULL,           -- base64, 32 byte hasil PBKDF2-HMAC-SHA256
+  salt           text NOT NULL,           -- base64, 16 byte acak per pengguna
+  iterations     integer NOT NULL,        -- 600000
   algo           text NOT NULL,           -- 'pbkdf2-hmac-sha256'
   created_at     timestamptz NOT NULL DEFAULT now()
 );

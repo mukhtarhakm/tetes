@@ -94,7 +94,7 @@ Autentikasi berjalan lewat Edge Function dan Postgres sendiri, tanpa Firebase, S
 **Register**
 1. Flutter memvalidasi bentuk input, lalu mengirim `username` dan password melalui HTTPS ke `auth-register`.
 2. Edge Function memvalidasi ulang, memastikan username unik, membuat salt acak, dan menghitung PBKDF2-HMAC-SHA256 memakai Web Crypto bawaan Deno.
-3. Jumlah iterasi **belum ditetapkan: tentukan dari rekomendasi terbaru, perlu dicek sebelum implementasi**, lalu simpan bersama hash dan salt per pengguna.
+3. Password di-hash dengan PBKDF2-HMAC-SHA256 sebanyak **600.000 iterasi**, salt acak 16 byte, dan keluaran 32 byte. Salt dan hash disimpan sebagai base64; jumlah iterasi serta nama algoritma disimpan per pengguna.
 4. Server membuat `users.id`, membuat session, dan mengembalikan profil pengguna, token acak 32 byte berformat base64url, serta `expires_at`.
 5. Flutter menyimpan cache profil di SQLite. Token session dan `expires_at` hanya disimpan di secure storage.
 
@@ -213,7 +213,7 @@ Permintaan:
 ```json
 { "username": "rais", "password": "…" }
 ```
-Perilaku: validasi input, pastikan username unik, hash password dengan PBKDF2-HMAC-SHA256 melalui Web Crypto Deno, buat user dan session. Jumlah iterasi **ditentukan dari rekomendasi terbaru dan wajib dicek sebelum implementasi**.
+Perilaku: validasi input, pastikan username unik melalui constraint database, hash password dengan PBKDF2-HMAC-SHA256 melalui Web Crypto Deno memakai 600.000 iterasi, salt acak 16 byte, dan keluaran 32 byte, lalu buat user dan session. Password harus 8-128 karakter.
 
 Respons:
 ```json
@@ -223,6 +223,8 @@ Respons:
   "expires_at": "…"
 }
 ```
+
+Untuk pengukuran saat pengujian, lama PBKDF2 dicatat sebagai `duration_ms` di log tanpa data sensitif. Bila permintaan membawa `x-debug-timing: 1`, respons sukses juga memuat field `duration_ms`; field ini tidak dikirim pada permintaan biasa.
 
 ### 7.2 `auth-login`
 Permintaan:

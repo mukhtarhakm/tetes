@@ -18,7 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-18: Langkah 5 Fitur 00 selesai. Aplikasi dibungkus `ProviderScope`, pembukaan database memakai satu `databaseProvider`, dan `DatabaseGate` menangani status memuat, galat, serta retry melalui invalidasi provider tanpa menutup database. Pembukaan singleton diamankan agar pemanggilan bersamaan memakai future atau koneksi yang sama. Kerangka folder arsitektur dibuat tanpa implementasi fitur. Seluruh 4 tes lulus, termasuk smoke test dengan database FFI in-memory, dan `flutter analyze` bersih. Berikutnya: uji di HP, lalu mulai Fitur 01 secara terpisah.
+2026-10-18: Fitur 01 sisi server langkah 1-2 siap diuji. Migrasi auth membuat tabel `users`, `sessions`, dan `login_attempts` dengan RLS aktif tanpa policy. `auth-register` memakai `Deno.serve`, Web Crypto PBKDF2-HMAC-SHA256 600.000 iterasi, salt 16 byte, hash 32 byte, session 7 hari, validasi server, serta pemetaan username duplikat ke `409`. Lama hash dicatat tanpa data sensitif dan hanya dikembalikan sebagai `duration_ms` bila header `x-debug-timing: 1` dikirim. Belum diterapkan ke database atau dideploy; berikutnya uji melalui Supabase CLI dan curl.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)

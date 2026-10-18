@@ -39,13 +39,14 @@ SQLite **tidak menyimpan** `password_hash`, `salt`, `iterations`, `algo`, atau t
 - `login_attempts`: `(username, window_start, attempt_count)` dengan primary key `(username, window_start)`.
 - Semua tabel memakai RLS aktif tanpa policy dan hanya diakses Edge Function dengan service role.
 
-Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan salt acak per pengguna. Jumlah iterasi **tentukan dari rekomendasi terbaru, perlu dicek sebelum implementasi** dan disimpan per pengguna.
+Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.000 iterasi, salt acak 16 byte, dan keluaran 32 byte. Salt dan hash disimpan sebagai base64; jumlah iterasi dan nama algoritma `pbkdf2-hmac-sha256` disimpan per pengguna. Password harus 8-128 karakter.
 
 ## Edge Function
 - `auth-register`: membuat user dan session.
 - `auth-login`: memverifikasi password, menerapkan pembatasan percobaan, dan membuat session.
 - `auth-logout`: mencabut session berdasarkan `x-session-token`.
 - Semua fungsi dipasang dengan `--no-verify-jwt`. Tidak memakai Supabase Auth atau layanan auth siap pakai.
+- `auth-register` mencatat lama PBKDF2 sebagai `duration_ms` tanpa data sensitif. Respons sukses hanya menambahkan nilai itu saat header `x-debug-timing: 1` dikirim.
 
 ## Alur
 
