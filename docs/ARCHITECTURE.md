@@ -412,13 +412,13 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 
 | Item | Nilai |
 |---|---|
-| Versi Flutter / Dart | (isi) |
+| Versi Flutter / Dart | Flutter 3.44.8 / Dart 3.12.2 |
 | Package ID | `com.raismukhtar.tetes` |
-| Versi paket utama | (isi dan kunci setelah pertama kali berjalan) |
+| Versi paket utama | `sqflite` 2.4.4+2, `path` 1.9.1; tes database: `sqflite_common_ffi` 2.4.4 |
 | URL proyek Supabase | (isi, bukan rahasia) |
 | Model LLM | (isi dari AI Studio, disimpan sebagai environment `AI_MODEL`) |
 | API kurs | (isi setelah diuji) |
-| Platform uji | HP Android: (isi tipe) |
+| Platform uji | HP Android 16 (API 36) |
 
 Environment Edge Function: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY`, `AI_MODEL`. Tidak ada satu pun yang ditulis di kode.
 

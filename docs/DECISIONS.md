@@ -26,3 +26,4 @@ Catat keputusan yang sudah diambil agar tidak diperdebatkan ulang. Format: tangg
 | 2026-10-18 | `sync-pull` menerima lokal kosong atau prefix valid dan menolak cabang | Mendukung perangkat baru tanpa menggabungkan dua riwayat yang berbeda secara otomatis |
 | 2026-10-18 | Konflik rantai dapat dipulihkan ulang dari server hanya setelah konfirmasi jumlah data lokal dan pending | Pemulihan bersifat destruktif terhadap data sinkronisasi lokal sehingga harus eksplisit |
 | 2026-10-18 | Logout offline menghapus session aktif lokal dan mengantrekan `pending_revoke_token` | Pengguna langsung keluar; pencabutan server dicoba saat online atau sebelum login berikutnya, dengan kedaluwarsa 7 hari sebagai pencadang |
+| 2026-10-18 | Migrasi SQLite diuji di host dengan `sqflite_common_ffi` sebagai dev dependency | `sqflite` tetap dipakai di aplikasi Android, sedangkan FFI memungkinkan tes migrasi, foreign key, dan constraint berjalan tanpa mengubah database produksi |

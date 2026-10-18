@@ -6,7 +6,7 @@ Perbarui di akhir setiap sesi.
 
 | Sprint | Fokus | Spec | Status | Catatan |
 |---|---|---|---|---|
-| 1 | Fondasi, login online buatan sendiri, biometrik, navigasi | 00, 01 | Sedang jalan | Langkah 1-3 Fitur 00 selesai; arsitektur auth server disepakati sebelum Langkah 4 database |
+| 1 | Fondasi, login online buatan sendiri, biometrik, navigasi | 00, 01 | Sedang jalan | Langkah 1-4 Fitur 00 selesai; berikutnya Langkah 5 state management dan struktur folder |
 | 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Belum mulai | |
 | 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Belum mulai | |
 | 4 | Jurnal | 04 | Belum mulai | |
@@ -18,7 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-18: Dokumen arsitektur diubah dari login lokal menjadi autentikasi online buatan sendiri lewat Edge Function. `accounts`, `sync_key`, dan `sync-register` dihapus dari rancangan; ditambahkan session server, pembatasan login, logout tertunda saat offline, dan `sync-pull` berbasis prefix rantai. Belum ada kode implementasi yang dibuat. Berikutnya: tinjau ulang rencana Langkah 4 database berdasarkan skema baru.
+2026-10-18: Langkah 4 Fitur 00 selesai. Ditambahkan pembuka SQLite dengan foreign keys pada setiap koneksi, migrasi bernomor versi 1 untuk sembilan tabel dan empat indeks, seed `stores` dari aset, serta tampilan galat pembukaan database dengan aksi coba lagi tanpa menghapus database. Tes migrasi membuktikan daftar tabel dan indeks, `user_version = 1`, skema cache `users`, penolakan foreign key, dan `UNIQUE (user_id, seq)`. Tes khusus lulus dan `flutter analyze` bersih. Berikutnya: uji di HP, lalu kerjakan Langkah 5 secara terpisah.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)
