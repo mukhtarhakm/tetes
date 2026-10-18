@@ -10,7 +10,7 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
 ┌──────────────────────────── HP (Flutter) ────────────────────────────┐
 │ UI ─ State ─ Repository ─ SQLite                                     │
 │        │                                                             │
-│        ├─ Auth lokal (hash+salt, session di secure storage)          │
+│        ├─ Session lokal + biometrik (token di secure storage)        │
 │        ├─ Sensor, notifikasi, lokasi, biometrik (paket perangkat)    │
 │        ├─ Klien Sinkronisasi ───────────┐                            │
 │        └─ Klien Kurs ─────────────┐     │                            │
@@ -18,14 +18,14 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
                                     │     │ HTTPS
                        API kurs     │     ▼
                       (publik)  ◄───┘   Supabase Edge Functions
-                                         ├─ sync-register
-                                         ├─ sync-push        ──► Postgres (RLS terkunci)
+                                         ├─ auth-register/login/logout
+                                         ├─ sync-push/pull   ──► Postgres (RLS terkunci)
                                          └─ ai               ──► API LLM (key = secret)
 ```
 
 **Prinsip:**
 1. **Offline-first.** Seduh, jurnal, dan biji jalan tanpa internet. SQLite adalah sumber utama di HP.
-2. **Server tipis.** Server hanya memverifikasi, menyimpan cadangan, dan memegang rahasia.
+2. **Server tipis.** Server menangani autentikasi, memverifikasi sinkronisasi, menyimpan cadangan, dan memegang rahasia.
 3. **Rahasia hanya di server.** API key LLM dan service role key tidak pernah ada di Flutter atau Git.
 4. **Satu sumber aturan.** Format hash dan skema hanya didefinisikan di `DATA_MODEL.md`.
 
@@ -36,10 +36,10 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
 | Aplikasi | Flutter (Dart) | Satu basis kode |
 | State | Riverpod | Putuskan di Sprint 1, jangan dicampur dengan pustaka state lain |
 | Database lokal | SQLite (`sqflite`) | Migrasi bernomor |
-| Penyimpanan aman | `flutter_secure_storage` | Session dan `sync_key` |
-| Hash password | PBKDF2-HMAC-SHA256 (`cryptography`) | Salt acak 16 byte, iterasi disimpan per pengguna |
+| Penyimpanan aman | `flutter_secure_storage` | Token session, waktu kedaluwarsa, dan token pencabutan tertunda |
+| Hash password | PBKDF2-HMAC-SHA256 (Web Crypto bawaan Deno) | Hanya di Edge Function; salt acak per pengguna, jumlah iterasi disimpan per pengguna |
 | Hash chain | SHA-256 (`crypto`) | Aturan di `DATA_MODEL.md` |
-| UUID | `uuid` | ID dibuat di Flutter |
+| UUID | `uuid` | ID data aplikasi dibuat di Flutter; ID pengguna dan session dibuat server |
 | Biometrik | `local_auth` | Pembuka aplikasi saja |
 | Sensor | `sensors_plus` | Accelerometer (goyang), gyroscope (game) |
 | Notifikasi | `flutter_local_notifications` + `timezone` | Lokal, tanpa server |
@@ -68,14 +68,15 @@ lib/
     db/                     pembuka database, migrasi, DAO
     repositories/           BeanRepo, BrewRepo, EventRepo, ScoreRepo, FeedbackRepo, UserRepo
     sync/                   SyncClient, antrean, pemetaan baris <-> JSON
-    remote/                 FxClient, AiClient
+    remote/                 AuthClient, FxClient, AiClient
   features/
     auth/   beans/   brew/   journal/   explore/   game/   profile/
       (tiap fitur: screens/, widgets/, state/)
 supabase/
   functions/
-    sync-register/  sync-push/  ai/
-    _shared/                hash.ts (buildHashInput), validasi, klien DB
+    auth-register/  auth-login/  auth-logout/
+    sync-push/  sync-pull/  ai/
+    _shared/                auth, hash.ts (buildHashInput), validasi, klien DB
   migrations/               SQL tabel server
 docs/
 ```
@@ -86,28 +87,39 @@ Aturan lapisan:
 - **Sinkronisasi** hanya membaca dan menulis lewat repository.
 - Warna, ukuran, dan gaya teks **hanya** dari tema (`UI_SPEC.md`), tidak ditulis langsung di layar.
 
-## 4. Autentikasi Lokal
+## 4. Autentikasi Online Buatan Sendiri
+
+Autentikasi berjalan lewat Edge Function dan Postgres sendiri, tanpa Firebase, Supabase Auth, atau layanan auth siap pakai. Semua fungsi dipasang dengan `--no-verify-jwt`; fungsi terlindungi memverifikasi header `x-session-token` terhadap hash token di tabel `sessions`.
 
 **Register**
-1. Validasi (lihat `DATA_MODEL.md` bagian 4). Cek username belum dipakai di SQLite.
-2. Buat `user_id` (UUID), `salt` (16 byte acak), hitung hash PBKDF2, simpan di `users`.
-3. Buat `sync_key` acak (32 byte, base64url) dan simpan di secure storage. Tandai `sync_registered = 0`.
+1. Flutter memvalidasi bentuk input, lalu mengirim `username` dan password melalui HTTPS ke `auth-register`.
+2. Edge Function memvalidasi ulang, memastikan username unik, membuat salt acak, dan menghitung PBKDF2-HMAC-SHA256 memakai Web Crypto bawaan Deno.
+3. Jumlah iterasi **belum ditetapkan: tentukan dari rekomendasi terbaru, perlu dicek sebelum implementasi**, lalu simpan bersama hash dan salt per pengguna.
+4. Server membuat `users.id`, membuat session, dan mengembalikan profil pengguna, token acak 32 byte berformat base64url, serta `expires_at`.
+5. Flutter menyimpan cache profil di SQLite. Token session dan `expires_at` hanya disimpan di secure storage.
 
 **Login**
-1. Ambil pengguna berdasarkan username. Hitung hash dari password input dengan `salt` dan `iterations` tersimpan. Bandingkan dengan perbandingan waktu-konstan.
-2. Jika cocok: buat session `{user_id, expires_at}` (7 hari) di secure storage. Pesan gagal selalu umum: "Username atau password salah".
-3. Pembatasan percobaan: 5 kali gagal beruntun, kunci beberapa menit (hitungan di memori atau settings).
+1. Login username/password selalu membutuhkan internet dan memanggil `auth-login`.
+2. Pembatasan dilakukan berdasarkan username yang diketik, termasuk username yang tidak ada. Jendela 15 menit dibulatkan ke awal jendela dan disimpan di `login_attempts(username, window_start, attempt_count)`.
+3. Hitung ulang PBKDF2 memakai parameter pengguna dan bandingkan hasil hash dengan cara waktu-konstan.
+4. Percobaan gagal ke-5 dalam jendela ditolak dengan `429` dan sisa waktu tunggu. Pesan kredensial gagal tetap "Username atau password salah".
+5. Login berhasil menghapus baris percobaan pada jendela itu, membuat session baru, lalu mengembalikan profil, token, dan `expires_at`.
 
 **Buka aplikasi**
-1. Ada session valid? Jika tidak, ke Login.
-2. Jika `biometric_enabled`: tampilkan prompt biometrik. Gagal atau dibatalkan, tawarkan "pakai password" (login ulang).
-3. Berhasil, masuk Beranda.
+1. Baca token dan `expires_at` dari secure storage. Kedaluwarsa dibandingkan dengan jam perangkat; keterbatasan ini diterima untuk v1.
+2. Jika session lokal belum kedaluwarsa, aplikasi boleh dibuka saat offline. Jika biometrik aktif, minta biometrik sebelum membuka Beranda.
+3. Jika session kedaluwarsa, arahkan ke Login. Saat offline, tampilkan pesan bahwa internet diperlukan; tidak ada mode baca saja.
+4. Session yang dicabut server diketahui pada permintaan terlindungi berikutnya melalui `401`; hapus session lokal dan keluar paksa.
+5. Session berlaku 7 hari tanpa perpanjangan otomatis pada v1.
 
-**Logout**: hapus session dari secure storage, kembali ke Login. Data lokal tidak dihapus.
+**Logout**
+1. Jika ada baris `sync_status = pending`, dialog konfirmasi wajib menyebut jumlahnya. Data lokal tetap disimpan setelah logout.
+2. Hapus session aktif dari secure storage seketika dan kembali ke Login.
+3. Panggil `auth-logout`. Jika gagal karena offline, simpan token lama di kunci secure storage terpisah `pending_revoke_token`.
+4. Coba pencabutan lagi saat aplikasi dibuka dengan internet atau sebelum login berikutnya. Jika sukses atau token sudah tidak sah, hapus `pending_revoke_token`.
+5. Bila pencabutan belum terkirim, jelaskan bahwa session server akan dicabut saat tersambung. Batas cadangan adalah kedaluwarsa 7 hari di server.
 
-**Biometrik** hanya membuka aplikasi yang session-nya masih ada. Ia bukan pengganti login dan tidak berbicara ke server. Cek ketersediaan perangkat sebelum menawarkan. Sembunyikan opsi jika tidak didukung.
-
-**Batasan yang dicatat untuk laporan:** autentikasi lokal, akun tidak berpindah antar HP, keamanan tidak setara autentikasi server.
+**Biometrik** hanya membuka aplikasi saat session lokal masih valid. Biometrik bukan autentikasi server dan tidak menggantikan login username/password. Cek ketersediaan perangkat sebelum menawarkan dan sembunyikan opsi bila tidak didukung.
 
 ## 5. Alur Fitur Inti
 
@@ -149,45 +161,92 @@ Semua pencarian dan filter lewat query SQLite (contoh di `DATA_MODEL.md` bagian 
 ## 6. Sinkronisasi
 
 ### 6.1 Identitas
-- `account_id` = `user_id` lokal. `sync_key` = rahasia di secure storage.
-- Server hanya menyimpan `SHA-256(sync_key)`. Tiap permintaan membawa header:
-  - `x-account-id: <uuid>`
-  - `x-sync-key: <sync_key>`
-- Batas yang dicatat: akun tidak pindah HP. Jika `sync_key` dicuri, pencuri dapat menyinkronkan sebagai pengguna itu.
+- `user_id` berasal dari `users.id` yang dibuat server dan nilainya sama pada SQLite serta Postgres.
+- Token session adalah nilai acak 32 byte berformat base64url. Flutter menyimpan token asli di secure storage; server hanya menyimpan SHA-256 token.
+- Fungsi terlindungi (`auth-logout`, `sync-push`, `sync-pull`, `ai`) menerima `x-session-token: <token>`. `auth-register` dan `auth-login` tidak memerlukan header ini.
+- Token valid bila hash ditemukan, belum dicabut, dan `expires_at` belum lewat.
 
 ### 6.2 Urutan
-1. `sync-register` sekali (jika `sync_registered = 0`), lalu set `1`.
+1. Bila perlu menerima data server, jalankan `sync-pull` sebelum push.
 2. Kirim data `pending` ke `sync-push` dalam urutan tabel: `beans` → `brews` (+ `brew_stages`) → `events` → `game_scores` → `feedback`.
 3. `brews` dikirim urut `seq` naik, per kelompok (misalnya 20). **Jika satu entri ditolak, hentikan kelompok itu**, karena entri sesudahnya pasti gagal.
-4. Respons memuat daftar `accepted` dan `rejected`. Tandai `synced` atau `error` (dengan pesan).
+4. Respons memuat daftar `accepted` dan `rejected`. Tandai `synced` atau `error` dengan pesan yang jelas.
 5. Pemicu: otomatis saat online dan ada data pending, serta tombol manual "Sinkronkan sekarang" di Profil.
 
 ### 6.3 Idempoten
 - Upsert berdasarkan `id`. Mengirim ulang baris yang sama tidak menghasilkan duplikat.
 - Entri `brews` yang sudah ada di server dengan `hash` sama dianggap sukses. Hanya field tidak-hash (`notes`, `ai_advice`, `cost_idr`, `status`) yang diperbarui. Jika field yang di-hash berbeda dari yang tersimpan, **tolak** dengan alasan `tamper`.
 
-### 6.3b Cakupan v1
-Hanya **push** (HP ke server). Tidak ada pull otomatis, tidak ada penggabungan dua arah. Unduh penuh saat login di HP lain tidak dikerjakan di versi ini.
+### 6.4 Pull dan konflik rantai
+Sebelum meminta pull, Flutter memverifikasi ulang urutan `seq`, `prev_hash`, dan hash seluruh rantai lokal. `sync-pull` lalu membandingkan pasangan `seq` dan `hash` lokal terhadap rantai server per urutan. Status berikut berlaku untuk rantai `brews`; tabel non-rantai tetap diproses berdasarkan ID yang belum ada.
+
+- **Lokal kosong:** tarik semua data. Tarik `beans` sebelum `brews`, verifikasi seluruh rantai, lalu simpan apa adanya dalam transaksi lokal.
+- **Lokal sama dengan server:** tidak ada `brews` yang ditarik.
+- **Lokal prefix valid dari server:** tarik suffix server dengan `seq` lebih besar dari `seq` lokal terakhir. Verifikasi hubungan `prev_hash` dan hash setiap entri sebelum menyimpan.
+- **Server prefix dari lokal:** tidak ada `brews` yang ditarik; lanjutkan push data lokal yang belum ada di server.
+- **Bercabang:** bila hash berbeda pada `seq` yang sama, atau kedua sisi memiliki entri yang tidak dimiliki sisi lain, jangan gabungkan otomatis.
+
+Untuk `beans`, `events`, `game_scores`, dan `feedback`, pull hanya menyisipkan baris yang belum ada di SQLite dan tidak menimpa baris yang sudah ada. Perubahan `notes` atau `status` dari perangkat lain belum ditarik pada v1.
+
+Saat rantai bercabang, tampilkan pilihan:
+1. **Pulihkan ulang dari server:** konfirmasi eksplisit menyebut jumlah seluruh data lokal yang akan dikosongkan, termasuk jumlah entri `pending`. Setelah pengguna setuju, kosongkan data pengguna yang disinkronkan (`beans`, `brews`, `brew_stages`, `events`, `game_scores`, `feedback`), lalu lakukan pull penuh dan verifikasi sebelum commit.
+2. **Batal:** pertahankan data lokal dan jangan lanjutkan sinkronisasi.
+
+### 6.5 Cakupan multi-perangkat v1
+- Akun dapat login di lebih dari satu perangkat, tetapi penulisan serentak tidak digabung otomatis.
+- Sebelum membuat seduhan di perangkat baru atau tertinggal, tarik data server lebih dahulu.
+- Server selalu menolak `brews` baru bila `seq` atau `prev_hash` tidak melanjutkan ujung rantai server.
+- Pull menangani rantai kosong atau prefix yang identik, bukan rekonsiliasi dua cabang.
 
 ## 7. Kontrak Edge Function
 
-Semua fungsi menerima dan mengembalikan JSON. Kode status: `200` sukses, `400` data tidak valid, `401` kunci salah, `429` batas pemakaian, `500` kesalahan server. Bentuk galat seragam:
+Semua fungsi menerima dan mengembalikan JSON. Kode status: `200` sukses, `400` data tidak valid, `401` kredensial atau session tidak sah, `409` konflik sinkronisasi, `429` batas percobaan atau pemakaian, `500` kesalahan server. Bentuk galat seragam:
 
 ```json
 { "error": { "code": "invalid_hash_chain", "message": "…", "details": {} } }
 ```
 
-Catatan konfigurasi: Edge Function bawaan Supabase biasanya meminta token (JWT) di header `Authorization`. Cek dokumentasi: gunakan `anon key` publik di header itu, atau atur fungsi agar tidak memverifikasi JWT. Otorisasi sebenarnya tetap lewat `x-account-id` dan `x-sync-key`. **Service role key hanya di environment fungsi.**
+Semua Edge Function dipasang dengan `--no-verify-jwt`. Otorisasi fungsi terlindungi dilakukan sendiri melalui `x-session-token`. **Service role key hanya di environment fungsi.** Password dan token tidak pernah ditulis ke log.
 
-### 7.1 `sync-register`
+### 7.1 `auth-register`
 Permintaan:
 ```json
-{ "account_id": "uuid", "username": "rais", "sync_key": "…" }
+{ "username": "rais", "password": "…" }
 ```
-Perilaku: jika `account_id` belum ada, buat dengan `sync_key_hash`. Jika sudah ada dan hash cocok, sukses (idempoten). Jika sudah ada dan hash tidak cocok, `401`.
-Respons: `{ "ok": true }`
+Perilaku: validasi input, pastikan username unik, hash password dengan PBKDF2-HMAC-SHA256 melalui Web Crypto Deno, buat user dan session. Jumlah iterasi **ditentukan dari rekomendasi terbaru dan wajib dicek sebelum implementasi**.
 
-### 7.2 `sync-push`
+Respons:
+```json
+{
+  "user": { "id": "uuid", "username": "rais", "created_at": "…" },
+  "session_token": "base64url",
+  "expires_at": "…"
+}
+```
+
+### 7.2 `auth-login`
+Permintaan:
+```json
+{ "username": "rais", "password": "…" }
+```
+Perilaku:
+1. Tentukan `window_start` dengan membulatkan waktu server ke awal jendela 15 menit.
+2. Hitung percobaan berdasarkan username input, termasuk username yang tidak terdaftar.
+3. Percobaan gagal ke-5 pada jendela yang sama menghasilkan `429` dengan `retry_after_seconds`. Kegagalan sebelum batas selalu memakai pesan umum "Username atau password salah".
+4. Login berhasil menghapus baris `login_attempts` untuk username dan jendela itu, lalu membuat session baru.
+
+Respons sama dengan `auth-register`.
+
+### 7.3 `auth-logout`
+Header: `x-session-token`.
+
+Perilaku: tandai session terkait `revoked = true`. Operasi idempoten; token yang sudah dicabut atau kedaluwarsa dianggap sudah tidak sah sehingga klien boleh menghapus `pending_revoke_token`.
+
+Respons: `{ "ok": true }`.
+
+### 7.4 `sync-push`
+Header: `x-session-token`.
+
 Permintaan:
 ```json
 {
@@ -199,7 +258,7 @@ Permintaan:
 }
 ```
 Validasi untuk `brews`:
-1. Ambil `seq` dan `hash` terakhir yang diterima server untuk akun ini.
+1. Ambil `seq` dan `hash` terakhir yang diterima server untuk pengguna dari session.
 2. Entri baru harus `seq = last_seq + 1` dan `prev_hash = last_hash` (atau `seq = 1`, `prev_hash = "0"`).
 3. Hitung ulang hash dengan `buildHashInput()` dan bandingkan.
 4. Entri yang sudah ada: aturan idempoten di 6.3.
@@ -212,7 +271,46 @@ Respons:
 }
 ```
 
-### 7.3 `ai`
+### 7.5 `sync-pull`
+Header: `x-session-token`.
+
+Permintaan mengirim seluruh ringkasan rantai lokal agar server dapat membuktikan hubungan prefix:
+```json
+{
+  "local_chain": [
+    { "seq": 1, "hash": "…" },
+    { "seq": 2, "hash": "…" }
+  ],
+  "local_ids": {
+    "beans": ["uuid"],
+    "events": [],
+    "game_scores": [],
+    "feedback": []
+  }
+}
+```
+
+Perilaku:
+1. Bandingkan tiap `seq` dan `hash` dengan rantai server.
+2. Kembalikan semua data bila lokal kosong, hanya suffix bila lokal prefix server, respons kosong bila sama, atau penanda `server_is_prefix` bila server merupakan prefix lokal.
+3. Bila bercabang, kembalikan `409` dengan `code: "sync_conflict"` dan jumlah data server yang relevan. Klien menawarkan pemulihan ulang atau batal.
+4. Payload sukses mengurutkan `beans` sebelum `brews`; `beans`, `events`, `game_scores`, dan `feedback` hanya memuat baris server yang ID-nya belum ada pada `local_ids`.
+
+Respons ringkas:
+```json
+{
+  "relation": "local_empty | equal | local_is_prefix | server_is_prefix",
+  "beans": [],
+  "brews": [ { "stages": [] } ],
+  "events": [],
+  "game_scores": [],
+  "feedback": []
+}
+```
+
+### 7.6 `ai`
+Header: `x-session-token`.
+
 Dua jenis permintaan dalam satu fungsi.
 
 Permintaan:
@@ -223,8 +321,8 @@ Permintaan:
 - `diagnose`: profil biji, seduhan (termasuk tahap dengan target vs aktual), skor dan tag rasa, catatan, riwayat singkat biji itu.
 
 Perilaku:
-1. Verifikasi akun (header kunci).
-2. Cek batas pemakaian: **20 panggilan per jam per akun** (tabel `ai_usage`). Lebih dari itu, `429`.
+1. Verifikasi session dari header token.
+2. Cek batas pemakaian: **20 panggilan per jam per pengguna** (tabel `ai_usage`). Lebih dari itu, `429`.
 3. Susun prompt sistem (bagian 8) dan panggil LLM dengan batas waktu 15 detik, suhu rendah, dan minta keluaran JSON.
 4. **Validasi** keluaran terhadap skema. Jika tidak valid, satu kali coba ulang. Jika tetap gagal, `500` dengan `code: "ai_invalid_output"`.
 5. Kembalikan JSON tervalidasi.
@@ -274,10 +372,11 @@ Label di UI selalu: "Saran, bukan kepastian. Coba dan catat hasilnya."
 | Tidak ada rahasia di Flutter | API key LLM dan service role key hanya di secret/environment Edge Function |
 | `.env` dan berkas kunci | Masuk `.gitignore` sejak commit pertama |
 | RLS aktif tanpa policy | Semua tabel Postgres. Akses hanya lewat Edge Function |
-| Password | Tidak pernah disimpan, dicatat di log, atau dikirim ke server |
-| `sync_key` | Secure storage. Server hanya menyimpan hash-nya |
+| Password | Dikirim hanya melalui HTTPS ke fungsi auth, tidak pernah disimpan atau dicatat di log; hash hanya dibuat di server |
+| Session token | Token asli hanya di secure storage; server menyimpan SHA-256 token, masa berlaku 7 hari, dan status pencabutan |
+| Pembatasan login | Server menghitung kegagalan per username dalam jendela 15 menit, termasuk username yang tidak ada |
 | HTTPS | Semua panggilan jaringan |
-| Batas AI | 20 panggilan per jam per akun |
+| Batas AI | 20 panggilan per jam per pengguna |
 | Validasi di server | Server memverifikasi hash dan skema, bukan hanya mempercayai aplikasi |
 | Log | Jangan mencatat password, key, atau isi lengkap data pribadi |
 
@@ -287,19 +386,24 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 
 | Kondisi | Perilaku |
 |---|---|
-| Internet mati | Seduh, jurnal, biji tetap jalan. Sinkronisasi dan AI menunjukkan pesan, AI memakai fallback |
+| Internet mati | Session lokal yang belum kedaluwarsa tetap membuka seduh, jurnal, dan biji. Login/register tertahan; sinkronisasi menunggu dan AI memakai fallback |
+| Logout saat offline | Hapus session aktif lokal, simpan `pending_revoke_token`, dan jelaskan bahwa pencabutan server dilakukan saat tersambung |
 | Izin lokasi ditolak | Daftar toko tanpa jarak + pesan |
 | Izin notifikasi ditolak | Tampilkan penjelasan dan cara mengaktifkan |
 | Biometrik tidak tersedia | Sembunyikan opsi, tetap bisa pakai password |
 | Sensor tidak ada | Pesan jelas, game dan goyang timer dinonaktifkan |
 | JSON AI tidak valid | Fallback atau pesan "saran tidak tersedia" |
+| Rantai sinkronisasi bercabang | Jangan gabung otomatis; tawarkan "Pulihkan ulang dari server" dengan jumlah data lokal dan pending, atau Batal |
 | Sinkronisasi ditolak | Tandai `error`, tampilkan alasan, jangan gagal diam-diam |
-| Token kedaluwarsa | Ke layar Login |
+| Session kedaluwarsa saat offline | Ke layar Login dengan pesan bahwa internet diperlukan; tidak ada mode baca saja |
+| Session dicabut server | Permintaan berikutnya mendapat `401`; hapus session lokal dan keluar paksa |
 | Aplikasi dimatikan di tengah sesi seduh | Sesi yang belum disimpan boleh hilang. Tidak ada entri setengah jadi karena penyimpanan satu transaksi |
 
 ## 11. Pengujian
 
 - **Tes unit wajib:** `buildHashInput` dan `sha256` memakai vektor uji di `DATA_MODEL.md` bagian 5.7 (Flutter **dan** Edge Function). Hitung stok, pengaturan terbaik, total air, dan konversi zona waktu.
+- **Tes auth server wajib:** register unik, hash PBKDF2 dan verifikasi, session kedaluwarsa/dicabut, serta kegagalan login ke-5 dalam jendela 15 menit.
+- **Tes sinkronisasi wajib:** pull penuh, prefix lokal, prefix server, rantai sama, rantai bercabang, dan pemulihan ulang dengan data pending.
 - **Uji manual di HP asli:** biometrik, sensor, notifikasi (jadwalkan 2 menit ke depan), lokasi, foto profil, sinkronisasi (nyalakan dan matikan internet).
 - **Uji tamper:** ubah satu nilai langsung di database, lalu verifikasi integritas harus menyatakan rantai putus.
 - Setiap sprint ditutup dengan acceptance criteria di `PRD.md`/`features/*.md` dan satu commit.

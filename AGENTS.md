@@ -22,12 +22,12 @@ Jika dokumen saling bertentangan atau ambigu: **berhenti dan tanya**. Jangan men
 - **Dependency:** jangan menambah atau memperbarui paket tanpa bertanya. Sebutkan nama dan alasannya. Jangan mengarang nama paket atau versi. Jika tidak yakin, katakan.
 - **File:** hanya ubah file yang diizinkan di bagian "Boleh menyentuh" pada spec fitur. Jangan menulis ulang file yang bukan bagian tugas.
 - **Larangan keras:**
-  - Tanpa Firebase dan tanpa Supabase Auth. Login lokal di Flutter.
+  - Tanpa Firebase dan tanpa Supabase Auth. Register, login, session, dan logout dibuat sendiri lewat Edge Function; hash password tidak boleh dilakukan atau disimpan di Flutter.
   - Tidak ada rahasia (API key LLM, service role key) di kode Flutter, di Git, atau di log.
   - Tidak ada katalog resep, berbagi resep, atau pencari kedai kopi.
   - Tidak ada edit atau hapus entri `brews`. Hanya status dibatalkan.
   - Jangan mengubah format hash, nama kolom, enum, atau kontrak Edge Function tanpa instruksi eksplisit.
-- **ID** adalah UUID v4 yang dibuat di Flutter. Waktu disimpan sebagai UTC ISO 8601 tanpa milidetik.
+- **ID data aplikasi** adalah UUID v4 yang dibuat di Flutter. `users.id` dan `sessions.id` dibuat server. Waktu disimpan sebagai UTC ISO 8601 tanpa milidetik.
 - **UI:** semua warna, ukuran, jarak, dan gaya teks diambil dari tema. Jangan menulis nilai gaya langsung di layar. Pakai komponen bersama di `lib/core/ui/`. Setiap layar punya empat keadaan: memuat, kosong, galat, berhasil.
 - **Layering:** UI tidak mengakses SQLite atau HTTP langsung. Alurnya UI, state, repository.
 - **Teks antarmuka** dalam bahasa Indonesia. Pesan galat jelas dan tidak membocorkan detail teknis atau rahasia.

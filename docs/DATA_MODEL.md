@@ -8,17 +8,17 @@ Terkait: `PRD.md`, `ARCHITECTURE.md`.
 
 | Hal | Aturan |
 |---|---|
-| ID | UUID v4 sebagai teks huruf kecil, dibuat di Flutter |
+| ID | ID data aplikasi adalah UUID v4 teks huruf kecil yang dibuat di Flutter. `users.id` dan `sessions.id` dibuat server |
 | Waktu | Disimpan sebagai teks ISO 8601 **UTC** tanpa milidetik, contoh `2026-10-17T08:30:00Z` |
 | Boolean | SQLite: `INTEGER` 0 atau 1. Postgres: `boolean` |
 | Uang | `REAL` dalam rupiah (IDR). Harga asli disimpan dalam mata uang aslinya |
 | Nama kolom | `snake_case`, bahasa Inggris |
 | Nilai enum | Teks huruf kecil, tanpa spasi (contoh `sedang_halus`) |
-| Kepemilikan | Tiap tabel data punya `user_id` (lokal) atau `account_id` (server) |
+| Kepemilikan | Tiap tabel data lokal dan server memakai `user_id` yang merujuk pengguna yang sama |
 | `sync_status` | `pending`, `synced`, atau `error` (hanya di SQLite) |
 | Hapus | Beberapa tabel memakai `deleted` (soft delete). Entri seduhan tidak pernah dihapus |
 
-`user_id` lokal dan `account_id` server adalah **nilai yang sama** untuk satu akun (UUID yang dibuat saat register). Jadi baris yang dikirim ke server tidak perlu diubah ID-nya.
+`user_id` lokal dan server adalah **nilai yang sama**, berasal dari `users.id` yang dibuat server saat register. Baris yang dikirim atau ditarik tidak perlu mengubah ID pengguna.
 
 ## 2. Enum
 
@@ -42,12 +42,9 @@ Daftar `taste_tag` boleh bertambah, tapi **nilai yang sudah dipakai di entri tid
 CREATE TABLE users (
   id              TEXT PRIMARY KEY,
   username        TEXT NOT NULL UNIQUE,
-  password_hash   TEXT NOT NULL,        -- base64, hasil PBKDF2
-  salt            TEXT NOT NULL,        -- base64, 16 byte acak
-  iterations      INTEGER NOT NULL,     -- jumlah iterasi yang dipakai
-  algo            TEXT NOT NULL,        -- contoh: 'pbkdf2-hmac-sha256'
   photo_path      TEXT,
-  created_at      TEXT NOT NULL
+  created_at      TEXT NOT NULL,
+  last_login_at   TEXT
 );
 
 CREATE TABLE settings (
@@ -62,7 +59,6 @@ CREATE TABLE settings (
 --   brew_reminder_time       'HH:MM' (waktu lokal)
 --   brew_reminder_days       '1,2,3,4,5,6,7' (1 = Senin)
 --   low_stock_threshold_g    default '15'
---   sync_registered          '0' | '1'
 --   last_sync_at             waktu UTC
 --   fx_cache                 JSON kurs terakhir + tanggal
 
@@ -189,8 +185,8 @@ CREATE INDEX idx_events_user_time ON events(user_id, start_utc);
 Data toko (`stores`) bukan data pengguna. Tabel ini diisi dari berkas seed bawaan aplikasi (10-15 titik), tanpa sinkronisasi dan tanpa `user_id`. Hanya toko biji, toko alat seduh, dan roastery. **Bukan kedai kopi.**
 
 Hal yang disimpan di luar database:
-- `sync_key`: di secure storage, bukan SQLite.
-- Session: di secure storage (`user_id`, waktu kedaluwarsa).
+- Session aktif: token, `user_id`, dan `expires_at` di secure storage, bukan SQLite.
+- `pending_revoke_token`: token session lama yang belum berhasil dicabut karena offline, di secure storage terpisah.
 - Foto profil: berkas di folder aplikasi, SQLite hanya menyimpan path.
 
 ## 4. Aturan Turunan
@@ -342,29 +338,54 @@ Hasil: **utuh (N entri)** atau **rantai putus di seq K** (K = entri pertama yang
 Semua tabel: **aktifkan Row Level Security tanpa membuat policy apa pun.** Hanya Edge Function (service role) yang mengakses. Aplikasi tidak pernah menyentuh tabel langsung.
 
 ```sql
-CREATE TABLE accounts (
-  account_id     uuid PRIMARY KEY,
+CREATE TABLE users (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   username       text NOT NULL UNIQUE,
-  sync_key_hash  text NOT NULL,          -- SHA-256 hex dari sync_key
-  created_at     timestamptz NOT NULL DEFAULT now(),
-  last_sync_at   timestamptz
+  password_hash  text NOT NULL,           -- base64, hasil PBKDF2-HMAC-SHA256
+  salt           text NOT NULL,           -- base64, acak per pengguna
+  iterations     integer NOT NULL,        -- tentukan dari rekomendasi terbaru, perlu dicek
+  algo           text NOT NULL,           -- 'pbkdf2-hmac-sha256'
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE sessions (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES users(id),
+  token_hash  text NOT NULL UNIQUE,        -- SHA-256 hex dari token 32 byte base64url
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  expires_at  timestamptz NOT NULL,
+  revoked     boolean NOT NULL DEFAULT false
+);
+
+CREATE TABLE login_attempts (
+  username       text NOT NULL,
+  window_start   timestamptz NOT NULL,     -- awal jendela 15 menit menurut waktu server
+  attempt_count  integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (username, window_start)
 );
 
 CREATE TABLE ai_usage (
-  account_id    uuid NOT NULL REFERENCES accounts(account_id),
+  user_id       uuid NOT NULL REFERENCES users(id),
   window_start  timestamptz NOT NULL,    -- awal jam
   call_count    integer NOT NULL DEFAULT 0,
-  PRIMARY KEY (account_id, window_start)
+  PRIMARY KEY (user_id, window_start)
 );
 ```
 
+Aturan `login_attempts`:
+- `window_start` dibulatkan ke awal jendela 15 menit.
+- Hitung percobaan berdasarkan username input meskipun username tidak terdaftar.
+- Percobaan gagal ke-5 dalam jendela ditolak dengan `429` dan sisa waktu tunggu.
+- Login berhasil menghapus baris untuk `(username, window_start)` tersebut.
+- Pesan kredensial gagal selalu "Username atau password salah".
+
 Tabel data (`beans`, `brews`, `brew_stages`, `events`, `game_scores`, `feedback`) memiliki **kolom yang sama dengan SQLite** dengan perbedaan:
-- `user_id` diganti `account_id uuid NOT NULL REFERENCES accounts(account_id)`.
+- `user_id` bertipe `uuid NOT NULL REFERENCES users(id)` dan namanya tidak berubah.
 - Kolom `sync_status` dihilangkan.
 - Kolom waktu memakai `timestamptz`. Untuk `brews.brewed_at_utc`, simpan **juga** teks aslinya di kolom `brewed_at_text` agar verifikasi hash memakai string yang persis sama, bukan hasil format ulang.
-- `brews` memiliki `UNIQUE (account_id, seq)` dan `UNIQUE (id)`.
+- `brews` memiliki `UNIQUE (user_id, seq)` dan `UNIQUE (id)`.
 - Boolean memakai tipe `boolean`.
-- `brew_stages` memiliki `account_id` juga, supaya pemeriksaan kepemilikan sederhana.
+- `brew_stages` memiliki `user_id` juga, supaya pemeriksaan kepemilikan sederhana.
 
 Tabel `stores` tidak ada di server.
 

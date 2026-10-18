@@ -94,11 +94,12 @@ Tema teman yang dekat dengan kopi: **Brewmaster** (resep kopi, berbagi resep, pe
 Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AUTH, BEAN, dan seterusnya) dipakai di FR di `features/*.md`.
 
 ### Akun dan keamanan (AUTH)
-- **M** Register dan login lokal, password disimpan sebagai hash dengan salt.
-- **M** Session disimpan di secure storage, masa berlaku 7 hari.
+- **M** Register dan login online lewat Edge Function buatan sendiri, tanpa Firebase, Supabase Auth, atau layanan auth siap pakai.
+- **M** Password di-hash di server dengan PBKDF2-HMAC-SHA256, salt acak per pengguna, dan jumlah iterasi yang disimpan per pengguna.
+- **M** Token session disimpan di secure storage, berlaku 7 hari tanpa perpanjangan otomatis. Session valid dapat membuka aplikasi saat offline.
 - **M** Login biometrik sebagai pembuka aplikasi.
-- **M** Logout.
-- **S** Pembatasan percobaan login.
+- **M** Logout mencabut session di server; saat offline pencabutan diantrekan tanpa menghapus data lokal.
+- **M** Pembatasan percobaan login dilakukan di server per username dalam jendela 15 menit.
 
 ### Profil biji (BEAN)
 - **M** Tambah, lihat, ubah, hapus biji.
@@ -136,6 +137,8 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 ### Sinkronisasi (SYNC)
 - **M** Data disimpan lokal dulu (SQLite), lalu dikirim ke server saat online.
 - **M** Server memverifikasi hash chain dan menolak entri yang tidak cocok.
+- **M** `sync-pull` menarik data server bila rantai lokal kosong atau merupakan prefix valid dari rantai server.
+- **M** Rantai bercabang tidak digabung otomatis; pengguna dapat membatalkan atau memulihkan ulang dari server dengan konfirmasi yang menyebut jumlah data lokal yang akan dikosongkan.
 - **M** Tombol sinkronkan manual dan status sinkronisasi.
 
 ### Event dan waktu (EVT)
@@ -167,7 +170,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 | Requirement dosen | Dipenuhi oleh |
 |---|---|
 | Konsep proyek akhir | PRD ini |
-| Login terenkripsi + session (tanpa Firebase) | AUTH: hash dengan salt, session lokal |
+| Login terenkripsi + session (tanpa Firebase) | AUTH: Edge Function sendiri, PBKDF2 dengan salt, token session 7 hari |
 | Login biometrik | AUTH: biometrik pembuka aplikasi |
 | Penyimpanan lokal dan online | SQLite + Supabase Postgres |
 | Web service/API | Edge Function sendiri + API kurs |
@@ -188,15 +191,15 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 Detail ada di `ARCHITECTURE.md`.
 
 - **Aplikasi:** Flutter. **Lokal:** SQLite.
-- **Login:** lokal di Flutter (hash + salt, session di secure storage). Tanpa Firebase dan tanpa Supabase Auth.
+- **Login:** online lewat Edge Function buatan sendiri. Password di-hash dan diverifikasi di server; Flutter hanya menyimpan token session dan waktu kedaluwarsa di secure storage. Tanpa Firebase dan tanpa Supabase Auth.
 - **Online:** Supabase Postgres dengan RLS aktif tanpa policy, diakses hanya lewat Edge Function.
-- **Edge Function:** `sync-register`, `sync-push`, `ai`.
+- **Edge Function:** `auth-register`, `auth-login`, `auth-logout`, `sync-push`, `sync-pull`, `ai`; semuanya dipasang dengan `--no-verify-jwt` dan fungsi terlindungi memakai `x-session-token`.
 - **LLM:** dipanggil hanya dari Edge Function. API key disimpan sebagai secret, tidak ada di kode Flutter.
 - **Kurs:** API kurs publik tanpa key (kandidat: Frankfurter), dipanggil dari Flutter. Kurs terakhir disimpan untuk mode offline.
 - **Peta:** OpenStreetMap. Data toko diisi manual 10-15 titik.
-- **ID:** semua ID berupa UUID yang dibuat di Flutter.
+- **ID:** ID data aplikasi berupa UUID yang dibuat di Flutter; ID pengguna dan session dibuat server.
 
-**Keterbatasan yang jujur (untuk laporan):** autentikasi bersifat lokal di perangkat, akun tidak berpindah antar HP, dan keamanannya tidak setara autentikasi server. Hash chain bersifat tamper-evident (perubahan terdeteksi), bukan tamper-proof, dan bukan blockchain terdistribusi.
+**Keterbatasan yang jujur (untuk laporan):** register dan login password memerlukan internet. Aplikasi dapat dibuka offline hanya selama session lokal belum kedaluwarsa; waktu kedaluwarsa dibandingkan dengan jam perangkat. Session yang dicabut di server baru diketahui saat permintaan berikutnya menghasilkan `401`. Sinkronisasi lintas perangkat hanya menarik suffix dari rantai yang cocok; cabang tidak digabung otomatis. Perubahan `notes` atau `status` dari perangkat lain belum ditarik pada v1. Hash chain bersifat tamper-evident (perubahan terdeteksi), bukan tamper-proof, dan bukan blockchain terdistribusi.
 
 ## 10. Kriteria Keberhasilan
 
@@ -217,7 +220,7 @@ Aplikasi dianggap berhasil jika:
 - Penjualan tiket atau pembayaran.
 - Integrasi scale Bluetooth atau IoT lain (bonus jika waktu sisa, tidak direncanakan).
 - Skor stabilitas tuangan dari sensor pada seduhan nyata (sensor hanya dipakai untuk timer dan game).
-- Sinkronisasi dua arah dengan penggabungan data, akun lintas perangkat, mode gelap.
+- Penggabungan otomatis rantai dari dua perangkat, sinkronisasi perubahan `notes` atau `status` dari perangkat lain, dan mode gelap.
 - Dukungan metode seduh selain V60.
 
 ## 12. Asumsi, Risiko, dan Pertanyaan Terbuka
@@ -230,7 +233,7 @@ Aplikasi dianggap berhasil jika:
 | Risiko | Mitigasi |
 |---|---|
 | Dosen menilai tema terlalu mirip Brewmaster | Konfirmasi di awal. Jaga batas di bagian 6. Tabel pembeda masuk laporan |
-| Dosen tidak menerima login lokal atau Supabase | Konfirmasi di awal. Cadangan: backend sendiri (Express) |
+| Dosen tidak menerima autentikasi buatan sendiri lewat Edge Function | Konfirmasi di awal bahwa login server tanpa layanan auth siap pakai diperbolehkan |
 | Rasa kontrol gyroscope tidak enak | Prototipe kasar dulu, uji di HP asli. Cadangan: accelerometer untuk game |
 | Hash tidak cocok antara aplikasi dan server | Satu fungsi format, satu data contoh uji untuk dua sisi |
 | Notifikasi dan biometrik berbeda antar HP | Uji di HP demo sejak awal |
@@ -239,7 +242,7 @@ Aplikasi dianggap berhasil jika:
 
 **Pertanyaan ke dosen (kirim sekaligus)**
 1. Apakah aplikasi pelatih dan jurnal seduh V60, tanpa katalog resep, berbagi resep, dan pencari kedai, dianggap berbeda dari tema resep dan pencari kedai kopi?
-2. Apakah login boleh sepenuhnya lokal (hash + salt, session)?
+2. Apakah login boleh dibuat sendiri di server (Edge Function, hash password dan session buatan sendiri), tanpa Firebase dan tanpa layanan auth siap pakai?
 3. Apakah boleh memakai Supabase (database dan Edge Function) untuk bagian online?
 4. **Sudah diputuskan mengikuti bunyi slide:** Saran & Kesan menjadi tab sendiri dan Logout menjadi aksi di bottom navigation; Profil tetap menjadi tab dengan foto pengguna. Keputusan ini tetap boleh dikonfirmasi kepada dosen untuk memastikan interpretasinya tepat.
 
@@ -258,7 +261,7 @@ Pengerjaan 8 hari, satu sprint per hari:
 
 | Sprint | Fokus |
 |---|---|
-| 1 | Fondasi, tema UI, login lokal, biometrik, bottom navigation |
+| 1 | Fondasi, tema UI, login online buatan sendiri, biometrik, bottom navigation |
 | 2 | Profil biji, kurs, Atur Seduh |
 | 3 | Sesi timer, hasil, hash chain |
 | 4 | Jurnal |
