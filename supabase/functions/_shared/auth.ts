@@ -108,6 +108,24 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes));
 }
 
+export function base64ToBytes(value: string): Uint8Array {
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+export function constantTimeEquals(
+  left: Uint8Array,
+  right: Uint8Array,
+): boolean {
+  const length = Math.max(left.length, right.length);
+  let difference = left.length ^ right.length;
+
+  for (let index = 0; index < length; index += 1) {
+    difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
+  }
+
+  return difference === 0;
+}
+
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

@@ -429,3 +429,13 @@ entrypoint = "./functions/hello/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/auth-register/index.ts"
+
+[functions.auth-login]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/auth-login/index.ts"
+
+[functions.auth-logout]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/auth-logout/index.ts"

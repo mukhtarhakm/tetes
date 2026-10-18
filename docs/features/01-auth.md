@@ -46,7 +46,8 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 - `auth-login`: memverifikasi password, menerapkan pembatasan percobaan, dan membuat session.
 - `auth-logout`: mencabut session berdasarkan `x-session-token`.
 - Semua fungsi dipasang dengan `--no-verify-jwt`. Tidak memakai Supabase Auth atau layanan auth siap pakai.
-- `auth-register` mencatat lama PBKDF2 sebagai `duration_ms` tanpa data sensitif. Respons sukses hanya menambahkan nilai itu saat header `x-debug-timing: 1` dikirim.
+- `auth-register` dan `auth-login` mencatat lama PBKDF2 sebagai `duration_ms` tanpa data sensitif. Respons sukses hanya menambahkan nilai itu saat header `x-debug-timing: 1` dikirim; pada galat kredensial login, nilai uji berada di `error.details.duration_ms`.
+- Helper `_shared/session.ts` memvalidasi token fungsi terlindungi dan akan dipakai oleh `sync-push`, `sync-pull`, dan `ai`.
 
 ## Alur
 
@@ -59,8 +60,9 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 **Login:**
 1. Semua login username/password memerlukan internet.
 2. `window_start` dibulatkan ke awal jendela 15 menit menurut waktu server. Percobaan dihitung dari username yang diketik meskipun akunnya tidak ada.
-3. Kegagalan ke-5 dalam satu jendela menghasilkan `429` dengan sisa waktu tunggu. Login berhasil menghapus baris jendela tersebut.
-4. Password cocok: server membuat session baru. Flutter memperbarui cache profil dan `last_login_at`, menyimpan session, lalu masuk Beranda.
+3. Periksa batas sebelum PBKDF2. Lima kegagalan pertama masing-masing menghasilkan `401` dan dinaikkan atomik melalui RPC; permintaan berikutnya menghasilkan `429` dengan `details.retry_after_s`.
+4. Username yang tidak ada tetap menjalankan satu PBKDF2 pura-pura dengan konstanta iterasi yang sama. Pengguna nyata diverifikasi memakai `iterations` dari baris pengguna dan perbandingan waktu-konstan.
+5. Login berhasil menghapus baris jendela tersebut dan membuat session baru. Flutter memperbarui cache profil dan `last_login_at`, menyimpan session, lalu masuk Beranda.
 
 **Buka aplikasi:**
 1. Baca `expires_at` dari secure storage dan bandingkan dengan jam perangkat.
@@ -80,7 +82,7 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 - Password tidak cocok dengan konfirmasi: pesan di kolom konfirmasi.
 - Register atau login saat offline: tetap di layar auth dengan pesan "Internet diperlukan untuk masuk atau mendaftar."
 - Pesan login gagal tidak membedakan username tidak ada dan password salah.
-- Percobaan gagal ke-5: tampilkan sisa waktu tunggu dari respons `429`.
+- Setelah lima percobaan gagal: permintaan berikutnya menampilkan sisa waktu tunggu dari `details.retry_after_s` pada respons `429`.
 - HP tanpa biometrik atau belum ada sidik jari terdaftar: jangan tawarkan, sembunyikan toggle.
 - Biometrik dibatalkan atau gagal: tawarkan login password; bila offline jelaskan bahwa internet diperlukan.
 - Session lokal kedaluwarsa saat offline: tertahan di Login tanpa mode baca saja.
@@ -103,7 +105,7 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 - [ ] SQLite `users` hanya berisi cache profil tanpa data hash password
 - [ ] Dua akun dengan username sama ditolak
 - [ ] Login online berhasil dan pesan kredensial gagal selalu umum
-- [ ] Kegagalan ke-5 dalam jendela 15 menit menghasilkan `429` dan sisa waktu tunggu
+- [ ] Lima kegagalan pertama dalam jendela 15 menit menghasilkan `401`; permintaan berikutnya menghasilkan `429` dan `details.retry_after_s`
 - [ ] Login berhasil menghapus baris percobaan untuk jendela aktif
 - [ ] Session berlaku 7 hari tanpa perpanjangan otomatis
 - [ ] Dengan session valid, tutup aplikasi lalu buka offline: masuk tanpa password, lewat biometrik bila aktif
@@ -116,7 +118,7 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 - [ ] Tidak ada password, token session, atau hash token di log
 
 ## Cara uji
-Register dua akun, coba username duplikat, lakukan lima login gagal dalam jendela yang sama, lalu login benar setelah jendela berganti. Aktifkan biometrik, buka ulang aplikasi saat offline dengan session valid, uji session kedaluwarsa saat offline, logout dengan data pending, logout offline lalu sambungkan internet, dan pastikan session lama ditolak server.
+Register dua akun, coba username duplikat, pastikan lima login gagal dalam jendela yang sama menghasilkan `401`, lalu pastikan permintaan keenam menghasilkan `429` sebelum mencoba login benar setelah jendela berganti. Aktifkan biometrik, buka ulang aplikasi saat offline dengan session valid, uji session kedaluwarsa saat offline, logout dengan data pending, logout offline lalu sambungkan internet, dan pastikan session lama ditolak server.
 
 ## Langkah pengerjaan yang disarankan
 1. Migrasi tabel auth dan helper PBKDF2/session di Edge Function, dengan tes. Berhenti.

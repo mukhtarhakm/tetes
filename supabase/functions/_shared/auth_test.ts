@@ -1,5 +1,7 @@
 import {
+  base64ToBytes,
   bytesToBase64,
+  constantTimeEquals,
   createSalt,
   createSessionToken,
   derivePasswordHash,
@@ -60,4 +62,19 @@ Deno.test("session token memakai 32 byte base64url dan hash SHA-256", async () =
 
   assert(/^[A-Za-z0-9_-]{43}$/u.test(token), "Format token session tidak valid.");
   assert(/^[a-f0-9]{64}$/u.test(tokenHash), "Hash token session tidak valid.");
+});
+
+Deno.test("base64 dapat dibaca ulang dan hash dibandingkan waktu-konstan", () => {
+  const bytes = new Uint8Array([0, 1, 127, 255]);
+  const decoded = base64ToBytes(bytesToBase64(bytes));
+
+  assert(constantTimeEquals(bytes, decoded), "Hasil decode harus sama.");
+  assert(
+    !constantTimeEquals(bytes, new Uint8Array([0, 1, 127, 254])),
+    "Byte berbeda harus ditolak.",
+  );
+  assert(
+    !constantTimeEquals(bytes, new Uint8Array([0, 1, 127])),
+    "Panjang berbeda harus ditolak.",
+  );
 });

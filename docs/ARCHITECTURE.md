@@ -102,7 +102,7 @@ Autentikasi berjalan lewat Edge Function dan Postgres sendiri, tanpa Firebase, S
 1. Login username/password selalu membutuhkan internet dan memanggil `auth-login`.
 2. Pembatasan dilakukan berdasarkan username yang diketik, termasuk username yang tidak ada. Jendela 15 menit dibulatkan ke awal jendela dan disimpan di `login_attempts(username, window_start, attempt_count)`.
 3. Hitung ulang PBKDF2 memakai parameter pengguna dan bandingkan hasil hash dengan cara waktu-konstan.
-4. Percobaan gagal ke-5 dalam jendela ditolak dengan `429` dan sisa waktu tunggu. Pesan kredensial gagal tetap "Username atau password salah".
+4. Lima percobaan gagal pertama dalam jendela masing-masing menghasilkan `401` dan menaikkan penghitung. Permintaan berikutnya ditolak dengan `429` dan sisa waktu tunggu sebelum PBKDF2 dijalankan. Pesan kredensial gagal tetap "Username atau password salah".
 5. Login berhasil menghapus baris percobaan pada jendela itu, membuat session baru, lalu mengembalikan profil, token, dan `expires_at`.
 
 **Buka aplikasi**
@@ -234,15 +234,18 @@ Permintaan:
 Perilaku:
 1. Tentukan `window_start` dengan membulatkan waktu server ke awal jendela 15 menit.
 2. Hitung percobaan berdasarkan username input, termasuk username yang tidak terdaftar.
-3. Percobaan gagal ke-5 pada jendela yang sama menghasilkan `429` dengan `retry_after_seconds`. Kegagalan sebelum batas selalu memakai pesan umum "Username atau password salah".
-4. Login berhasil menghapus baris `login_attempts` untuk username dan jendela itu, lalu membuat session baru.
+3. Periksa batas sebelum menjalankan PBKDF2. Lima kegagalan pertama pada jendela yang sama menghasilkan `401`; permintaan berikutnya menghasilkan `429` dengan `details.retry_after_s`.
+4. Username yang tidak ditemukan tetap menjalankan satu PBKDF2 pura-pura dengan konstanta 600.000 iterasi. Hash pengguna yang ditemukan dihitung memakai nilai `iterations` pada baris pengguna dan dibandingkan dengan cara waktu-konstan.
+5. Kegagalan menaikkan penghitung secara atomik melalui RPC `increment_login_attempt(p_username, p_window_start)` yang hanya dapat dijalankan service role. Login berhasil menghapus baris `login_attempts` untuk username dan jendela itu, lalu membuat session baru.
 
 Respons sama dengan `auth-register`.
 
 ### 7.3 `auth-logout`
 Header: `x-session-token`.
 
-Perilaku: tandai session terkait `revoked = true`. Operasi idempoten; token yang sudah dicabut atau kedaluwarsa dianggap sudah tidak sah sehingga klien boleh menghapus `pending_revoke_token`.
+Perilaku: tandai session terkait `revoked = true`. Operasi idempoten; token yang tidak dikenal, sudah dicabut, atau kedaluwarsa tetap menghasilkan respons sukses yang sama sehingga klien boleh menghapus `pending_revoke_token`.
+
+Helper bersama `_shared/session.ts` memvalidasi `x-session-token` dengan mencari hash token yang belum dicabut dan belum kedaluwarsa, lalu mengembalikan `user_id`. Helper ini dipakai oleh fungsi terlindungi `sync-push`, `sync-pull`, dan `ai`.
 
 Respons: `{ "ok": true }`.
 
@@ -404,7 +407,7 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 ## 11. Pengujian
 
 - **Tes unit wajib:** `buildHashInput` dan `sha256` memakai vektor uji di `DATA_MODEL.md` bagian 5.7 (Flutter **dan** Edge Function). Hitung stok, pengaturan terbaik, total air, dan konversi zona waktu.
-- **Tes auth server wajib:** register unik, hash PBKDF2 dan verifikasi, session kedaluwarsa/dicabut, serta kegagalan login ke-5 dalam jendela 15 menit.
+- **Tes auth server wajib:** register unik, hash PBKDF2 dan verifikasi, session kedaluwarsa/dicabut, lima kegagalan login menghasilkan `401`, serta permintaan berikutnya dalam jendela 15 menit menghasilkan `429`.
 - **Tes sinkronisasi wajib:** pull penuh, prefix lokal, prefix server, rantai sama, rantai bercabang, dan pemulihan ulang dengan data pending.
 - **Uji manual di HP asli:** biometrik, sensor, notifikasi (jadwalkan 2 menit ke depan), lokasi, foto profil, sinkronisasi (nyalakan dan matikan internet).
 - **Uji tamper:** ubah satu nilai langsung di database, lalu verifikasi integritas harus menyatakan rantai putus.

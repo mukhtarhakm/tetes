@@ -18,7 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-18: Fitur 01 sisi server langkah 1-2 siap diuji. Migrasi auth membuat tabel `users`, `sessions`, dan `login_attempts` dengan RLS aktif tanpa policy. `auth-register` memakai `Deno.serve`, Web Crypto PBKDF2-HMAC-SHA256 600.000 iterasi, salt 16 byte, hash 32 byte, session 7 hari, validasi server, serta pemetaan username duplikat ke `409`. Lama hash dicatat tanpa data sensitif dan hanya dikembalikan sebagai `duration_ms` bila header `x-debug-timing: 1` dikirim. Belum diterapkan ke database atau dideploy; berikutnya uji melalui Supabase CLI dan curl.
+2026-10-18: Fitur 01 sisi server langkah 3 siap diuji. Migrasi baru menambahkan RPC atomik `increment_login_attempt(p_username, p_window_start)` khusus service role. `auth-login` memeriksa batas sebelum PBKDF2, memberi lima respons `401` lalu `429`, menjalankan PBKDF2 pura-pura untuk username yang tidak ada, memakai perbandingan waktu-konstan, dan membuat session 7 hari saat berhasil. `auth-logout` mencabut session secara idempoten, sedangkan `_shared/session.ts` menyiapkan validasi session bagi fungsi sinkronisasi dan AI. Belum dilakukan `db push` atau deploy; pengujian dilakukan melalui Supabase CLI dan curl.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)

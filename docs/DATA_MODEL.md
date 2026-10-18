@@ -375,7 +375,8 @@ CREATE TABLE ai_usage (
 Aturan `login_attempts`:
 - `window_start` dibulatkan ke awal jendela 15 menit.
 - Hitung percobaan berdasarkan username input meskipun username tidak terdaftar.
-- Percobaan gagal ke-5 dalam jendela ditolak dengan `429` dan sisa waktu tunggu.
+- Lima percobaan gagal pertama dalam jendela masing-masing menghasilkan `401`; permintaan berikutnya ditolak dengan `429` dan `details.retry_after_s` sebelum PBKDF2 dijalankan.
+- Kenaikan `attempt_count` dilakukan atomik melalui RPC `increment_login_attempt(p_username, p_window_start)` dengan `INSERT ... ON CONFLICT DO UPDATE`; hak eksekusi hanya diberikan kepada service role.
 - Login berhasil menghapus baris untuk `(username, window_start)` tersebut.
 - Pesan kredensial gagal selalu "Username atau password salah".
 
