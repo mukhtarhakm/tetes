@@ -13,9 +13,10 @@ Catat keputusan yang sudah diambil agar tidak diperdebatkan ulang. Format: tangg
 | (awal) | Ambang stok menipis default 15 g | Satu kali seduh sekitar 15 g |
 | (awal) | Stok dihitung (initial_stock_g dikurangi seduhan aktif), tidak disimpan | Konsisten saat seduhan dibatalkan |
 | (awal) | Sinkronisasi v1 hanya push | Hemat waktu, cukup untuk persyaratan |
-| (awal) | Saran & Kesan dan Logout sementara di Profil | Menunggu jawaban dosen |
+| (awal) | Saran & Kesan dan Logout sementara di Profil | Keputusan sementara sebelum bunyi slide diterapkan; digantikan keputusan 2026-10-18 |
 | (awal) | State management: Riverpod | Pilih satu di Sprint 1, jangan dicampur |
 | (UI) | Gaya UI: bersih, sejuk, kartu bersudut sangat membulat, aksen cyan dan mint, kontras hitam | Satu gaya konsisten dari referensi. Tema dibuat sekali di Sprint 1 |
 | (UI) | Font Plus Jakarta Sans dikemas di aset (Zona Pro dari referensi mungkin berbayar) | Offline-first, tanpa paket tambahan, gaya serupa |
 | (UI) | Tema dasar terang. Layar fokus (Sesi, Game) gelap lewat override tema lokal | Angka besar terbaca saat menuang. Tidak ada mode gelap sistem |
 | (UI) | Teks di atas cyan dan mint selalu hitam | Cyan terlalu terang untuk teks putih |
+| 2026-10-18 | Bottom navigation berisi Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, dan Logout | Mengikuti bunyi slide tugas: Saran & Kesan menjadi tab sendiri, Profil tetap memuat foto, dan Logout menjadi aksi konfirmasi tanpa layar |

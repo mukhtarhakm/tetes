@@ -2,7 +2,7 @@
 
 **Sprint:** 1
 **Tujuan:** pengguna dapat mendaftar, login, tetap masuk lewat session, membuka aplikasi dengan biometrik, dan logout.
-**FR terkait:** FR-AUTH-01 sampai FR-AUTH-07, FR-PROF-04 (logout)
+**FR terkait:** FR-AUTH-01 sampai FR-AUTH-07, NAV (aksi logout)
 **Dokumen wajib dibaca:** ARCHITECTURE.md (bagian 4, 9, 10), DATA_MODEL.md (users, settings)
 
 ## Layar
@@ -10,7 +10,7 @@
 **Login:** kolom username dan password, tombol Masuk, tautan ke Register, indikator memuat. Pesan galat umum.
 **Gerbang biometrik:** muncul saat membuka aplikasi bila biometrik aktif dan session masih valid. Tombol "Pakai password".
 **Tawaran biometrik:** dialog setelah login pertama berhasil: "Aktifkan biometrik?" (Ya, Nanti).
-**Logout:** tombol di Profil (tempat sementara). Konfirmasi singkat lalu kembali ke Login.
+**Logout:** aksi pada item Logout di bottom navigation. Item membuka dialog konfirmasi, lalu menghapus session dan kembali ke Login. Logout bukan layar dan tidak menjadi tab aktif.
 
 ## Data
 - Tabel `users` dan `settings` (`biometric_enabled`).

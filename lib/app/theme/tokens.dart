@@ -38,7 +38,7 @@ abstract final class AppRadius {
 
 abstract final class AppSizes {
   static const minimumTouchTarget = 48.0;
-  static const bottomNavigationHeight = 64.0;
+  static const bottomNavigationHeight = 76.0;
   static const navigationIcon = 24.0;
   static const buttonProgress = 20.0;
   static const stateIcon = 28.0;
@@ -61,13 +61,10 @@ abstract final class AppInsets {
   static const button = EdgeInsets.symmetric(horizontal: AppSpacing.s24);
   static const dialog = EdgeInsets.all(AppSpacing.s24);
   static const bottomNavigation = EdgeInsets.symmetric(
-    horizontal: AppSpacing.s12,
+    horizontal: AppSpacing.s4,
     vertical: AppSpacing.s8,
   );
-  static const bottomNavigationItem = EdgeInsets.symmetric(
-    horizontal: AppSpacing.s12,
-    vertical: AppSpacing.s8,
-  );
+  static const bottomNavigationItem = EdgeInsets.all(AppSpacing.s4);
 }
 
 abstract final class AppShadows {

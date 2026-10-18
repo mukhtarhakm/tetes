@@ -41,14 +41,19 @@
 - **Pengaturan:** toggle biometrik, pengingat seduh (aktif, jam, hari), ambang stok menipis (default 15 g).
 - **Data:** tombol "Sinkronkan sekarang" dan status terakhir sinkron (dari Fitur 05).
 - **Keamanan:** tombol "Verifikasi Integritas Jurnal" menampilkan "utuh (N entri)" atau "rantai putus di entri ke-K".
-- **Saran & Kesan** dan **Logout**: ditempatkan sesuai jawaban dosen. Sementara di dalam Profil. Jika dosen meminta terpisah di bottom navigation, tambahkan tab dan jangan ubah struktur data.
 
 ## Bagian C: Saran & Kesan
+- Menjadi layar tab sendiri di bottom navigation, terpisah dari Profil.
 - Dua kolom teks: saran dan kesan untuk mata kuliah Pemrograman Aplikasi Mobile. Tombol Kirim. Riwayat kiriman di bawahnya.
 - Disimpan di `feedback`, ikut sinkronisasi.
 - Kolom tidak boleh dikirim kosong (minimal salah satu terisi).
 
-## Bagian D: Perapian
+## Bagian D: Logout
+- Logout adalah aksi item bottom navigation, bukan layar dan bukan isi Profil.
+- Ketuk Logout membuka dialog konfirmasi. Setelah dikonfirmasi, mekanisme Fitur 01 menghapus session dan kembali ke Login.
+- Membatalkan dialog mempertahankan tab yang sebelumnya aktif.
+
+## Bagian E: Perapian
 - Pembatasan percobaan login (FR-AUTH-07) bila belum ada dari Fitur 01.
 - Pesan galat dan keadaan kosong di semua layar diperiksa.
 - Konsistensi tema dan komponen.
@@ -89,5 +94,6 @@ Mainkan level 1-3 dengan sensitivitas berbeda, ganti foto dari kamera dan galeri
 3. Skor tersimpan dan pemilihan level. Berhenti.
 4. Level 2 dan 3, sensitivitas, dan kalibrasi (bila waktu). Berhenti.
 5. Layar Profil dan foto. Berhenti.
-6. Pengaturan, verifikasi integritas, dan Saran & Kesan. Berhenti.
-7. Perapian. Berhenti.
+6. Pengaturan dan verifikasi integritas. Berhenti.
+7. Tab Saran & Kesan dan penyambungan aksi Logout. Berhenti.
+8. Perapian. Berhenti.

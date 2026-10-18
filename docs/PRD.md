@@ -157,8 +157,10 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 - **S** Level 2 dan 3, kalibrasi dan sensitivitas.
 
 ### Profil (PROF) dan navigasi (NAV)
-- **M** Bottom navigation: Seduh, Jurnal, Eksplor, Profil.
-- **M** Foto profil, pengaturan, Saran & Kesan, verifikasi integritas, sinkronkan sekarang, logout.
+- **M** Bottom navigation: Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, Logout.
+- **M** Profil: foto profil, pengaturan, verifikasi integritas, dan sinkronkan sekarang.
+- **M** Saran & Kesan menjadi layar tab sendiri untuk mengirim dan melihat riwayat masukan.
+- **M** Logout menjadi aksi di bottom navigation yang meminta konfirmasi, bukan layar tersendiri.
 
 ## 8. Pemenuhan Requirement Tugas
 
@@ -170,7 +172,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 | Penyimpanan lokal dan online | SQLite + Supabase Postgres |
 | Web service/API | Edge Function sendiri + API kurs |
 | LBS terkait tema | LBS: toko biji dan alat seduh |
-| Bottom navigation: profil (ada gambar), saran dan kesan, logout | NAV dan PROF |
+| Bottom navigation: profil (ada gambar), saran dan kesan, logout | NAV: enam item; Profil dan Saran & Kesan berupa layar, Logout berupa aksi konfirmasi |
 | Konversi mata uang (min. 3) | CUR: harga biji impor |
 | Konversi waktu (WIB, WIT, WITA, London) | EVT: agenda event |
 | Min. 2 sensor | Accelerometer (goyang timer) dan gyroscope (game) |
@@ -239,12 +241,11 @@ Aplikasi dianggap berhasil jika:
 1. Apakah aplikasi pelatih dan jurnal seduh V60, tanpa katalog resep, berbagi resep, dan pencari kedai, dianggap berbeda dari tema resep dan pencari kedai kopi?
 2. Apakah login boleh sepenuhnya lokal (hash + salt, session)?
 3. Apakah boleh memakai Supabase (database dan Edge Function) untuk bagian online?
-4. Apakah Saran & Kesan dan Logout boleh berada di dalam Profil, atau harus menjadi menu terpisah di bottom navigation? (Saat ini ditempatkan di Profil. Jika harus terpisah, tambahkan tab baru; struktur data tidak berubah.)
+4. **Sudah diputuskan mengikuti bunyi slide:** Saran & Kesan menjadi tab sendiri dan Logout menjadi aksi di bottom navigation; Profil tetap menjadi tab dengan foto pengguna. Keputusan ini tetap boleh dikonfirmasi kepada dosen untuk memastikan interpretasinya tepat.
 
 **Keputusan yang masih menunggu**
 - Nama dan tagline: **Tetes**, "Jurnal seduh V60" (belum dicek kemiripannya di toko aplikasi).
 - Package ID: `com.raismukhtar.tetes` (ditetapkan oleh Rais Mukhtar Hakim; jangan diubah setelah Sprint 1 dimulai).
-- Penempatan Saran & Kesan dan Logout: mengikuti jawaban dosen (pertanyaan 4). Sementara di dalam Profil.
 - Gaya UI: menunggu referensi dan style guide (`UI_SPEC.md`).
 
 ## 13. Laporan

@@ -7,7 +7,7 @@
 
 ## Layar
 - **Splash:** logo atau nama Tetes, memeriksa session, lalu mengarah ke Login atau Beranda.
-- **Beranda dengan bottom navigation:** 4 tab, yaitu Seduh, Jurnal, Eksplor, Profil. Tiap tab untuk saat ini berisi layar kosong dengan judul dan keadaan "belum ada isi".
+- **Beranda dengan bottom navigation:** 6 item, yaitu Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, dan Logout. Lima item pertama untuk saat ini berisi layar kosong dengan judul dan keadaan "belum ada isi". Logout adalah aksi dialog, bukan layar, dan tidak mengubah tab aktif.
 
 ## Data
 - Buka database SQLite dengan `PRAGMA user_version` dan migrasi bernomor.
@@ -17,7 +17,7 @@
 ## Alur
 1. Setup proyek dengan package ID `com.raismukhtar.tetes`, nama tampilan "Tetes".
 2. Buat tema dari UI_SPEC.md (warna, tipografi, bentuk) dan komponen bersama dasar: tombol, kartu, kolom isian, dialog, indikator memuat, tampilan kosong, tampilan galat.
-3. Router dan bottom navigation 4 tab.
+3. Router dan bottom navigation 6 item: 5 layar tab dalam `IndexedStack` dan 1 aksi Logout.
 4. Database dan migrasi.
 5. Konfigurasi state management (Riverpod) dan struktur folder sesuai ARCHITECTURE.md bagian 3.
 
@@ -37,12 +37,12 @@
 - [ ] Aplikasi berjalan di HP asli dengan nama "Tetes" dan package ID yang benar
 - [ ] `flutter analyze` bersih
 - [ ] Tema dipakai oleh semua layar. Mengubah satu warna di tema mengubah seluruh aplikasi
-- [ ] Bottom navigation berpindah antar 4 tab tanpa error
+- [ ] Bottom navigation berpindah antar 5 layar tab tanpa error; Logout membuka dialog tanpa mengubah tab aktif
 - [ ] Database terbuat dengan semua tabel (cek lewat alat inspeksi atau log)
 - [ ] Menutup dan membuka aplikasi tidak mereset database
 
 ## Cara uji
-Jalankan di HP, pindah tab, tutup dan buka lagi. Cek tabel di database lewat inspeksi.
+Jalankan di HP, pindah tab, buka dan tutup dialog Logout, tutup dan buka lagi aplikasi. Cek tabel di database lewat inspeksi.
 
 ## Langkah pengerjaan yang disarankan
 1. Proyek kosong berjalan di HP. Berhenti.

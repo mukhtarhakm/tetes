@@ -82,7 +82,7 @@ Semua layar wajib memakai komponen ini. Tambah komponen baru di sini, jangan mem
 | `AppCard` | Putih, radius 24, bayangan kartu. Varian `featured` (hitam, teks putih), `tinted` (`primaryContainer`) |
 | `AppChip` | Pil. Tidak terpilih: `background` (terang) atau `chipDark` (gelap). Terpilih: `primary`, teks hitam. Dipakai untuk tag rasa, grind, filter, jenis toko |
 | `AppTextField` | Pil untuk pencarian (dengan ikon), radius 16 untuk isian biasa. Label di atas, galat di bawah dalam `error` |
-| `AppBottomNav` | Putih, 4 item. Item aktif: ikon + label di dalam kotak `primaryContainer` radius 16. Item lain: ikon saja berwarna `inkSoft` |
+| `AppBottomNav` | Putih, 6 item: Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, Logout. Item aktif: ikon di atas label maksimal dua baris, di dalam kotak `primaryContainer` radius 16. Item lain: ikon saja berwarna `inkSoft`. Area sentuh tiap item minimal 48 × 48 dan seluruh bar menghormati safe area bawah. Logout adalah aksi dialog dan tidak pernah menjadi item aktif |
 | `AppListRow` | Baris dalam kartu putih: ikon, judul, chevron. Pemisah `divider` dengan inset |
 | `SegmentProgress` | Batang bersegmen di atas layar (satu segmen per tahap seduh atau langkah) |
 | `ScoreChart` | Garis `primary` tebal 2.5, isian gradien `primary` 25% ke transparan, garis bantu putus-putus `divider`, gelembung keterangan pada titik terpilih |
@@ -123,7 +123,9 @@ Deskripsi bentuk. Isi dan alur ada di spec fitur.
 | **Agenda event** | Kartu event dengan empat jam (WIB, WITA, WIT, London) sebagai baris kecil |
 | **Peta toko** | Peta penuh lebar, daftar di bottom sheet yang bisa ditarik, chip filter jenis toko |
 | **Game (layar gelap)** | Zona hijau `accent`, titik aliran putih, bar air `primary`, angka waktu `display` |
-| **Profil** | Avatar besar di tengah, nama, `ScoreChart` ringkas bila ada data, kartu daftar pengaturan (`AppListRow`), tombol keluar dan Saran & Kesan |
+| **Saran & Kesan** | Layar tab sendiri: dua kolom teks untuk saran dan kesan, tombol Kirim, lalu riwayat kiriman |
+| **Profil** | Avatar besar di tengah, nama, `ScoreChart` ringkas bila ada data, dan kartu daftar pengaturan (`AppListRow`). Tidak memuat Saran & Kesan atau Logout |
+| **Logout (aksi navigasi)** | Tidak memiliki layar. Ketuk item membuka `AppDialog` konfirmasi; menutup dialog mengembalikan pengguna ke tab aktif sebelumnya |
 
 ## 9. Gerak dan Umpan Balik
 

@@ -6,7 +6,7 @@ Perbarui di akhir setiap sesi.
 
 | Sprint | Fokus | Spec | Status | Catatan |
 |---|---|---|---|---|
-| 1 | Fondasi, login lokal, biometrik, navigasi | 00, 01 | Sedang jalan | Langkah 1-3 Fitur 00 selesai: proyek, tema, komponen dasar, router, dan bottom navigation |
+| 1 | Fondasi, login lokal, biometrik, navigasi | 00, 01 | Sedang jalan | Langkah 1-3 Fitur 00 selesai; navigasi disesuaikan menjadi 5 layar tab dan 1 aksi Logout |
 | 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Belum mulai | |
 | 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Belum mulai | |
 | 4 | Jurnal | 04 | Belum mulai | |
@@ -18,7 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-18: Fitur 00 Langkah 3 selesai. Navigator bawaan, `IndexedStack`, dan bottom navigation empat tab sudah dibuat; `flutter analyze` bersih. Berikutnya: Langkah 4, database dan migrasi. Riverpod dan struktur folder Langkah 5 dikerjakan terpisah setelah Langkah 4.
+2026-10-18: Penyesuaian Fitur 00 Langkah 3 selesai. Bottom navigation kini memuat Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, dan aksi Logout; `IndexedStack` menyimpan lima layar tab dan Logout tidak mengubah tab aktif. Berikutnya: Langkah 4, database dan migrasi. Riverpod dan struktur folder Langkah 5 dikerjakan terpisah setelah Langkah 4.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)
@@ -27,7 +27,7 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - [ ] Tema (V60 pelatih/jurnal vs Brewmaster)
 - [ ] Login lokal diperbolehkan
 - [ ] Supabase diperbolehkan untuk bagian online
-- [ ] Penempatan Saran & Kesan dan Logout di bottom navigation
+- [x] Penempatan Saran & Kesan dan Logout di bottom navigation: diputuskan mengikuti bunyi slide, tetap boleh dikonfirmasi kepada dosen
 
 ## Daftar tangkapan layar untuk laporan
 (centang setelah diambil: login, biji, atur seduh, sesi, hasil, jurnal, bandingkan, verifikasi, event, peta, game, profil)

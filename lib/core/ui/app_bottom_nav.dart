@@ -35,13 +35,23 @@ class AppBottomNav extends StatelessWidget {
             child: Row(
               children: [
                 for (var index = 0; index < items.length; index++)
-                  Expanded(
-                    child: _NavigationItem(
-                      item: items[index],
-                      isSelected: index == currentIndex,
-                      onTap: () => onTap(index),
+                  if (index == currentIndex)
+                    Expanded(
+                      child: _NavigationItem(
+                        item: items[index],
+                        isSelected: true,
+                        onTap: () => onTap(index),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: AppSizes.minimumTouchTarget,
+                      child: _NavigationItem(
+                        item: items[index],
+                        isSelected: false,
+                        onTap: () => onTap(index),
+                      ),
                     ),
-                  ),
               ],
             ),
           ),
@@ -88,7 +98,7 @@ class _NavigationItem extends StatelessWidget {
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.navigation),
             ),
-            child: Row(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -98,12 +108,13 @@ class _NavigationItem extends StatelessWidget {
                   color: foregroundColor,
                 ),
                 if (isSelected) ...[
-                  const SizedBox(width: AppSpacing.s8),
+                  const SizedBox(height: AppSpacing.s4),
                   Flexible(
                     child: Text(
                       item.label,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       style: Theme.of(
                         context,
                       ).textTheme.labelLarge?.copyWith(color: foregroundColor),
