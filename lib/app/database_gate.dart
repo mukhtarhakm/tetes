@@ -1,64 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/ui/state_views.dart';
-import '../data/db/app_database.dart';
+import '../data/db/database_provider.dart';
 import 'theme/tokens.dart';
 
-class DatabaseGate extends StatefulWidget {
+class DatabaseGate extends ConsumerWidget {
   const DatabaseGate({required this.child, super.key});
 
   final Widget child;
 
   @override
-  State<DatabaseGate> createState() => _DatabaseGateState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final database = ref.watch(databaseProvider);
 
-class _DatabaseGateState extends State<DatabaseGate> {
-  late Future<void> _opening;
-
-  @override
-  void initState() {
-    super.initState();
-    _opening = _openDatabase();
-  }
-
-  Future<void> _openDatabase() async {
-    await AppDatabase.instance.open();
-  }
-
-  void _retry() {
-    setState(() {
-      _opening = _openDatabase();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _opening,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: LoadingView(message: 'Menyiapkan data...'),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Scaffold(
-            body: SafeArea(
-              child: Padding(
-                padding: AppInsets.screen,
-                child: ErrorView(
-                  message: 'Database tidak dapat dibuka. Silakan coba lagi.',
-                  onRetry: _retry,
-                ),
-              ),
+    return database.when(
+      loading: () =>
+          const Scaffold(body: LoadingView(message: 'Menyiapkan data...')),
+      error: (_, _) => Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: AppInsets.screen,
+            child: ErrorView(
+              message: 'Database tidak dapat dibuka. Silakan coba lagi.',
+              onRetry: () => ref.invalidate(databaseProvider),
             ),
-          );
-        }
-
-        return widget.child;
-      },
+          ),
+        ),
+      ),
+      data: (_) => child,
     );
   }
 }

@@ -414,7 +414,7 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 |---|---|
 | Versi Flutter / Dart | Flutter 3.44.8 / Dart 3.12.2 |
 | Package ID | `com.raismukhtar.tetes` |
-| Versi paket utama | `sqflite` 2.4.4+2, `path` 1.9.1; tes database: `sqflite_common_ffi` 2.4.4 |
+| Versi paket utama | `flutter_riverpod` 3.4.3, `sqflite` 2.4.4+2, `path` 1.9.1; tes database: `sqflite_common_ffi` 2.4.4 |
 | URL proyek Supabase | (isi, bukan rahasia) |
 | Model LLM | (isi dari AI Studio, disimpan sebagai environment `AI_MODEL`) |
 | API kurs | (isi setelah diuji) |

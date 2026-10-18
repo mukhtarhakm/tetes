@@ -11,13 +11,29 @@ class AppDatabase {
   static const databaseName = 'tetes.db';
 
   Database? _database;
+  Future<Database>? _opening;
 
-  Future<Database> open() async {
+  Future<Database> open() {
     final existingDatabase = _database;
     if (existingDatabase != null && existingDatabase.isOpen) {
-      return existingDatabase;
+      return Future.value(existingDatabase);
     }
 
+    final existingOpening = _opening;
+    if (existingOpening != null) {
+      return existingOpening;
+    }
+
+    final opening = _openDatabase();
+    _opening = opening;
+    return opening.whenComplete(() {
+      if (identical(_opening, opening)) {
+        _opening = null;
+      }
+    });
+  }
+
+  Future<Database> _openDatabase() async {
     final databasePath = path.join(await getDatabasesPath(), databaseName);
     final database = await openDatabase(
       databasePath,
