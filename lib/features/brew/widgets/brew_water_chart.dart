@@ -1,0 +1,109 @@
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+
+import '../../../app/theme/tokens.dart';
+import '../brew_plan.dart';
+
+class BrewWaterChart extends StatelessWidget {
+  const BrewWaterChart({required this.plan, super.key});
+
+  final BrewPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Air kumulatif terhadap waktu',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: AppSpacing.s4),
+        Text(
+          '${_formatNumber(plan.totalWaterG)} g dalam ${plan.totalTimeSeconds} detik',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+        ),
+        const SizedBox(height: AppSpacing.s16),
+        SizedBox(
+          height: AppSizes.statePreviewHeight,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: plan.totalTimeSeconds.toDouble(),
+              minY: 0,
+              maxY: plan.totalWaterG,
+              gridData: FlGridData(
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => const FlLine(
+                  color: AppColors.divider,
+                  strokeWidth: AppSizes.progressStroke,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: AxisTitles(
+                  axisNameWidget: Text(
+                    'Waktu (detik)',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  sideTitles: const SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  axisNameWidget: Text(
+                    'Air (g)',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  sideTitles: const SideTitles(showTitles: false),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: _spots(),
+                  isCurved: false,
+                  color: AppColors.primary,
+                  barWidth: AppSizes.progressStroke,
+                  dotData: const FlDotData(show: false),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<FlSpot> _spots() {
+    final spots = <FlSpot>[const FlSpot(0, 0)];
+    var cumulativeWater = 0.0;
+    for (final stage in plan.stages) {
+      if (spots.last.x != stage.startSeconds.toDouble()) {
+        spots.add(FlSpot(stage.startSeconds.toDouble(), cumulativeWater));
+      }
+      cumulativeWater += stage.targetPourG;
+      spots.add(FlSpot(stage.endSeconds.toDouble(), cumulativeWater));
+      if (stage.gapAfterSeconds > 0) {
+        spots.add(
+          FlSpot(
+            (stage.endSeconds + stage.gapAfterSeconds).toDouble(),
+            cumulativeWater,
+          ),
+        );
+      }
+    }
+    return spots;
+  }
+}
+
+String _formatNumber(double value) {
+  return value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(1);
+}

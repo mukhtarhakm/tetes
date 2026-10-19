@@ -9,6 +9,7 @@ import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
 import '../bean_model.dart';
 import '../state/bean_providers.dart';
+import '../../brew/screens/brew_setup_screen.dart';
 import 'bean_detail_screen.dart';
 import 'bean_form_screen.dart';
 
@@ -36,8 +37,15 @@ class BeanListScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.s20),
             AppButton(
+              label: 'Mulai seduh',
+              icon: Icons.play_arrow_rounded,
+              onPressed: () => _openBrewSetup(context),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            AppButton(
               label: 'Tambah biji',
               icon: Icons.add_rounded,
+              variant: AppButtonVariant.secondary,
               onPressed: () => _openForm(context),
             ),
             const SizedBox(height: AppSpacing.s20),
@@ -92,6 +100,12 @@ class BeanListScreen extends ConsumerWidget {
           const SnackBar(content: Text('Biji berhasil disimpan.')),
         );
     }
+  }
+
+  Future<void> _openBrewSetup(BuildContext context) async {
+    await Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute(builder: (_) => const BrewSetupScreen()));
   }
 
   Future<void> _openDetail(BuildContext context, String beanId) async {

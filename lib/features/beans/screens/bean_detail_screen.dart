@@ -11,6 +11,7 @@ import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
 import '../bean_model.dart';
 import '../state/bean_providers.dart';
+import '../../brew/screens/brew_setup_screen.dart';
 import 'bean_form_screen.dart';
 
 class BeanDetailScreen extends ConsumerWidget {
@@ -181,9 +182,13 @@ class _BeanDetailContent extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: AppSpacing.s16),
-              const AppButton(
+              AppButton(
                 label: 'Seduh dengan ini',
-                onPressed: null,
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => BrewSetupScreen(initialBeanId: bean.id),
+                  ),
+                ),
                 icon: Icons.coffee_rounded,
               ),
             ],

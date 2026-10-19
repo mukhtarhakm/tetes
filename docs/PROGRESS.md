@@ -7,7 +7,7 @@ Perbarui di akhir setiap sesi.
 | Sprint | Fokus | Spec | Status | Catatan |
 |---|---|---|---|---|
 | 1 | Fondasi, login online buatan sendiri, biometrik, navigasi | 00, 01 | Selesai | Fitur 00 selesai. Fitur 01: server (register, login, logout, pembatasan percobaan) dan Flutter (register, login, session, guard, logout, biometrik) sudah diimplementasikan. Fitur 01 lolos uji di HP  |
-| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Fitur 02 tanpa kurs diperbarui dengan ukuran kemasan, proses khusus, dan tag buatan sendiri |
+| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Fitur 02 dan implementasi Fitur 03 bagian A selesai; Atur Seduh menunggu uji manual di HP |
 | 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Belum mulai | |
 | 4 | Jurnal | 04 | Belum mulai | |
 | 5 | Sinkronisasi dan AI | 05 | Belum mulai | |
@@ -18,6 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
+2026-10-19: Fitur 03 Sesi A diimplementasikan: kalkulator dan validasi rencana seduh murni, pengeditan tahap dengan sisa otomatis, pembacaan pengaturan terbaik secara hanya-baca, layar Atur Seduh dengan empat keadaan, timeline, grafik air kumulatif, placeholder sesi, serta pintu masuk dari tab Seduh dan detail biji. Seluruh 90 tes lulus dan `flutter analyze` bersih; uji manual di HP belum dilakukan.
 2026-10-19: Fitur 02 Sesi B selesai: kurs IDR/asing, cache per mata uang, fallback offline, pratinjau rupiah, preservasi kurs saat input harga tidak berubah, dan detail harga rupiah telah diimplementasikan; seluruh 71 tes lulus dan `flutter analyze` bersih.
 2026-10-19: `AppChip` kini mengikuti lebar isi sehingga kelompok chip tersusun berdampingan, dan mata uang pada form biji memakai dropdown pil sejajar dengan harga kemasan.
 2026-10-19: Tampilan `AppChip` diperjelas dengan latar `surface` dan garis `divider` pada chip terang yang tidak aktif; seluruh kelompok chip form biji memakai `Wrap` dan jarak token tanpa memotong teks.
