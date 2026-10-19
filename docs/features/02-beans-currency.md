@@ -25,6 +25,26 @@ Tombol Simpan dan Batal.
 - Kurs: pilih mata uang minimal IDR, USD, EUR, JPY. Panggil API kurs, hitung `price_idr_per_kg`, simpan `fx_rate` dan `fx_date`. Simpan juga cache kurs terakhir di `settings.fx_cache`.
 - Biji yang sudah punya seduhan tidak boleh dihapus, hanya diarsipkan (`archived = 1`).
 
+## API kurs (hasil uji manual 2026-10-19)
+Alamat dasar (satu konstanta di lib/core/config/app_config.dart):
+https://api.frankfurter.dev/v1
+
+Permintaan: GET /latest?base=USD&symbols=IDR,EUR,JPY
+Parameter memakai `base` dan `symbols` (bukan from dan to).
+
+Contoh respons asli:
+
+```json
+{"amount":1.0,"base":"USD","date":"2026-10-16","rates":{"EUR":0.88865,"IDR":18031,"JPY":158.02}}
+```
+
+Catatan:
+- `rates["IDR"]` berarti 1 unit mata uang `base` = nilai itu rupiah. Untuk base selain USD, ganti `base` (contoh base=EUR&symbols=IDR). Jika mata uang asal sudah IDR, tidak perlu memanggil API.
+- Kurs referensi harian hari kerja (tanggal bisa hari Jumat saat akhir pekan), bukan kurs jual-beli.
+- Parser harus tahan banting: jika `rates` tidak memuat mata uang yang diminta, atau respons rusak atau bukan JSON, tampilkan galat jelas, bukan crash.
+- Jangan menebak alamat atau bentuk respons dari ingatan. Gunakan contoh di atas.
+- Simpan contoh ini sebagai data uji (fixture) untuk tes parser.
+
 ## Alur
 Tambah biji, isi form, pilih mata uang asing, aplikasi mengambil kurs dan menampilkan hasil rupiah, simpan. Ubah biji tidak mengubah `fx_rate` lama kecuali pengguna mengubah harga atau mata uang.
 
