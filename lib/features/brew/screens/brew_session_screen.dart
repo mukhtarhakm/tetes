@@ -1,18 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
-import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/state_views.dart';
 import '../brew_calculator.dart';
 import '../brew_plan.dart';
 import '../services/brew_session_hardware.dart';
+import '../services/brew_stage_feedback.dart';
 import '../state/brew_session_controller.dart';
+import '../widgets/brew_stage_colors.dart';
 import 'brew_result_placeholder_screen.dart';
 
 const sessionUiRefreshInterval = Duration(milliseconds: 200);
@@ -25,6 +25,7 @@ class BrewSessionScreen extends StatefulWidget {
     this.timeSource,
     this.shakeDetector,
     this.wakeLock,
+    this.feedback,
     super.key,
   });
 
@@ -32,16 +33,19 @@ class BrewSessionScreen extends StatefulWidget {
   final ElapsedTimeSource? timeSource;
   final BrewShakeDetector? shakeDetector;
   final BrewWakeLock? wakeLock;
+  final BrewStageFeedback? feedback;
 
   @override
   State<BrewSessionScreen> createState() => _BrewSessionScreenState();
 }
 
-class _BrewSessionScreenState extends State<BrewSessionScreen> {
+class _BrewSessionScreenState extends State<BrewSessionScreen>
+    with WidgetsBindingObserver {
   _SessionScreenState _screenState = _SessionScreenState.loading;
   BrewSessionController? _controller;
   BrewShakeDetector? _shakeDetector;
   late final BrewWakeLock _wakeLock;
+  late final BrewStageFeedback _feedback;
   Timer? _uiTimer;
   String? _hardwareWarning;
   bool _cancelDialogOpen = false;
@@ -50,16 +54,27 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _wakeLock = widget.wakeLock ?? const SystemBrewWakeLock();
+    _feedback = widget.feedback ?? BrewStageFeedback();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _uiTimer?.cancel();
+    _feedback.dispose();
     unawaited(_shakeDetector?.dispose());
     unawaited(_wakeLock.disable());
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshRunningSession();
+    }
   }
 
   @override
@@ -110,6 +125,10 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
     final activeStage = controller.activeStage;
     final running = controller.status == BrewSessionStatus.running;
     final isLast = controller.activeStageIndex == plan.stages.length - 1;
+    final activeStageColor = BrewStageColors.forPosition(activeStage.position);
+    final activeStageSoftColor = BrewStageColors.softForPosition(
+      activeStage.position,
+    );
     return ListView(
       padding: AppInsets.screen,
       children: [
@@ -118,7 +137,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
           const SizedBox(height: AppSpacing.s16),
         ],
         AppCard(
-          variant: AppCardVariant.tinted,
+          backgroundColor: activeStageColor,
           child: Column(
             children: [
               Text(
@@ -149,7 +168,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
         ),
         const SizedBox(height: AppSpacing.s16),
         AppCard(
-          variant: AppCardVariant.tinted,
+          backgroundColor: activeStageSoftColor,
           child: Row(
             children: [
               const Icon(Icons.timer_outlined),
@@ -174,16 +193,34 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
           child: Column(
             children: List.generate(plan.stages.length, (index) {
               final stage = plan.stages[index];
-              return Padding(
-                padding: EdgeInsets.only(
-                  bottom: index == plan.stages.length - 1 ? 0 : AppSpacing.s12,
+              final isActive = index == controller.activeStageIndex;
+              return AnimatedContainer(
+                duration: AppDurations.feedback,
+                margin: EdgeInsets.only(
+                  bottom: index == plan.stages.length - 1 ? 0 : AppSpacing.s8,
                 ),
+                padding: AppInsets.chip,
+                decoration: isActive
+                    ? BoxDecoration(
+                        color: activeStageColor,
+                        borderRadius: BorderRadius.circular(AppRadius.small),
+                      )
+                    : null,
                 child: Row(
                   children: [
+                    Container(
+                      width: AppSpacing.s12,
+                      height: AppSpacing.s12,
+                      decoration: BoxDecoration(
+                        color: BrewStageColors.forPosition(stage.position),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s12),
                     Expanded(
-                      child: AppChip(
-                        label: stage.name.label,
-                        selected: index == controller.activeStageIndex,
+                      child: Text(
+                        stage.name.label,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s12),
@@ -217,8 +254,10 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
           ),
         ] else
           AppButton(
-            label: isLast ? 'Air habis' : 'Tahap berikutnya',
-            icon: isLast ? Icons.water_drop_outlined : Icons.skip_next_rounded,
+            label: isLast ? 'Selesai' : 'Tahap berikutnya',
+            icon: isLast
+                ? Icons.check_circle_outline_rounded
+                : Icons.skip_next_rounded,
             onPressed: isLast ? _finishSession : _advanceStage,
           ),
         const SizedBox(height: AppSpacing.s8),
@@ -284,27 +323,42 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
     }
     unawaited(_shakeDetector?.dispose());
     unawaited(_enableWakeLock());
+    unawaited(_feedback.playTransition());
     _startUiTimer();
     setState(() {});
   }
 
   void _startUiTimer() {
     _uiTimer?.cancel();
-    _uiTimer = Timer.periodic(sessionUiRefreshInterval, (_) {
-      if (!mounted || _controller?.status != BrewSessionStatus.running) {
-        return;
-      }
-      if (_controller!.pollTarget() == BrewSessionAction.targetReached) {
-        _playCue();
-      }
-      setState(() {});
-    });
+    _uiTimer = Timer.periodic(
+      sessionUiRefreshInterval,
+      (_) => _refreshRunningSession(),
+    );
+  }
+
+  void _refreshRunningSession() {
+    if (!mounted || _controller?.status != BrewSessionStatus.running) {
+      return;
+    }
+    final action = _controller!.reconcile();
+    if (action == BrewSessionAction.stageAdvanced) {
+      unawaited(_feedback.playTransition());
+    } else if (action == BrewSessionAction.completed) {
+      _uiTimer?.cancel();
+      unawaited(_finishAndOpenResult());
+      return;
+    }
+    setState(() {});
   }
 
   void _advanceStage() {
-    if (_controller!.nextStage() == BrewSessionAction.stageAdvanced) {
-      _playCue();
+    final action = _controller!.nextStage();
+    if (action == BrewSessionAction.stageAdvanced) {
+      unawaited(_feedback.playTransition());
       setState(() {});
+    } else if (action == BrewSessionAction.completed) {
+      _uiTimer?.cancel();
+      unawaited(_finishAndOpenResult());
     }
   }
 
@@ -312,18 +366,21 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
     if (_controller!.finish() != BrewSessionAction.completed) {
       return;
     }
-    _playCue();
     _uiTimer?.cancel();
-    unawaited(_completeAndOpenResult());
+    unawaited(_finishAndOpenResult());
+  }
+
+  Future<void> _finishAndOpenResult() async {
+    if (_leavingScreen) {
+      return;
+    }
+    _leavingScreen = true;
+    await _feedback.playCompleted();
+    await _completeAndOpenResult();
   }
 
   Future<void> _completeAndOpenResult() async {
     await _disableWakeLock();
-    if (!mounted) {
-      return;
-    }
-    setState(() => _leavingScreen = true);
-    await WidgetsBinding.instance.endOfFrame;
     if (!mounted) {
       return;
     }
@@ -356,6 +413,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
       return;
     }
     _controller?.cancel();
+    _feedback.cancel();
     _uiTimer?.cancel();
     await _disableWakeLock();
     if (mounted) {
@@ -396,11 +454,6 @@ class _BrewSessionScreenState extends State<BrewSessionScreen> {
       setState(() => _hardwareWarning = message);
     }
   }
-
-  void _playCue() {
-    unawaited(HapticFeedback.mediumImpact());
-    unawaited(SystemSound.play(SystemSoundType.click));
-  }
 }
 
 String _stageStatus(BrewSessionController controller, int index) {
@@ -420,10 +473,7 @@ String _formatNumber(double value) {
 }
 
 String _formatCountdown(int seconds) {
-  if (seconds >= 0) {
-    return _formatTime(seconds);
-  }
-  return 'Lewat ${_formatTime(seconds.abs())}';
+  return _formatTime(seconds < 0 ? 0 : seconds);
 }
 
 String _formatTime(int totalSeconds) {

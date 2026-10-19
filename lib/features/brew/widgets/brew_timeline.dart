@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/tokens.dart';
 import '../brew_plan.dart';
+import 'brew_stage_colors.dart';
 
 class BrewTimeline extends StatelessWidget {
   const BrewTimeline({required this.plan, super.key});
@@ -22,15 +23,6 @@ class BrewTimeline extends StatelessWidget {
             child: Row(children: _segments(context)),
           ),
         ),
-        const SizedBox(height: AppSpacing.s8),
-        Wrap(
-          spacing: AppSpacing.s16,
-          runSpacing: AppSpacing.s8,
-          children: [
-            _Legend(color: AppColors.primary, label: 'Menuang'),
-            _Legend(color: AppColors.divider, label: 'Jeda'),
-          ],
-        ),
       ],
     );
   }
@@ -42,7 +34,7 @@ class BrewTimeline extends StatelessWidget {
         Expanded(
           flex: stage.durationSeconds,
           child: Container(
-            color: AppColors.primary,
+            color: BrewStageColors.forPosition(stage.position),
             alignment: Alignment.center,
             child: Text(
               stage.name.label,
@@ -54,41 +46,7 @@ class BrewTimeline extends StatelessWidget {
           ),
         ),
       );
-      if (stage.gapAfterSeconds > 0) {
-        segments.add(
-          Expanded(
-            flex: stage.gapAfterSeconds,
-            child: const ColoredBox(color: AppColors.divider),
-          ),
-        );
-      }
     }
     return segments;
-  }
-}
-
-class _Legend extends StatelessWidget {
-  const _Legend({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: AppSpacing.s12,
-          height: AppSpacing.s12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(AppRadius.small),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s8),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
   }
 }

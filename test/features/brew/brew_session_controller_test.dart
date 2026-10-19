@@ -15,58 +15,117 @@ void main() {
     );
   });
 
-  test('tahap berjalan berurutan sesuai rencana', () {
-    expect(controller.start(), BrewSessionAction.started);
-    time.seconds = 45;
-    expect(controller.nextStage(), BrewSessionAction.stageAdvanced);
-    expect(controller.activeStageIndex, 1);
-    expect(controller.activeStage.name.databaseValue, 'pouring_2');
-    time.seconds = 80;
-    expect(controller.nextStage(), BrewSessionAction.stageAdvanced);
-    expect(controller.activeStageIndex, 2);
-    expect(controller.activeStage.name.databaseValue, 'pouring_3');
-    expect(controller.actualStages[1]!.actualStartS, 45);
-    expect(controller.actualStages[1]!.actualDurationS, 35);
-  });
-
-  test('tombol berikutnya menutup durasi tahap sebelumnya', () {
+  test('pindah otomatis tepat saat hitung mundur nol', () {
     controller.start();
-    time.seconds = 47;
+    time.seconds = 39;
 
-    controller.nextStage();
+    expect(controller.reconcile(), BrewSessionAction.ignored);
+    expect(controller.activeStageIndex, 0);
 
+    time.seconds = 40;
+    expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
+    expect(controller.activeStageIndex, 1);
     expect(controller.actualStages[0]!.actualStartS, 0);
-    expect(controller.actualStages[0]!.actualDurationS, 47);
-    expect(controller.activeStageIndex, 1);
+    expect(controller.actualStages[0]!.actualDurationS, 40);
+    expect(controller.countdownSeconds, 30);
   });
 
-  test('Air habis mengisi drawdown dan total waktu', () {
+  test(
+    'tombol berikutnya menutup lebih awal dan menggeser tenggat berikutnya',
+    () {
+      controller.start();
+      time.seconds = 25;
+
+      expect(controller.nextStage(), BrewSessionAction.stageAdvanced);
+
+      expect(controller.actualStages[0]!.actualStartS, 0);
+      expect(controller.actualStages[0]!.actualDurationS, 25);
+      expect(controller.activeStageIndex, 1);
+      expect(controller.countdownSeconds, 30);
+
+      time.seconds = 54;
+      expect(controller.reconcile(), BrewSessionAction.ignored);
+      expect(controller.activeStageIndex, 1);
+
+      time.seconds = 55;
+      expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
+      expect(controller.activeStageIndex, 2);
+      expect(controller.actualStages[1]!.actualStartS, 25);
+      expect(controller.actualStages[1]!.actualDurationS, 30);
+    },
+  );
+
+  test('Selesai lebih awal mencatat total waktu dan drawdown null', () {
     controller.start();
-    time.seconds = 45;
+    time.seconds = 40;
     controller.nextStage();
-    time.seconds = 80;
+    time.seconds = 70;
     controller.nextStage();
-    time.seconds = 120;
+    time.seconds = 85;
 
     expect(controller.finish(), BrewSessionAction.completed);
 
     final result = controller.result!;
-    expect(result.totalTimeS, 120);
+    expect(result.totalTimeS, 85);
     expect(result.stages, hasLength(3));
-    expect(result.stages.last.actualStartS, 80);
-    expect(result.stages.last.actualDurationS, 40);
-    expect(result.stages.last.drawdownS, 10);
+    expect(result.stages.last.actualStartS, 70);
+    expect(result.stages.last.actualDurationS, 15);
+    expect(result.stages.every((stage) => stage.drawdownS == null), isTrue);
   });
 
-  test('countdown nol memberi tanda tanpa mengganti tahap', () {
+  test('tahap terakhir menyelesaikan sesi otomatis tepat saat nol', () {
     controller.start();
     time.seconds = 40;
+    expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
+    time.seconds = 70;
+    expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
+    expect(controller.activeStageIndex, 2);
 
-    expect(controller.pollTarget(), BrewSessionAction.targetReached);
-    expect(controller.activeStageIndex, 0);
-    expect(controller.status, BrewSessionStatus.running);
-    expect(controller.pollTarget(), BrewSessionAction.ignored);
+    time.seconds = 100;
+    expect(controller.reconcile(), BrewSessionAction.completed);
+    expect(controller.activeStageIndex, 2);
+    expect(controller.status, BrewSessionStatus.completed);
+    expect(controller.result!.totalTimeS, 100);
+    expect(controller.result!.stages.last.actualDurationS, 30);
+    expect(
+      controller.result!.stages.every((stage) => stage.drawdownS == null),
+      isTrue,
+    );
+    expect(controller.reconcile(), BrewSessionAction.ignored);
   });
+
+  test('kembali dari latar belakang melewati dua tahap pada tenggatnya', () {
+    controller.start();
+    time.seconds = 75;
+
+    expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
+    expect(controller.activeStageIndex, 2);
+    expect(controller.actualStages[0]!.actualStartS, 0);
+    expect(controller.actualStages[0]!.actualDurationS, 40);
+    expect(controller.actualStages[1]!.actualStartS, 40);
+    expect(controller.actualStages[1]!.actualDurationS, 30);
+    expect(controller.activeStageElapsedSeconds, 5);
+    expect(controller.reconcile(), BrewSessionAction.ignored);
+  });
+
+  test(
+    'kembali setelah tenggat terakhir selesai pada tenggat, bukan waktu kini',
+    () {
+      controller.start();
+      time.seconds = 125;
+
+      expect(controller.reconcile(), BrewSessionAction.completed);
+
+      final result = controller.result!;
+      expect(result.totalTimeS, 100);
+      expect(result.stages[0].actualDurationS, 40);
+      expect(result.stages[1].actualStartS, 40);
+      expect(result.stages[1].actualDurationS, 30);
+      expect(result.stages[2].actualStartS, 70);
+      expect(result.stages[2].actualDurationS, 30);
+      expect(result.stages.every((stage) => stage.drawdownS == null), isTrue);
+    },
+  );
 
   test('goyang memulai sebelum sesi dan tidak memajukan setelah berjalan', () {
     expect(controller.handleShake(), BrewSessionAction.started);
@@ -77,6 +136,8 @@ void main() {
     expect(controller.activeStageIndex, 0);
     expect(controller.elapsedSeconds, 50);
     expect(controller.actualStages[0], isNull);
+    expect(controller.status, BrewSessionStatus.running);
+    expect(controller.result, isNull);
   });
 
   test('batal tidak menghasilkan hasil', () {

@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tetes/app/theme/tokens.dart';
+import 'package:tetes/core/ui/app_card.dart';
 import 'package:tetes/features/beans/bean_model.dart';
 import 'package:tetes/features/brew/brew_calculator.dart';
 import 'package:tetes/features/brew/screens/brew_setup_screen.dart';
 import 'package:tetes/features/brew/state/brew_setup_controller.dart';
+import 'package:tetes/features/brew/widgets/brew_stage_colors.dart';
 
 void main() {
   testWidgets('menampilkan keadaan memuat', (tester) async {
@@ -53,8 +56,24 @@ void main() {
     expect(find.text('240 g'), findsWidgets);
     expect(find.text('Timeline'), findsOneWidget);
     expect(find.text('Air kumulatif terhadap waktu'), findsOneWidget);
+    expect(find.textContaining('Jeda'), findsNothing);
     expect(find.text('Rekomendasikan dengan AI'), findsOneWidget);
     expect(find.text('Mulai Sesi'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is AppCard && widget.backgroundColor == AppColors.stage1,
+      ),
+      findsOneWidget,
+    );
+  });
+
+  test('pemetaan warna tahap memakai lima token tema', () {
+    expect(BrewStageColors.forPosition(1), AppColors.stage1);
+    expect(BrewStageColors.forPosition(2), AppColors.stage2);
+    expect(BrewStageColors.forPosition(3), AppColors.stage3);
+    expect(BrewStageColors.forPosition(4), AppColors.stage4);
+    expect(BrewStageColors.forPosition(5), AppColors.stage5);
   });
 }
 

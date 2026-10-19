@@ -45,7 +45,6 @@ void main() {
       expect(plan.stages, hasLength(1));
       expect(plan.stages.single.name.databaseValue, 'bloom');
       expect(plan.stages.single.targetPourG, 240);
-      expect(plan.stages.single.gapAfterSeconds, 0);
     });
 
     test('bloom yang mencapai total air ditolak dengan pesan jelas', () {
@@ -83,10 +82,7 @@ void main() {
 
       for (var index = 1; index < plan.stages.length; index++) {
         final previous = plan.stages[index - 1];
-        expect(
-          plan.stages[index].startSeconds,
-          previous.endSeconds + previous.gapAfterSeconds,
-        );
+        expect(plan.stages[index].startSeconds, previous.endSeconds);
       }
       expect(() => BrewCalculator.validatePlan(plan), returnsNormally);
     });
@@ -135,17 +131,16 @@ void main() {
       );
     });
 
-    test('durasi dan jeda mengatur ulang waktu mulai tanpa tumpang tindih', () {
+    test('durasi mengatur ulang waktu mulai tanpa celah', () {
       var plan = BrewCalculator.createDefault(beanId: 'bean-1');
       plan = BrewCalculator.updateDuration(
         plan,
         stageIndex: 0,
         durationSeconds: 55,
       );
-      plan = BrewCalculator.updateGap(plan, stageIndex: 0, gapSeconds: 12);
 
-      expect(plan.stages[1].startSeconds, 67);
-      expect(plan.stages[2].startSeconds, 102);
+      expect(plan.stages[1].startSeconds, 55);
+      expect(plan.stages[2].startSeconds, 85);
       expect(() => BrewCalculator.validatePlan(plan), returnsNormally);
     });
 
@@ -166,7 +161,7 @@ void main() {
 
       expect(rebuilt.stages.first.durationSeconds, 40);
       expect(rebuilt.stages.first.targetPourG, 60);
-      expect(rebuilt.stages[1].startSeconds, 45);
+      expect(rebuilt.stages[1].startSeconds, 40);
       expect(rebuilt.fromBestBrew, isFalse);
     });
   });
@@ -193,15 +188,11 @@ void main() {
       expect(BrewValidation.pouringCount(6), isNotNull);
     });
 
-    test('batas durasi dan jeda diterapkan', () {
+    test('batas durasi diterapkan', () {
       expect(BrewValidation.duration(4), isNotNull);
       expect(BrewValidation.duration(5), isNull);
       expect(BrewValidation.duration(120), isNull);
       expect(BrewValidation.duration(121), isNotNull);
-      expect(BrewValidation.gap(-1), isNotNull);
-      expect(BrewValidation.gap(0), isNull);
-      expect(BrewValidation.gap(60), isNull);
-      expect(BrewValidation.gap(61), isNotNull);
     });
   });
 

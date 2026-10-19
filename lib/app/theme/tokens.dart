@@ -15,6 +15,16 @@ abstract final class AppColors {
   static const error = Color(0xFFE5484D);
   static const divider = Color(0xFFE6E8EA);
   static const shadow = Color(0x0F000000);
+  static const stage1 = Color(0xFF9EE3F6);
+  static const stage2 = Color(0xFFAEEBD6);
+  static const stage3 = Color(0xFFFFD58A);
+  static const stage4 = Color(0xFFFFB8C8);
+  static const stage5 = Color(0xFFCCBCFF);
+  static const stage1Soft = Color(0xFFDDF5FB);
+  static const stage2Soft = Color(0xFFE0F7EF);
+  static const stage3Soft = Color(0xFFFFF0D2);
+  static const stage4Soft = Color(0xFFFFE6EC);
+  static const stage5Soft = Color(0xFFEEE9FF);
 }
 
 abstract final class AppSpacing {

@@ -56,7 +56,6 @@ class BrewStage {
     required this.name,
     required this.startSeconds,
     required this.durationSeconds,
-    required this.gapAfterSeconds,
     required this.targetPourG,
   });
 
@@ -64,7 +63,6 @@ class BrewStage {
   final BrewStageName name;
   final int startSeconds;
   final int durationSeconds;
-  final int gapAfterSeconds;
   final double targetPourG;
 
   int get endSeconds => startSeconds + durationSeconds;
@@ -72,7 +70,6 @@ class BrewStage {
   BrewStage copyWith({
     int? startSeconds,
     int? durationSeconds,
-    int? gapAfterSeconds,
     double? targetPourG,
   }) {
     return BrewStage(
@@ -80,7 +77,6 @@ class BrewStage {
       name: name,
       startSeconds: startSeconds ?? this.startSeconds,
       durationSeconds: durationSeconds ?? this.durationSeconds,
-      gapAfterSeconds: gapAfterSeconds ?? this.gapAfterSeconds,
       targetPourG: targetPourG ?? this.targetPourG,
     );
   }

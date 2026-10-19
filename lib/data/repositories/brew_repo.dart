@@ -63,17 +63,12 @@ class BrewRepository {
         if ((storedCumulative - cumulativeWater).abs() > 0.000001) {
           return null;
         }
-        final gapAfter = index == stageRows.length - 1
-            ? 0
-            : (stageRows[index + 1]['target_start_s']! as num).toInt() -
-                  (start + duration);
         stages.add(
           BrewStage(
             position: position,
             name: name,
             startSeconds: start,
             durationSeconds: duration,
-            gapAfterSeconds: gapAfter,
             targetPourG: targetPour,
           ),
         );

@@ -12,6 +12,7 @@ import '../../beans/bean_model.dart';
 import '../../beans/screens/bean_form_screen.dart';
 import '../brew_plan.dart';
 import '../state/brew_setup_controller.dart';
+import '../widgets/brew_stage_colors.dart';
 import '../widgets/brew_timeline.dart';
 import '../widgets/brew_water_chart.dart';
 import 'brew_session_screen.dart';
@@ -279,6 +280,7 @@ class _StageCard extends StatelessWidget {
     final stage = plan.stages[stageIndex];
     final isLast = stageIndex == plan.stages.length - 1;
     return AppCard(
+      backgroundColor: BrewStageColors.forPosition(stage.position),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -307,21 +309,6 @@ class _StageCard extends StatelessWidget {
             onChanged: (value) =>
                 controller.updateStageDuration(stageIndex, value),
           ),
-          const SizedBox(height: AppSpacing.s12),
-          if (isLast)
-            Text(
-              'Jeda: — (tahap terakhir)',
-              style: Theme.of(context).textTheme.bodyLarge,
-            )
-          else
-            _BrewNumberField(
-              key: ValueKey('gap-${plan.beanId}-$stageIndex'),
-              label: 'Jeda setelah tahap (detik)',
-              value: stage.gapAfterSeconds.toString(),
-              errorText: errors['gap_$stageIndex'],
-              onChanged: (value) =>
-                  controller.updateStageGap(stageIndex, value),
-            ),
           const SizedBox(height: AppSpacing.s12),
           _BrewNumberField(
             key: ValueKey('target-${plan.beanId}-$stageIndex'),

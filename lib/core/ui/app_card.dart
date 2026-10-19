@@ -9,21 +9,25 @@ class AppCard extends StatelessWidget {
     required this.child,
     this.variant = AppCardVariant.standard,
     this.padding = AppInsets.card,
+    this.backgroundColor,
     super.key,
   });
 
   final Widget child;
   final AppCardVariant variant;
   final EdgeInsetsGeometry padding;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final backgroundColor = switch (variant) {
-      AppCardVariant.standard => colors.surface,
-      AppCardVariant.featured => AppColors.ink,
-      AppCardVariant.tinted => colors.primaryContainer,
-    };
+    final resolvedBackgroundColor =
+        backgroundColor ??
+        switch (variant) {
+          AppCardVariant.standard => colors.surface,
+          AppCardVariant.featured => AppColors.ink,
+          AppCardVariant.tinted => colors.primaryContainer,
+        };
     final foregroundColor = switch (variant) {
       AppCardVariant.featured => AppColors.onDark,
       AppCardVariant.standard || AppCardVariant.tinted => AppColors.ink,
@@ -32,7 +36,7 @@ class AppCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: resolvedBackgroundColor,
         borderRadius: BorderRadius.circular(AppRadius.card),
         boxShadow: AppShadows.card,
       ),

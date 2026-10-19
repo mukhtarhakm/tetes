@@ -5,6 +5,8 @@ allprojects {
     }
 }
 
+val projectCompileSdkVersion = 36
+
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")
@@ -17,6 +19,17 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+subprojects {
+    if (name == "flutter_ringtone_player") {
+        plugins.withId("com.android.library") {
+            extensions.configure<com.android.build.api.variant.LibraryAndroidComponentsExtension> {
+                finalizeDsl { libraryExtension ->
+                    libraryExtension.compileSdk = projectCompileSdkVersion
+                }
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

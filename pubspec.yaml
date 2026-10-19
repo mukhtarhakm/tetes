@@ -44,6 +44,8 @@ dependencies:
   crypto: ^3.0.7
   sensors_plus: ^7.1.1
   wakelock_plus: ^1.8.1
+  vibration: ^3.2.1
+  flutter_ringtone_player: ^4.0.0+4
 
 dev_dependencies:
   flutter_test:

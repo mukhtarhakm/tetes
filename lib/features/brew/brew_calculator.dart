@@ -57,13 +57,6 @@ abstract final class BrewValidation {
     }
     return null;
   }
-
-  static String? gap(int? value) {
-    if (value == null || value < 0 || value > 60) {
-      return 'Jeda harus antara 0 dan 60 detik.';
-    }
-    return null;
-  }
 }
 
 abstract final class BrewCalculator {
@@ -74,7 +67,6 @@ abstract final class BrewCalculator {
   static const defaultPouringCount = 3;
   static const defaultBloomDurationSeconds = 40;
   static const defaultPourDurationSeconds = 30;
-  static const defaultGapSeconds = 5;
 
   static BrewPlan createDefault({
     required String beanId,
@@ -207,28 +199,6 @@ abstract final class BrewCalculator {
     );
   }
 
-  static BrewPlan updateGap(
-    BrewPlan plan, {
-    required int stageIndex,
-    required int gapSeconds,
-  }) {
-    if (stageIndex >= plan.stages.length - 1) {
-      throw const BrewPlanException('Tahap terakhir tidak memiliki jeda.');
-    }
-    final error = BrewValidation.gap(gapSeconds);
-    if (error != null) {
-      throw BrewPlanException(error);
-    }
-    final stages = List<BrewStage>.of(plan.stages);
-    stages[stageIndex] = stages[stageIndex].copyWith(
-      gapAfterSeconds: gapSeconds,
-    );
-    return plan.copyWith(
-      stages: _recalculateStarts(stages),
-      fromBestBrew: false,
-    );
-  }
-
   static BrewPlan updateTargetPour(
     BrewPlan plan, {
     required int stageIndex,
@@ -291,18 +261,12 @@ abstract final class BrewCalculator {
         );
       }
       if (index < plan.stages.length - 1) {
-        final gapError = BrewValidation.gap(stage.gapAfterSeconds);
-        if (gapError != null) {
-          throw BrewPlanException(gapError);
-        }
         final next = plan.stages[index + 1];
-        if (next.startSeconds != stage.endSeconds + stage.gapAfterSeconds) {
+        if (next.startSeconds != stage.endSeconds) {
           throw const BrewPlanException(
-            'Waktu tahap tidak boleh tumpang tindih.',
+            'Waktu tahap harus berurutan tanpa jeda atau tumpang tindih.',
           );
         }
-      } else if (stage.gapAfterSeconds != 0) {
-        throw const BrewPlanException('Tahap terakhir tidak memiliki jeda.');
       }
       cumulativeWater += stage.targetPourG;
     }
@@ -317,22 +281,19 @@ abstract final class BrewCalculator {
     final stages = <BrewStage>[];
     var startSeconds = 0;
     for (var index = 0; index < pours.length; index++) {
-      final isLast = index == pours.length - 1;
       final duration = index == 0
           ? defaultBloomDurationSeconds
           : defaultPourDurationSeconds;
-      final gap = isLast ? 0 : defaultGapSeconds;
       stages.add(
         BrewStage(
           position: index + 1,
           name: BrewStageName.forPosition(index + 1),
           startSeconds: startSeconds,
           durationSeconds: duration,
-          gapAfterSeconds: gap,
           targetPourG: pours[index],
         ),
       );
-      startSeconds += duration + gap;
+      startSeconds += duration;
     }
     return stages;
   }
@@ -343,7 +304,7 @@ abstract final class BrewCalculator {
     for (final stage in stages) {
       final updated = stage.copyWith(startSeconds: startSeconds);
       result.add(updated);
-      startSeconds = updated.endSeconds + updated.gapAfterSeconds;
+      startSeconds = updated.endSeconds;
     }
     return List.unmodifiable(result);
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/tokens.dart';
 import '../brew_plan.dart';
+import 'brew_stage_colors.dart';
 
 class BrewWaterChart extends StatelessWidget {
   const BrewWaterChart({required this.plan, super.key});
@@ -64,15 +65,7 @@ class BrewWaterChart extends StatelessWidget {
                 ),
               ),
               borderData: FlBorderData(show: false),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: _spots(),
-                  isCurved: false,
-                  color: AppColors.primary,
-                  barWidth: AppSizes.progressStroke,
-                  dotData: const FlDotData(show: false),
-                ),
-              ],
+              lineBarsData: _lineBars(),
             ),
           ),
         ),
@@ -80,25 +73,26 @@ class BrewWaterChart extends StatelessWidget {
     );
   }
 
-  List<FlSpot> _spots() {
-    final spots = <FlSpot>[const FlSpot(0, 0)];
+  List<LineChartBarData> _lineBars() {
+    final lines = <LineChartBarData>[];
     var cumulativeWater = 0.0;
     for (final stage in plan.stages) {
-      if (spots.last.x != stage.startSeconds.toDouble()) {
-        spots.add(FlSpot(stage.startSeconds.toDouble(), cumulativeWater));
-      }
+      final startWater = cumulativeWater;
       cumulativeWater += stage.targetPourG;
-      spots.add(FlSpot(stage.endSeconds.toDouble(), cumulativeWater));
-      if (stage.gapAfterSeconds > 0) {
-        spots.add(
-          FlSpot(
-            (stage.endSeconds + stage.gapAfterSeconds).toDouble(),
-            cumulativeWater,
-          ),
-        );
-      }
+      lines.add(
+        LineChartBarData(
+          spots: [
+            FlSpot(stage.startSeconds.toDouble(), startWater),
+            FlSpot(stage.endSeconds.toDouble(), cumulativeWater),
+          ],
+          isCurved: false,
+          color: BrewStageColors.forPosition(stage.position),
+          barWidth: AppSizes.progressStroke,
+          dotData: const FlDotData(show: false),
+        ),
+      );
     }
-    return spots;
+    return lines;
   }
 }
 

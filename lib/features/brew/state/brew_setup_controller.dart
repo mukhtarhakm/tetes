@@ -237,28 +237,6 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     );
   }
 
-  void updateStageGap(int stageIndex, String input) {
-    final value = int.tryParse(input.trim());
-    final key = 'gap_$stageIndex';
-    final error = BrewValidation.gap(value);
-    if (error != null) {
-      _setFieldError(key, error);
-      return;
-    }
-    final plan = _current.plan;
-    if (plan == null) {
-      return;
-    }
-    _applyPlanChange(
-      fieldKey: key,
-      change: () => BrewCalculator.updateGap(
-        plan,
-        stageIndex: stageIndex,
-        gapSeconds: value!,
-      ),
-    );
-  }
-
   void updateStageTarget(int stageIndex, String input) {
     final value = _parseDouble(input);
     final key = 'target_$stageIndex';
@@ -325,10 +303,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
       }
       if (clearStageErrors) {
         errors.removeWhere(
-          (key, _) =>
-              key.startsWith('duration_') ||
-              key.startsWith('gap_') ||
-              key.startsWith('target_'),
+          (key, _) => key.startsWith('duration_') || key.startsWith('target_'),
         );
       }
       state = AsyncData(

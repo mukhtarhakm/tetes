@@ -52,7 +52,7 @@ void main() {
         id: 'stage-2',
         position: 2,
         name: 'pouring_2',
-        start: 47,
+        start: 40,
         duration: 35,
         cumulative: 145,
         pour: 100,
@@ -64,7 +64,7 @@ void main() {
         id: 'stage-3',
         position: 3,
         name: 'pouring_3',
-        start: 89,
+        start: 75,
         duration: 30,
         cumulative: 240,
         pour: 95,
@@ -87,7 +87,7 @@ void main() {
     expect(plan, isNotNull);
     expect(plan!.fromBestBrew, isTrue);
     expect(plan.grind, Grind.sedangHalus);
-    expect(plan.stages.map((stage) => stage.gapAfterSeconds), [7, 7, 0]);
+    expect(plan.stages.map((stage) => stage.startSeconds), [0, 40, 75]);
     expect(plan.stages.map((stage) => stage.targetPourG), [45, 100, 95]);
     expect(plan.cumulativeWaterAt(2), 240);
   });
@@ -126,6 +126,43 @@ void main() {
         position: 2,
         name: 'pouring_2',
         start: 35,
+        duration: 30,
+        cumulative: 240,
+        pour: 195,
+      ),
+    );
+
+    final plan = await brewRepository.findBestPlan(
+      userId: 'user-1',
+      beanId: beanId,
+      bestBrewId: 'brew-best',
+    );
+
+    expect(plan, isNull);
+  });
+
+  test('tahap yang memiliki celah dianggap tidak valid', () async {
+    final beanId = await _createBean(beanRepository);
+    await database.insert('brews', _brew(beanId: beanId));
+    await database.insert(
+      'brew_stages',
+      _stage(
+        id: 'stage-1',
+        position: 1,
+        name: 'bloom',
+        start: 0,
+        duration: 40,
+        cumulative: 45,
+        pour: 45,
+      ),
+    );
+    await database.insert(
+      'brew_stages',
+      _stage(
+        id: 'stage-2',
+        position: 2,
+        name: 'pouring_2',
+        start: 45,
         duration: 30,
         cumulative: 240,
         pour: 195,

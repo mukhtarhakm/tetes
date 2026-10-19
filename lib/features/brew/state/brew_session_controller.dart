@@ -5,14 +5,7 @@ import '../brew_session_result.dart';
 
 enum BrewSessionStatus { ready, running, completed, cancelled }
 
-enum BrewSessionAction {
-  ignored,
-  started,
-  stageAdvanced,
-  targetReached,
-  completed,
-  cancelled,
-}
+enum BrewSessionAction { ignored, started, stageAdvanced, completed, cancelled }
 
 abstract interface class ElapsedTimeSource {
   Duration get elapsed;
@@ -54,7 +47,6 @@ class BrewSessionController {
   final BrewPlan plan;
   final ElapsedTimeSource _timeSource;
   final List<_MutableStageActual> _actualStages;
-  final Set<int> _targetCueSentForStage = {};
 
   BrewSessionStatus _status = BrewSessionStatus.ready;
   int _activeStageIndex = 0;
@@ -98,7 +90,7 @@ class BrewSessionController {
           name: plan.stages[index].name,
           actualStartS: start,
           actualDurationS: duration,
-          drawdownS: actual.drawdownS,
+          drawdownS: null,
         );
       }),
     );
@@ -122,20 +114,41 @@ class BrewSessionController {
     return start();
   }
 
-  BrewSessionAction pollTarget() {
-    if (_status != BrewSessionStatus.running ||
-        _targetCueSentForStage.contains(_activeStageIndex) ||
-        countdownSeconds > 0) {
+  BrewSessionAction reconcile() {
+    if (_status != BrewSessionStatus.running) {
       return BrewSessionAction.ignored;
     }
-    _targetCueSentForStage.add(_activeStageIndex);
-    return BrewSessionAction.targetReached;
+
+    final now = elapsedSeconds;
+    var advanced = false;
+    while (_status == BrewSessionStatus.running) {
+      final actualStart = _actualStages[_activeStageIndex].actualStartS!;
+      final deadline = actualStart + activeStage.durationSeconds;
+      if (now < deadline) {
+        return advanced
+            ? BrewSessionAction.stageAdvanced
+            : BrewSessionAction.ignored;
+      }
+      if (_activeStageIndex == plan.stages.length - 1) {
+        return _completeAt(deadline);
+      }
+      _closeActiveStage(deadline);
+      _activeStageIndex++;
+      _actualStages[_activeStageIndex].actualStartS = deadline;
+      advanced = true;
+    }
+    return BrewSessionAction.ignored;
   }
 
   BrewSessionAction nextStage() {
     if (_status != BrewSessionStatus.running ||
         _activeStageIndex >= plan.stages.length - 1) {
       return BrewSessionAction.ignored;
+    }
+    final reconciled = reconcile();
+    if (reconciled == BrewSessionAction.stageAdvanced ||
+        reconciled == BrewSessionAction.completed) {
+      return reconciled;
     }
     final now = elapsedSeconds;
     _closeActiveStage(now);
@@ -149,13 +162,11 @@ class BrewSessionController {
         _activeStageIndex != plan.stages.length - 1) {
       return BrewSessionAction.ignored;
     }
-    final now = elapsedSeconds;
-    _closeActiveStage(now);
-    final lastActual = _actualStages.last;
-    lastActual.drawdownS = math.max(
-      0,
-      lastActual.actualDurationS! - plan.stages.last.durationSeconds,
-    );
+    return _completeAt(elapsedSeconds);
+  }
+
+  BrewSessionAction _completeAt(int endSeconds) {
+    _closeActiveStage(endSeconds);
     _timeSource.stop();
     _status = BrewSessionStatus.completed;
     _result = BrewSessionResult(
@@ -168,11 +179,11 @@ class BrewSessionController {
             name: plan.stages[index].name,
             actualStartS: actual.actualStartS!,
             actualDurationS: actual.actualDurationS!,
-            drawdownS: actual.drawdownS,
+            drawdownS: null,
           );
         }),
       ),
-      totalTimeS: now,
+      totalTimeS: endSeconds,
     );
     return BrewSessionAction.completed;
   }
@@ -198,5 +209,4 @@ class BrewSessionController {
 class _MutableStageActual {
   int? actualStartS;
   int? actualDurationS;
-  int? drawdownS;
 }
