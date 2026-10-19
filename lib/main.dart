@@ -14,11 +14,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: AppRouter.navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Tetes',
       theme: AppTheme.light,
       themeMode: ThemeMode.light,
-      initialRoute: AppRoutes.login,
+      initialRoute: AppRoutes.home,
       routes: AppRouter.routes,
     );
   }

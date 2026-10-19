@@ -4,12 +4,28 @@ class SessionStorageException implements Exception {
   const SessionStorageException();
 }
 
+class StoredSession {
+  const StoredSession({
+    required this.token,
+    required this.userId,
+    required this.expiresAt,
+  });
+
+  final String token;
+  final String userId;
+  final String expiresAt;
+}
+
 abstract interface class SessionStorage {
   Future<void> saveSession({
     required String token,
     required String userId,
     required String expiresAt,
   });
+
+  Future<StoredSession?> readSession();
+
+  Future<void> clearSession();
 }
 
 class SecureSessionStorage implements SessionStorage {
@@ -33,6 +49,45 @@ class SecureSessionStorage implements SessionStorage {
       await _storage.write(key: _expiresAtKey, value: expiresAt);
     } catch (_) {
       await _removePartialSession();
+      throw const SessionStorageException();
+    }
+  }
+
+  @override
+  Future<StoredSession?> readSession() async {
+    try {
+      final values = await Future.wait([
+        _storage.read(key: _tokenKey),
+        _storage.read(key: _userIdKey),
+        _storage.read(key: _expiresAtKey),
+      ]);
+      final token = values[0];
+      final userId = values[1];
+      final expiresAt = values[2];
+
+      if (token == null && userId == null && expiresAt == null) {
+        return null;
+      }
+      if (token == null || userId == null || expiresAt == null) {
+        await clearSession();
+        return null;
+      }
+
+      return StoredSession(token: token, userId: userId, expiresAt: expiresAt);
+    } catch (_) {
+      throw const SessionStorageException();
+    }
+  }
+
+  @override
+  Future<void> clearSession() async {
+    try {
+      await Future.wait([
+        _storage.delete(key: _tokenKey),
+        _storage.delete(key: _userIdKey),
+        _storage.delete(key: _expiresAtKey),
+      ]);
+    } catch (_) {
       throw const SessionStorageException();
     }
   }

@@ -10,7 +10,7 @@ class UserRepository {
   final AuthClient _authClient;
   final SessionStorage _sessionStorage;
 
-  Future<void> register({
+  Future<String> register({
     required String username,
     required String password,
   }) async {
@@ -19,9 +19,10 @@ class UserRepository {
       password: password,
     );
     await _persistAuthentication(session);
+    return session.user.id;
   }
 
-  Future<void> login({
+  Future<String> login({
     required String username,
     required String password,
   }) async {
@@ -30,6 +31,7 @@ class UserRepository {
       password: password,
     );
     await _persistAuthentication(session);
+    return session.user.id;
   }
 
   Future<void> _persistAuthentication(AuthSession session) async {

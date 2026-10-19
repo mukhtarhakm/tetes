@@ -9,7 +9,9 @@ import '../auth_validation.dart';
 import '../state/auth_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({this.sessionMessage, super.key});
+
+  final String? sessionMessage;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -95,12 +97,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 textInputAction: TextInputAction.done,
                 onChanged: (_) => _clearFieldError('password'),
               ),
-              if (authState.errorMessage != null) ...[
+              if (authState.errorMessage != null ||
+                  widget.sessionMessage != null) ...[
                 const SizedBox(height: AppSpacing.s16),
                 Semantics(
                   liveRegion: true,
                   child: Text(
-                    authState.errorMessage!,
+                    authState.errorMessage ?? widget.sessionMessage!,
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: AppColors.error),

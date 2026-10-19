@@ -47,7 +47,7 @@ void main() {
       expect(succeeded, isFalse);
       expect(
         container.read(authControllerProvider).errorMessage,
-      'Sesi tidak dapat disimpan dengan aman. Silakan coba lagi.',
+        'Sesi tidak dapat disimpan dengan aman. Silakan coba lagi.',
       );
       expect(
         container.read(authControllerProvider).toString(),
@@ -80,6 +80,12 @@ AuthClient _successfulAuthClient() {
 
 class _FailingSessionStorage implements SessionStorage {
   const _FailingSessionStorage();
+
+  @override
+  Future<void> clearSession() async {}
+
+  @override
+  Future<StoredSession?> readSession() async => null;
 
   @override
   Future<void> saveSession({

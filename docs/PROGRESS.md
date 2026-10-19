@@ -18,10 +18,12 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-19: Fitur 01 sisi Flutter untuk Register dan Login selesai diimplementasikan. `AuthClient` memanggil Edge Function tanpa `apikey` atau header debug, memetakan galat server/jaringan/timeout, dan memakai batas waktu 20 detik. Register serta login sukses meng-upsert cache profil SQLite, menyimpan token, `user_id`, dan `expires_at` melalui secure storage, lalu membuka shell utama. Form memakai validasi klien, komponen bersama, state Riverpod tanpa password, serta pesan `429` dalam menit. Seluruh 19 tes lulus, `flutter analyze` bersih, dan APK debug berhasil dibangun tanpa perubahan konfigurasi Gradle. Guard session penuh, biometrik, dan logout nyata belum dikerjakan.
+2026-10-19: Fitur 01 sisi Flutter untuk penyimpanan session dan guard router selesai diimplementasikan. Saat aplikasi dibuka, guard membaca session dari secure storage dan membandingkan `expires_at` dalam UTC dengan jam perangkat tanpa memanggil jaringan. Session valid langsung membuka shell sehingga aplikasi dapat dibuka offline; session tidak ada, rusak, atau kedaluwarsa menuju Login, dan session rusak/kedaluwarsa dibersihkan. State session hanya menyimpan status dan `user_id`, sedangkan token tetap hanya berada di secure storage. Login/Register sukses langsung mengaktifkan session dan mengganti seluruh tumpukan navigasi. Helper `forceLogoutOnUnauthorized()` tersedia untuk respons `401`, membersihkan session lokal tanpa menghapus SQLite, menampilkan pesan singkat, dan mengganti seluruh tumpukan ke guard Login. Seluruh 25 tes lulus dan `flutter analyze` bersih. Biometrik dan logout nyata belum dikerjakan.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)
+
+- Guard belum memeriksa ulang masa berlaku session ketika aplikasi kembali dari latar belakang; pengecekan saat resume ditunda ke langkah berikutnya.
 
 ## Menunggu jawaban dosen
 - [ ] Tema (V60 pelatih/jurnal vs Brewmaster)

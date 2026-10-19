@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/remote/auth_client.dart';
 import 'auth_providers.dart';
+import 'session_controller.dart';
 
 class AuthState {
   const AuthState({
@@ -46,14 +47,15 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<bool> _submit(Future<void> Function() operation) async {
+  Future<bool> _submit(Future<String> Function() operation) async {
     if (state.isLoading) {
       return false;
     }
 
     state = const AuthState(isLoading: true);
     try {
-      await operation();
+      final userId = await operation();
+      ref.read(sessionControllerProvider.notifier).markAuthenticated(userId);
       state = const AuthState();
       return true;
     } on AuthException catch (error) {
