@@ -41,6 +41,9 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   local_auth: ^3.0.2
   fl_chart: ^1.2.0
+  crypto: ^3.0.7
+  sensors_plus: ^7.1.1
+  wakelock_plus: ^1.8.1
 
 dev_dependencies:
   flutter_test:

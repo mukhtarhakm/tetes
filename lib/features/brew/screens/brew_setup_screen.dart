@@ -14,7 +14,7 @@ import '../brew_plan.dart';
 import '../state/brew_setup_controller.dart';
 import '../widgets/brew_timeline.dart';
 import '../widgets/brew_water_chart.dart';
-import 'brew_session_placeholder_screen.dart';
+import 'brew_session_screen.dart';
 
 class BrewSetupScreen extends ConsumerWidget {
   const BrewSetupScreen({this.initialBeanId, super.key});
@@ -251,7 +251,7 @@ class _BrewForm extends StatelessWidget {
           onPressed: state.canStart
               ? () => Navigator.of(context).push<void>(
                   MaterialPageRoute(
-                    builder: (_) => BrewSessionPlaceholderScreen(plan: plan),
+                    builder: (_) => BrewSessionScreen(plan: plan),
                   ),
                 )
               : null,
