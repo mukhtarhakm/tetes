@@ -9,10 +9,21 @@ import 'auth_providers.dart';
 enum SessionStatus { authenticated, unauthenticated }
 
 class SessionState {
-  const SessionState._({required this.status, this.userId, this.message});
+  const SessionState._({
+    required this.status,
+    this.userId,
+    this.message,
+    this.isFreshAuthentication = false,
+  });
 
-  const SessionState.authenticated(String userId)
-    : this._(status: SessionStatus.authenticated, userId: userId);
+  const SessionState.authenticated(
+    String userId, {
+    bool isFreshAuthentication = false,
+  }) : this._(
+         status: SessionStatus.authenticated,
+         userId: userId,
+         isFreshAuthentication: isFreshAuthentication,
+       );
 
   const SessionState.unauthenticated({String? message})
     : this._(status: SessionStatus.unauthenticated, message: message);
@@ -20,6 +31,7 @@ class SessionState {
   final SessionStatus status;
   final String? userId;
   final String? message;
+  final bool isFreshAuthentication;
 }
 
 final sessionControllerProvider =
@@ -61,7 +73,9 @@ class SessionController extends AsyncNotifier<SessionState> {
   }
 
   void markAuthenticated(String userId) {
-    state = AsyncData(SessionState.authenticated(userId));
+    state = AsyncData(
+      SessionState.authenticated(userId, isFreshAuthentication: true),
+    );
   }
 
   Future<void> logout() async {

@@ -10,6 +10,9 @@ class UserRepository {
   final AuthClient _authClient;
   final SessionStorage _sessionStorage;
 
+  static const _biometricEnabledKey = 'biometric_enabled';
+  static const _biometricPromptedKey = 'biometric_prompted';
+
   Future<String> register({
     required String username,
     required String password,
@@ -57,6 +60,40 @@ class UserRepository {
     return (rows.single['total'] as num?)?.toInt() ?? 0;
   }
 
+  Future<bool> isBiometricEnabled(String userId) {
+    return _isSettingEnabled(userId, _biometricEnabledKey);
+  }
+
+  Future<bool> wasBiometricPrompted(String userId) {
+    return _isSettingEnabled(userId, _biometricPromptedKey);
+  }
+
+  Future<void> enableBiometric(String userId) async {
+    await _database.transaction((transaction) async {
+      await _upsertSetting(
+        transaction,
+        userId: userId,
+        key: _biometricEnabledKey,
+        value: '1',
+      );
+      await _upsertSetting(
+        transaction,
+        userId: userId,
+        key: _biometricPromptedKey,
+        value: '1',
+      );
+    });
+  }
+
+  Future<void> markBiometricPrompted(String userId) {
+    return _upsertSetting(
+      _database,
+      userId: userId,
+      key: _biometricPromptedKey,
+      value: '1',
+    );
+  }
+
   Future<void> _persistAuthentication(AuthSession session) async {
     try {
       await _database.rawInsert(
@@ -94,6 +131,33 @@ class UserRepository {
         message: 'Sesi tidak dapat disimpan dengan aman. Silakan coba lagi.',
       );
     }
+  }
+
+  Future<bool> _isSettingEnabled(String userId, String key) async {
+    final rows = await _database.query(
+      'settings',
+      columns: ['value'],
+      where: 'user_id = ? AND key = ?',
+      whereArgs: [userId, key],
+      limit: 1,
+    );
+    return rows.isNotEmpty && rows.single['value'] == '1';
+  }
+
+  Future<void> _upsertSetting(
+    DatabaseExecutor database, {
+    required String userId,
+    required String key,
+    required String value,
+  }) {
+    return database.rawInsert(
+      '''
+      INSERT INTO settings (user_id, key, value)
+      VALUES (?, ?, ?)
+      ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value
+      ''',
+      [userId, key, value],
+    );
   }
 
   String _utcNowWithoutMilliseconds() {

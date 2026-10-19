@@ -5,7 +5,12 @@ import '../../../data/db/database_provider.dart';
 import '../../../data/remote/auth_client.dart';
 import '../../../data/repositories/user_repo.dart';
 import '../../../data/secure/session_storage.dart';
+import '../biometric/biometric_authenticator.dart';
 import '../session/session_revocation_queue.dart';
+
+final biometricAuthenticatorProvider = Provider<BiometricAuthenticator>((ref) {
+  return LocalBiometricAuthenticator();
+});
 
 final authClientProvider = Provider<AuthClient>((ref) {
   final client = AuthClient();

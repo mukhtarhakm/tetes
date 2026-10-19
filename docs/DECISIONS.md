@@ -30,3 +30,6 @@ Catat keputusan yang sudah diambil agar tidak diperdebatkan ulang. Format: tangg
 | 2026-10-18 | Migrasi SQLite diuji di host dengan `sqflite_common_ffi` sebagai dev dependency | `sqflite` tetap dipakai di aplikasi Android, sedangkan FFI memungkinkan tes migrasi, foreign key, dan constraint berjalan tanpa mengubah database produksi |
 | 2026-10-18 | Password server memakai PBKDF2-HMAC-SHA256 dengan 600.000 iterasi, salt acak 16 byte, dan keluaran 32 byte | Mengikuti rekomendasi OWASP yang dipilih untuk tugas; parameter disimpan per pengguna agar dapat dinaikkan pada masa depan |
 | 2026-10-19 | Klien HTTP Flutter memakai paket `http` | Kebutuhan auth hanya POST JSON sederhana; API kecil, mudah diinjeksi untuk tes, dan tidak menambah kompleksitas interceptor yang belum diperlukan |
+| 2026-10-19 | kotlin.incremental=false di android/gradle.properties | Proyek di drive D dan cache paket di drive C membuat Kotlin gagal ("different roots"). Workaround, build sedikit lebih lambat |
+| 2026-10-19 | PBKDF2-HMAC-SHA256 dengan 600.000 iterasi di Edge Function | Mengikuti rekomendasi OWASP. Terukur sekitar 110 ms, jadi tidak perlu diturunkan |
+| 2026-10-19 | Biometrik hanya membuka aplikasi lokal. "Pakai password" memakai alur logout yang sama | Menghindari token yatim di server. Tidak ada data biometrik yang disimpan atau dikirim |
