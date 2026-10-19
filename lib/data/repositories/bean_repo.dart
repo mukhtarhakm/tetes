@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/utils/uuid_v4.dart';
 import '../../features/beans/bean_model.dart';
 import '../../features/beans/bean_validation.dart';
+import '../../features/beans/fx_conversion.dart';
+import '../../features/beans/fx_quote_service.dart';
 
-class BeanRepository {
+class BeanRepository implements FxCacheStore {
   const BeanRepository(this._database);
 
   final Database _database;
@@ -59,9 +63,6 @@ class BeanRepository {
       'id': id,
       'user_id': userId,
       ..._draftValues(draft),
-      'fx_rate': null,
-      'fx_date': null,
-      'price_idr_per_kg': null,
       'best_brew_id': null,
       'archived': 0,
       'created_at': now,
@@ -80,9 +81,6 @@ class BeanRepository {
       'beans',
       {
         ..._draftValues(draft),
-        'fx_rate': null,
-        'fx_date': null,
-        'price_idr_per_kg': null,
         'updated_at': _utcNowWithoutMilliseconds(),
         'sync_status': 'pending',
       },
@@ -108,6 +106,70 @@ class BeanRepository {
     if (changedRows != 1) {
       throw StateError('Biji tidak ditemukan.');
     }
+  }
+
+  @override
+  Future<FxQuote?> readFxCache({
+    required String userId,
+    required String currency,
+  }) async {
+    final rows = await _database.query(
+      'settings',
+      columns: ['value'],
+      where: 'user_id = ? AND key = ?',
+      whereArgs: [userId, 'fx_cache'],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    final cache = _decodeFxCache(rows.single['value']);
+    final item = cache[currency.toUpperCase()];
+    if (item is! Map) {
+      return null;
+    }
+    final rateValue = item['rate'];
+    final dateValue = item['date'];
+    final rate = rateValue is num ? rateValue.toDouble() : null;
+    if (rate == null ||
+        !rate.isFinite ||
+        rate <= 0 ||
+        dateValue is! String ||
+        DateTime.tryParse(dateValue) == null) {
+      return null;
+    }
+    return FxQuote(
+      currency: currency.toUpperCase(),
+      rate: rate,
+      date: dateValue,
+      source: FxQuoteSource.cache,
+    );
+  }
+
+  @override
+  Future<void> writeFxCache({
+    required String userId,
+    required FxQuote quote,
+  }) async {
+    final rows = await _database.query(
+      'settings',
+      columns: ['value'],
+      where: 'user_id = ? AND key = ?',
+      whereArgs: [userId, 'fx_cache'],
+      limit: 1,
+    );
+    final cache = rows.isEmpty
+        ? <String, Object?>{}
+        : _decodeFxCache(rows.single['value']);
+    cache[quote.currency.toUpperCase()] = {
+      'rate': quote.rate,
+      'date': quote.date,
+    };
+    await _database.insert('settings', {
+      'user_id': userId,
+      'key': 'fx_cache',
+      'value': jsonEncode(cache),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Map<String, Object?> _draftValues(BeanDraft draft) {
@@ -139,6 +201,11 @@ class BeanRepository {
       'pack_size_g': draft.packSizeG,
       'price_original': draft.priceOriginal,
       'currency': draft.priceOriginal == null ? null : draft.currency,
+      'fx_rate': draft.priceOriginal == null ? null : draft.fxRate,
+      'fx_date': draft.priceOriginal == null ? null : draft.fxDate,
+      'price_idr_per_kg': draft.priceOriginal == null
+          ? null
+          : draft.priceIdrPerKg,
       'initial_stock_g': draft.initialStockG,
       'roastery_notes_tags': tagValues.isEmpty ? null : tagValues.join(','),
       'roastery_notes_text': _nullableText(draft.roasteryNotesText),
@@ -148,6 +215,21 @@ class BeanRepository {
   String? _nullableText(String? value) {
     final normalized = value?.trim();
     return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  Map<String, Object?> _decodeFxCache(Object? value) {
+    if (value is! String) {
+      return <String, Object?>{};
+    }
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! Map) {
+        return <String, Object?>{};
+      }
+      return decoded.map((key, item) => MapEntry('$key', item));
+    } on FormatException {
+      return <String, Object?>{};
+    }
   }
 
   String _utcNowWithoutMilliseconds() {

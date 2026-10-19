@@ -146,6 +146,9 @@ class Bean {
     this.packSizeG,
     this.priceOriginal,
     this.currency,
+    this.fxRate,
+    this.fxDate,
+    this.priceIdrPerKg,
     this.roasteryNotesText,
     this.bestBrewId,
   });
@@ -166,6 +169,9 @@ class Bean {
   final double? packSizeG;
   final double? priceOriginal;
   final String? currency;
+  final double? fxRate;
+  final String? fxDate;
+  final double? priceIdrPerKg;
   final double initialStockG;
   final double remainingStockG;
   final List<String> roasteryNotesTags;
@@ -197,6 +203,9 @@ class Bean {
       packSizeG: (map['pack_size_g'] as num?)?.toDouble(),
       priceOriginal: (map['price_original'] as num?)?.toDouble(),
       currency: map['currency'] as String?,
+      fxRate: (map['fx_rate'] as num?)?.toDouble(),
+      fxDate: map['fx_date'] as String?,
+      priceIdrPerKg: (map['price_idr_per_kg'] as num?)?.toDouble(),
       initialStockG: (map['initial_stock_g']! as num).toDouble(),
       remainingStockG: (map['remaining_stock_g']! as num).toDouble(),
       roasteryNotesTags: BeanTagValues.fromDatabase(
@@ -231,6 +240,9 @@ class BeanDraft {
     this.packSizeG,
     this.priceOriginal,
     this.currency,
+    this.fxRate,
+    this.fxDate,
+    this.priceIdrPerKg,
     this.roasteryNotesText,
   });
 
@@ -248,6 +260,9 @@ class BeanDraft {
   final double? packSizeG;
   final double? priceOriginal;
   final String? currency;
+  final double? fxRate;
+  final String? fxDate;
+  final double? priceIdrPerKg;
   final double initialStockG;
   final List<String> roasteryNotesTags;
   final String? roasteryNotesText;

@@ -1,14 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/tokens.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/utils/currency_format.dart';
 import '../../../core/ui/app_button.dart';
+import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dropdown_field.dart';
 import '../../../core/ui/app_input_dialog.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../bean_model.dart';
 import '../bean_validation.dart';
+import '../fx_conversion.dart';
+import '../fx_quote_service.dart';
 import '../state/bean_providers.dart';
 
 class BeanFormScreen extends ConsumerStatefulWidget {
@@ -46,6 +53,14 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   String? _currency;
   Set<String> _selectedTags = {};
   Map<String, String> _errors = const {};
+  final FxRequestGuard _fxRequestGuard = FxRequestGuard();
+  Timer? _fxDebounce;
+  FxPricingInput? _originalPricingInput;
+  FxQuote? _fxQuote;
+  double? _priceIdrPerPackage;
+  double? _priceIdrPerKg;
+  bool _isFxLoading = false;
+  String? _fxMessage;
 
   @override
   void initState() {
@@ -85,10 +100,17 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     _stockEditedManually = bean != null;
     _currency = bean?.currency;
     _selectedTags = {...?bean?.roasteryNotesTags};
+    _originalPricingInput = FxPricingInput(
+      priceOriginal: bean?.priceOriginal,
+      currency: bean?.currency,
+      packSizeG: bean?.packSizeG,
+    );
+    _restoreOriginalFx();
   }
 
   @override
   void dispose() {
+    _fxDebounce?.cancel();
     _nameController.dispose();
     _originController.dispose();
     _roasteryController.dispose();
@@ -304,7 +326,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                         decimal: true,
                       ),
                       textInputAction: TextInputAction.next,
-                      onChanged: (_) => _clearError('price'),
+                      onChanged: _onPriceChanged,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.s12),
@@ -321,11 +343,13 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                           _currency = currency;
                           _errors = Map.of(_errors)..remove('currency');
                         });
+                        _scheduleFxUpdate(immediate: true);
                       },
                     ),
                   ),
                 ],
               ),
+              _buildFxResult(context),
               const SizedBox(height: AppSpacing.s20),
               AppTextField(
                 key: const Key('bean-stock-field'),
@@ -403,7 +427,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
               AppButton(
                 label: 'Simpan',
                 isLoading: isSaving,
-                onPressed: isSaving ? null : _submit,
+                onPressed: isSaving || _isFxLoading ? null : _submit,
               ),
               const SizedBox(height: AppSpacing.s8),
               AppButton(
@@ -416,6 +440,222 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildFxResult(BuildContext context) {
+    if (!_isFxLoading && _fxQuote == null && _fxMessage == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.s16),
+      child: AppCard(
+        variant: AppCardVariant.tinted,
+        child: _isFxLoading
+            ? Row(
+                children: [
+                  const SizedBox.square(
+                    dimension: AppSizes.buttonProgress,
+                    child: CircularProgressIndicator(
+                      strokeWidth: AppSizes.progressStroke,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Expanded(
+                    child: Text(
+                      'Mengambil kurs rupiah...',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ),
+                ],
+              )
+            : _fxQuote == null
+            ? Text(
+                _fxMessage!,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.error),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hasil rupiah',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    '${formatIdr(_priceIdrPerPackage!)} per kemasan',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  Text(
+                    '${formatIdr(_priceIdrPerKg!)} per kg',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    _fxDescription(_fxQuote!),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  String _fxDescription(FxQuote quote) {
+    if (quote.currency == 'IDR') {
+      return 'IDR tidak memerlukan konversi.';
+    }
+    final base = '1 ${quote.currency} = ${formatIdr(quote.rate)}';
+    return quote.source == FxQuoteSource.cache
+        ? '$base • kurs per ${quote.date}'
+        : base;
+  }
+
+  void _onPriceChanged(String _) {
+    _clearError('price');
+    _scheduleFxUpdate();
+  }
+
+  void _scheduleFxUpdate({bool immediate = false}) {
+    _fxDebounce?.cancel();
+    final input = _currentPricingInput;
+    if (!FxConversion.shouldRecalculate(
+      original: _originalPricingInput,
+      current: input,
+    )) {
+      _fxRequestGuard.invalidate();
+      setState(_restoreOriginalFx);
+      return;
+    }
+    if (!input.isComplete) {
+      _fxRequestGuard.invalidate();
+      setState(_clearFx);
+      return;
+    }
+
+    final generation = _fxRequestGuard.issue(input);
+    setState(() {
+      _isFxLoading = true;
+      _fxMessage = null;
+      _fxQuote = null;
+      _priceIdrPerPackage = null;
+      _priceIdrPerKg = null;
+    });
+    if (immediate) {
+      unawaited(_loadFx(input, generation));
+      return;
+    }
+    _fxDebounce = Timer(
+      AppConfig.fxInputDebounce,
+      () => _loadFx(input, generation),
+    );
+  }
+
+  Future<void> _loadFx(FxPricingInput input, int generation) async {
+    try {
+      final service = await ref.read(fxQuoteServiceProvider.future);
+      final quote = await service.resolve(input.currency!);
+      if (!_acceptsFxResult(generation, input)) {
+        return;
+      }
+      setState(() {
+        _fxQuote = quote;
+        _priceIdrPerPackage = FxConversion.packagePriceIdr(
+          priceOriginal: input.priceOriginal!,
+          fxRate: quote.rate,
+        );
+        _priceIdrPerKg = FxConversion.priceIdrPerKg(
+          priceOriginal: input.priceOriginal!,
+          fxRate: quote.rate,
+          packSizeG: input.packSizeG!,
+        );
+        _isFxLoading = false;
+        _fxMessage = null;
+      });
+    } on FxQuoteException catch (error) {
+      _showFxError(generation, input, error.message);
+    } catch (_) {
+      _showFxError(
+        generation,
+        input,
+        'Kurs belum tersedia. Biji tetap dapat disimpan tanpa harga rupiah.',
+      );
+    }
+  }
+
+  void _showFxError(int generation, FxPricingInput input, String message) {
+    if (!_acceptsFxResult(generation, input)) {
+      return;
+    }
+    setState(() {
+      _clearFx();
+      _fxMessage = message;
+    });
+  }
+
+  bool _acceptsFxResult(int generation, FxPricingInput input) {
+    return mounted &&
+        _fxRequestGuard.accepts(generation, input) &&
+        input == _currentPricingInput;
+  }
+
+  FxPricingInput get _currentPricingInput {
+    return FxPricingInput(
+      priceOriginal: _tryParseNumber(_priceController.text),
+      currency: _currency,
+      packSizeG: _tryParseNumber(_selectedPackSizeText),
+    );
+  }
+
+  double? _tryParseNumber(String value) {
+    return double.tryParse(value.trim().replaceAll(',', '.'));
+  }
+
+  void _restoreOriginalFx() {
+    final bean = widget.initialBean;
+    final rate = bean?.fxRate;
+    final date = bean?.fxDate;
+    final price = bean?.priceOriginal;
+    final packSize = bean?.packSizeG;
+    final pricePerKg = bean?.priceIdrPerKg;
+    _isFxLoading = false;
+    _fxMessage = null;
+    if (rate == null ||
+        date == null ||
+        price == null ||
+        packSize == null ||
+        pricePerKg == null ||
+        bean?.currency == null) {
+      _fxQuote = null;
+      _priceIdrPerPackage = null;
+      _priceIdrPerKg = null;
+      return;
+    }
+    _fxQuote = FxQuote(
+      currency: bean!.currency!,
+      rate: rate,
+      date: date,
+      source: bean.currency == 'IDR'
+          ? FxQuoteSource.local
+          : FxQuoteSource.network,
+    );
+    _priceIdrPerPackage = FxConversion.packagePriceIdr(
+      priceOriginal: price,
+      fxRate: rate,
+    );
+    _priceIdrPerKg = pricePerKg;
+  }
+
+  void _clearFx() {
+    _isFxLoading = false;
+    _fxQuote = null;
+    _priceIdrPerPackage = null;
+    _priceIdrPerKg = null;
+    _fxMessage = null;
   }
 
   Widget _optionalChips<T>({
@@ -487,6 +727,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
         _autofillStock(size);
       }
     });
+    _scheduleFxUpdate(immediate: true);
   }
 
   void _selectCustomPack(bool selected) {
@@ -498,6 +739,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       }
       _errors = Map.of(_errors)..remove('packSize');
     });
+    _scheduleFxUpdate(immediate: true);
   }
 
   void _onCustomPackChanged(String value) {
@@ -506,6 +748,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     if (size != null && size > 0) {
       setState(() => _autofillStock(size));
     }
+    _scheduleFxUpdate();
   }
 
   void _autofillStock(double size) {
@@ -588,6 +831,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
 
   Future<void> _submit() async {
     final packSizeText = _selectedPackSizeText;
+    final pricingInput = _currentPricingInput;
     final errors = BeanValidation.validate(
       name: _nameController.text,
       species: _species,
@@ -601,6 +845,13 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       processCustom: _processCustomController.text,
       tags: _selectedTags,
     );
+    final legacyPricingUnchanged =
+        widget.initialBean?.priceOriginal != null &&
+        widget.initialBean?.packSizeG == null &&
+        pricingInput == _originalPricingInput;
+    if (legacyPricingUnchanged) {
+      errors.remove('packSize');
+    }
     if (errors.isNotEmpty) {
       setState(() => _errors = errors);
       return;
@@ -626,6 +877,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           ? null
           : BeanValidation.parseNumber(priceText),
       currency: priceText.isEmpty ? null : _currency,
+      fxRate: priceText.isEmpty ? null : _fxQuote?.rate,
+      fxDate: priceText.isEmpty ? null : _fxQuote?.date,
+      priceIdrPerKg: priceText.isEmpty ? null : _priceIdrPerKg,
       initialStockG: BeanValidation.parseNumber(_stockController.text),
       roasteryNotesTags: [..._selectedTags],
       roasteryNotesText: _notesController.text,

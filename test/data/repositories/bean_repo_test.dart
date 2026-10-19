@@ -4,6 +4,7 @@ import 'package:tetes/data/db/app_database.dart';
 import 'package:tetes/data/db/database_migrations.dart';
 import 'package:tetes/data/repositories/bean_repo.dart';
 import 'package:tetes/features/beans/bean_model.dart';
+import 'package:tetes/features/beans/fx_conversion.dart';
 
 void main() {
   late Database database;
@@ -65,7 +66,7 @@ void main() {
     expect(beans.map((bean) => bean.id), [activeId]);
   });
 
-  test('simpan mengurutkan tag dan mengosongkan hasil kurs', () async {
+  test('simpan mengurutkan tag dan menyimpan hasil kurs', () async {
     final beanId = await repository.create(
       userId: 'user-1',
       draft: BeanDraft(
@@ -78,6 +79,9 @@ void main() {
         packSizeG: 250,
         priceOriginal: 100000,
         currency: 'IDR',
+        fxRate: 1,
+        fxDate: '2026-10-19',
+        priceIdrPerKg: 400000,
         initialStockG: 250,
         roasteryNotesTags: const ['manis', 'beri merah', 'asam'],
       ),
@@ -95,9 +99,9 @@ void main() {
     expect(row['process'], 'lainnya');
     expect(row['process_custom'], 'anaerobik');
     expect(row['roastery_notes_tags'], 'asam,beri merah,manis');
-    expect(row['fx_rate'], isNull);
-    expect(row['fx_date'], isNull);
-    expect(row['price_idr_per_kg'], isNull);
+    expect(row['fx_rate'], 1);
+    expect(row['fx_date'], '2026-10-19');
+    expect(row['price_idr_per_kg'], 400000);
     expect(row['sync_status'], 'pending');
 
     final bean = await repository.findById(userId: 'user-1', id: beanId);
@@ -149,6 +153,43 @@ void main() {
       expect(bean.roasteryNotesTags, ['cokelat', 'unik lama']);
     },
   );
+
+  test('cache kurs dipisahkan per pengguna dan mata uang', () async {
+    await repository.writeFxCache(
+      userId: 'user-1',
+      quote: const FxQuote(
+        currency: 'USD',
+        rate: 18031,
+        date: '2026-10-16',
+        source: FxQuoteSource.network,
+      ),
+    );
+    await repository.writeFxCache(
+      userId: 'user-1',
+      quote: const FxQuote(
+        currency: 'EUR',
+        rate: 20100,
+        date: '2026-10-16',
+        source: FxQuoteSource.network,
+      ),
+    );
+
+    final usd = await repository.readFxCache(userId: 'user-1', currency: 'USD');
+    final eur = await repository.readFxCache(userId: 'user-1', currency: 'EUR');
+    final missingCurrency = await repository.readFxCache(
+      userId: 'user-1',
+      currency: 'JPY',
+    );
+    final otherUser = await repository.readFxCache(
+      userId: 'user-2',
+      currency: 'USD',
+    );
+
+    expect(usd?.rate, 18031);
+    expect(eur?.rate, 20100);
+    expect(missingCurrency, isNull);
+    expect(otherUser, isNull);
+  });
 }
 
 BeanDraft _draft({String name = 'Biji Uji', double stock = 200}) {

@@ -1,13 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/db/database_provider.dart';
+import '../../../data/remote/fx_client.dart';
 import '../../../data/repositories/bean_repo.dart';
 import '../../auth/state/session_controller.dart';
 import '../bean_model.dart';
+import '../fx_quote_service.dart';
 
 final beanRepositoryProvider = FutureProvider<BeanRepository>((ref) async {
   final database = await ref.watch(databaseProvider.future);
   return BeanRepository(database);
+});
+
+final fxRateSourceProvider = Provider<FxRateSource>((ref) {
+  final client = FxClient();
+  ref.onDispose(client.close);
+  return client;
+});
+
+final fxNowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+final fxQuoteServiceProvider = FutureProvider<FxQuoteService>((ref) async {
+  final userId = await _activeUserId(ref);
+  final repository = await ref.watch(beanRepositoryProvider.future);
+  return FxQuoteService(
+    source: ref.watch(fxRateSourceProvider),
+    cache: repository,
+    userId: userId,
+    now: ref.watch(fxNowProvider),
+  );
 });
 
 final beanListProvider = AsyncNotifierProvider<BeanListController, List<Bean>>(

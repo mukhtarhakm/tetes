@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/tokens.dart';
+import '../../../core/utils/currency_format.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
@@ -104,13 +105,16 @@ class _BeanDetailContent extends ConsumerWidget {
                     ? null
                     : '${_formatNumber(bean.priceOriginal!)} ${bean.currency ?? ''}',
               ),
-              const _DetailRow(
-                label: 'Kurs saat input',
-                value: 'Belum dihitung pada sesi ini',
+              _DetailRow(label: 'Kurs saat input', value: _fxLabel(bean)),
+              _DetailRow(
+                label: 'Harga rupiah per kemasan',
+                value: _packagePriceIdr(bean),
               ),
-              const _DetailRow(
-                label: 'Harga rupiah',
-                value: 'Belum dihitung pada sesi ini',
+              _DetailRow(
+                label: 'Harga rupiah per kg',
+                value: bean.priceIdrPerKg == null
+                    ? null
+                    : formatIdr(bean.priceIdrPerKg!),
               ),
               _DetailRow(
                 label: 'Stok awal',
@@ -306,4 +310,18 @@ String? _processLabel(Bean bean) {
     return process.label;
   }
   return '${process.label} — ${bean.processCustom}';
+}
+
+String? _fxLabel(Bean bean) {
+  if (bean.fxRate == null || bean.fxDate == null || bean.currency == null) {
+    return null;
+  }
+  return '1 ${bean.currency} = ${formatIdr(bean.fxRate!)} • ${bean.fxDate}';
+}
+
+String? _packagePriceIdr(Bean bean) {
+  if (bean.priceOriginal == null || bean.fxRate == null) {
+    return null;
+  }
+  return formatIdr(bean.priceOriginal! * bean.fxRate!);
 }
