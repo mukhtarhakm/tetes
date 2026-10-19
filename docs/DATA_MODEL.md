@@ -72,10 +72,12 @@ CREATE TABLE beans (
   roastery             TEXT,                   -- boleh kosong
   is_self_roasted      INTEGER NOT NULL DEFAULT 0,
   origin               TEXT,                   -- teks bebas, bukan fitur pelacakan
-  process              TEXT,                   -- enum process
+  process              TEXT,                   -- enum process; 'lainnya' memakai process_custom
+  process_custom       TEXT,                   -- proses bebas, maksimal 40 karakter
   roast_level          TEXT,                   -- enum roast_level
   roast_date           TEXT,                   -- tanggal (YYYY-MM-DD)
-  price_original       REAL,                   -- per kg, dalam mata uang asli
+  pack_size_g          REAL,                   -- ukuran satu kemasan dalam gram
+  price_original       REAL,                   -- harga satu kemasan dalam mata uang asli
   currency             TEXT,                   -- kode ISO: IDR, USD, EUR, JPY, ...
   fx_rate              REAL,                   -- 1 unit currency = fx_rate IDR, saat input
   fx_date              TEXT,                   -- tanggal kurs
@@ -193,6 +195,8 @@ Hal yang disimpan di luar database:
 
 **Stok tersisa (g)** = `initial_stock_g` − jumlah `dose_g` seluruh `brews` aktif untuk biji itu. Dihitung lewat query, **tidak disimpan**, supaya konsisten saat seduhan dibatalkan. Notifikasi stok menipis dipicu saat hasil ini di bawah `low_stock_threshold_g` (default 15 g).
 
+**Harga per kg (IDR)** = `price_original` × `fx_rate` ÷ `pack_size_g` × 1000. `price_original` adalah harga satu kemasan dalam mata uang asli, bukan harga per kg.
+
 **Biaya seduhan (IDR)** = `dose_g` × `price_idr_per_kg` ÷ 1000. Disimpan di `brews.cost_idr` saat simpan.
 
 **Pengaturan terbaik biji:** di antara seduhan aktif biji itu, skor `taste_score` tertinggi. Jika seri, pilih yang terbaru. Otomatis dihitung ulang setiap seduhan disimpan atau dibatalkan. Pengguna boleh menimpa manual (`best_brew_id`). Jika seduhan terpilih dibatalkan, hitung ulang otomatis.
@@ -213,7 +217,11 @@ Hal yang disimpan di luar database:
 | `taste_score` | 1 sampai 5 |
 | jumlah pouring | 1 sampai 5 |
 | `arabica_percent` | 0 sampai 100, hanya jika `species = campuran` |
-| `initial_stock_g` | ≥ 0 |
+| `pack_size_g` | Jika diisi harus > 0; wajib bila `price_original` diisi |
+| `price_original` | Jika diisi harus > 0 dan memerlukan `currency` serta `pack_size_g` |
+| `initial_stock_g` | > 0 |
+| `process_custom` | Wajib bila `process = lainnya`, maksimal 40 karakter; kosong untuk proses lain |
+| `roastery_notes_tags` | Maksimal 10 tag total; tag sendiri di-trim, huruf kecil, tanpa koma, maksimal 30 karakter, dan tidak boleh kembar |
 | pengingat event | Setidaknya satu, maksimal tiga |
 
 Angka batas ini adalah default awal, boleh disesuaikan, tapi ubah di sini dulu.
@@ -423,5 +431,6 @@ ORDER BY seq ASC;
 ## 8. Catatan Migrasi
 
 - Versi skema SQLite disimpan lewat `PRAGMA user_version`. Tiap perubahan skema = migrasi bernomor, bukan menghapus database.
+- Migrasi 2 menambahkan `beans.pack_size_g REAL` dan `beans.process_custom TEXT` melalui dua perintah `ALTER TABLE`; data biji lama dibiarkan bernilai `NULL`.
 - Menambah kolom opsional aman. Mengubah atau menghapus kolom yang ikut hash **dilarang** setelah ada data.
 - Setelah Sprint 3, perubahan pada format hash harus dianggap perubahan besar dan dikonfirmasi dulu.

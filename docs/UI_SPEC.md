@@ -80,7 +80,7 @@ Semua layar wajib memakai komponen ini. Tambah komponen baru di sini, jangan mem
 | `AppButton` | Pil. **Primary (layar terang):** isi hitam, teks putih. **Primary (layar gelap):** isi putih, teks hitam. **Secondary:** putih dengan garis tipis. **Text:** tanpa latar. Ada keadaan memuat dan nonaktif |
 | `RoundAction` | Tombol bulat 44 berisi ikon, latar `primary`, ikon hitam (seperti tombol play di kartu) |
 | `AppCard` | Putih, radius 24, bayangan kartu. Varian `featured` (hitam, teks putih), `tinted` (`primaryContainer`) |
-| `AppChip` | Pil. Tidak terpilih: `background` (terang) atau `chipDark` (gelap). Terpilih: `primary`, teks hitam. Dipakai untuk tag rasa, grind, filter, jenis toko |
+| `AppChip` | Pil. Tidak terpilih: `surface` dengan garis tipis `divider` pada layar terang, atau `chipDark` pada layar gelap. Terpilih: `primary` dengan teks `ink`. Lebar mengikuti teks tanpa memotong label. Dipakai untuk tag rasa, grind, filter, jenis toko |
 | `AppTextField` | Pil untuk pencarian (dengan ikon), radius 16 untuk isian biasa. Label di atas, galat di bawah dalam `error` |
 | `AppBottomNav` | Putih, 6 item: Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, Logout. Item aktif: ikon di atas label maksimal dua baris, di dalam kotak `primaryContainer` radius 16. Item lain: ikon saja berwarna `inkSoft`. Area sentuh tiap item minimal 48 × 48 dan seluruh bar menghormati safe area bawah. Logout adalah aksi dialog dan tidak pernah menjadi item aktif |
 | `AppListRow` | Baris dalam kartu putih: ikon, judul, chevron. Pemisah `divider` dengan inset |
@@ -112,7 +112,7 @@ Deskripsi bentuk. Isi dan alur ada di spec fitur.
 | **Login / Register** | Judul besar, isian bertumpuk, satu `AppButton` primary penuh lebar, tautan teks di bawah |
 | **Seduh (beranda tab)** | Sapaan `headline` + tombol lonceng, kolom pencarian pil, dua `AppCard` sejajar (kartu hitam: biji aktif atau terakhir; kartu putih: aksi cepat), lalu bagian "Pengaturan terbaik" dengan `tinted` card dan `RoundAction` |
 | **Daftar biji** | `AppCard` per biji, chip kecil untuk spesies dan sangrai, `StatusPill` untuk stok |
-| **Form biji** | Isian bertumpuk, `AppChip` untuk pilihan (spesies, proses, sangrai), slider untuk persen arabika |
+| **Form biji** | Isian bertumpuk; setiap kelompok `AppChip` memakai `Wrap` dengan jarak horizontal dan vertikal dari token `AppSpacing`, sehingga chip berpindah baris tanpa memotong teks; slider untuk persen arabika |
 | **Atur Seduh** | Isian angka besar, chip grind, daftar tahap sebagai kartu, `ScoreChart` atau grafik air di atas atau bawah kartu tahap, tombol "Mulai Sesi" di dasar layar |
 | **Sesi (layar gelap)** | `SegmentProgress` di atas, nama tahap dan target air, **timer `display`**, tombol putih besar "Tahap berikutnya" di bawah, tombol batal berupa teks |
 | **Hasil** | Kartu ringkasan, tabel plan vs realisasi di dalam kartu, bintang 1-5 atau wajah sederhana untuk skor rasa, chip tag rasa (boleh dalam bottom sheet gelap), kartu notes roastery vs rasa, tombol simpan |

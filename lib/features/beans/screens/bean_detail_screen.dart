@@ -90,10 +90,16 @@ class _BeanDetailContent extends ConsumerWidget {
               if (bean.species == BeanSpecies.campuran)
                 _DetailRow(label: 'Arabika', value: '${bean.arabicaPercent}%'),
               _DetailRow(label: 'Asal', value: bean.origin),
-              _DetailRow(label: 'Proses', value: bean.process?.label),
+              _DetailRow(label: 'Proses', value: _processLabel(bean)),
               _DetailRow(label: 'Tanggal roasting', value: bean.roastDate),
               _DetailRow(
-                label: 'Harga asli',
+                label: 'Ukuran kemasan',
+                value: bean.packSizeG == null
+                    ? 'Ukuran kemasan belum diisi'
+                    : '${_formatNumber(bean.packSizeG!)} g',
+              ),
+              _DetailRow(
+                label: 'Harga kemasan',
                 value: bean.priceOriginal == null
                     ? null
                     : '${_formatNumber(bean.priceOriginal!)} ${bean.currency ?? ''}',
@@ -138,7 +144,10 @@ class _BeanDetailContent extends ConsumerWidget {
                   spacing: AppSpacing.s8,
                   runSpacing: AppSpacing.s8,
                   children: bean.roasteryNotesTags
-                      .map((tag) => AppChip(label: tag.label))
+                      .map(
+                        (tag) =>
+                            AppChip(label: RoasteryNoteTag.labelForValue(tag)),
+                      )
                       .toList(),
                 ),
               if (bean.roasteryNotesText != null) ...[
@@ -284,4 +293,17 @@ String _formatNumber(double value) {
   return value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(1);
+}
+
+String? _processLabel(Bean bean) {
+  final process = bean.process;
+  if (process == null) {
+    return null;
+  }
+  if (process != BeanProcess.lainnya ||
+      bean.processCustom == null ||
+      bean.processCustom!.isEmpty) {
+    return process.label;
+  }
+  return '${process.label} — ${bean.processCustom}';
 }

@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../core/utils/uuid_v4.dart';
 import '../../features/beans/bean_model.dart';
+import '../../features/beans/bean_validation.dart';
 
 class BeanRepository {
   const BeanRepository(this._database);
@@ -111,7 +112,11 @@ class BeanRepository {
 
   Map<String, Object?> _draftValues(BeanDraft draft) {
     final tagValues =
-        draft.roasteryNotesTags.map((tag) => tag.databaseValue).toList()
+        draft.roasteryNotesTags
+            .map(BeanValidation.normalizeTag)
+            .where((tag) => tag.isNotEmpty)
+            .toSet()
+            .toList()
           ..sort();
     return {
       'name': draft.name.trim(),
@@ -126,8 +131,12 @@ class BeanRepository {
       'is_self_roasted': draft.isSelfRoasted ? 1 : 0,
       'origin': _nullableText(draft.origin),
       'process': draft.process?.databaseValue,
+      'process_custom': draft.process == BeanProcess.lainnya
+          ? _nullableText(draft.processCustom)
+          : null,
       'roast_level': draft.roastLevel?.databaseValue,
       'roast_date': draft.roastDate,
+      'pack_size_g': draft.packSizeG,
       'price_original': draft.priceOriginal,
       'currency': draft.priceOriginal == null ? null : draft.currency,
       'initial_stock_g': draft.initialStockG,

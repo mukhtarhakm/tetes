@@ -7,12 +7,14 @@ class AppChip extends StatelessWidget {
     required this.label,
     this.selected = false,
     this.onSelected,
+    this.onDeleted,
     super.key,
   });
 
   final String label;
   final bool selected;
   final ValueChanged<bool>? onSelected;
+  final VoidCallback? onDeleted;
 
   @override
   Widget build(BuildContext context) {
@@ -21,41 +23,62 @@ class AppChip extends StatelessWidget {
         ? AppColors.primary
         : isDark
         ? AppColors.chipDark
-        : AppColors.background;
+        : AppColors.surface;
+    final foregroundColor = selected || !isDark
+        ? AppColors.ink
+        : AppColors.onDark;
+    final isInteractive = onSelected != null || onDeleted != null;
     final chip = AnimatedContainer(
       duration: AppDurations.feedback,
       constraints: BoxConstraints(
-        minHeight: onSelected == null
+        minHeight: !isInteractive
             ? AppSizes.chipHeight
             : AppSizes.minimumTouchTarget,
       ),
       padding: AppInsets.chip,
       decoration: BoxDecoration(
         color: backgroundColor,
+        border: !selected && !isDark
+            ? Border.all(color: AppColors.divider)
+            : null,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: selected || !isDark ? AppColors.ink : AppColors.onDark,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: foregroundColor),
+          ),
+          if (onDeleted != null) ...[
+            const SizedBox(width: AppSpacing.s8),
+            Icon(
+              Icons.close_rounded,
+              size: AppSizes.navigationIcon,
+              color: foregroundColor,
+            ),
+          ],
+        ],
       ),
     );
 
-    if (onSelected == null) {
+    if (!isInteractive) {
       return chip;
     }
 
     return Semantics(
       button: true,
-      selected: selected,
+      selected: onSelected == null ? null : selected,
       label: label,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          onTap: () => onSelected!(!selected),
+          onTap: onDeleted ?? () => onSelected!(!selected),
           child: chip,
         ),
       ),

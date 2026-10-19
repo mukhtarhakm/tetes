@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_chip.dart';
+import '../../../core/ui/app_dropdown_field.dart';
+import '../../../core/ui/app_input_dialog.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../bean_model.dart';
 import '../bean_validation.dart';
@@ -19,9 +21,14 @@ class BeanFormScreen extends ConsumerStatefulWidget {
 }
 
 class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
+  static const _currencies = ['IDR', 'USD', 'EUR', 'JPY'];
+  static const _standardPackSizes = [100.0, 150.0, 200.0, 250.0, 500.0, 1000.0];
+
   late final TextEditingController _nameController;
-  late final TextEditingController _roasteryController;
   late final TextEditingController _originController;
+  late final TextEditingController _roasteryController;
+  late final TextEditingController _processCustomController;
+  late final TextEditingController _customPackController;
   late final TextEditingController _priceController;
   late final TextEditingController _stockController;
   late final TextEditingController _notesController;
@@ -33,26 +40,37 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   int? _arabicaPercent;
   bool _isSelfRoasted = false;
   String? _roastDate;
+  double? _packSizeG;
+  bool _customPackSelected = false;
+  bool _stockEditedManually = false;
   String? _currency;
-  Set<RoasteryNoteTag> _selectedTags = {};
+  Set<String> _selectedTags = {};
   Map<String, String> _errors = const {};
-
-  static const _currencies = ['IDR', 'USD', 'EUR', 'JPY'];
 
   @override
   void initState() {
     super.initState();
     final bean = widget.initialBean;
+    final existingPackSize = bean?.packSizeG;
+    final hasStandardPack =
+        existingPackSize != null &&
+        _standardPackSizes.contains(existingPackSize);
     _nameController = TextEditingController(text: bean?.name);
-    _roasteryController = TextEditingController(text: bean?.roastery);
     _originController = TextEditingController(text: bean?.origin);
+    _roasteryController = TextEditingController(text: bean?.roastery);
+    _processCustomController = TextEditingController(text: bean?.processCustom);
+    _customPackController = TextEditingController(
+      text: existingPackSize != null && !hasStandardPack
+          ? _formatEditableNumber(existingPackSize)
+          : null,
+    );
     _priceController = TextEditingController(
       text: bean?.priceOriginal == null
           ? null
           : _formatEditableNumber(bean!.priceOriginal!),
     );
     _stockController = TextEditingController(
-      text: _formatEditableNumber(bean?.initialStockG ?? 0),
+      text: bean == null ? null : _formatEditableNumber(bean.initialStockG),
     );
     _notesController = TextEditingController(text: bean?.roasteryNotesText);
     _species = bean?.species;
@@ -62,6 +80,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     _arabicaPercent = bean?.arabicaPercent;
     _isSelfRoasted = bean?.isSelfRoasted ?? false;
     _roastDate = bean?.roastDate;
+    _packSizeG = hasStandardPack ? existingPackSize : null;
+    _customPackSelected = existingPackSize != null && !hasStandardPack;
+    _stockEditedManually = bean != null;
     _currency = bean?.currency;
     _selectedTags = {...?bean?.roasteryNotesTags};
   }
@@ -69,8 +90,10 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _roasteryController.dispose();
     _originController.dispose();
+    _roasteryController.dispose();
+    _processCustomController.dispose();
+    _customPackController.dispose();
     _priceController.dispose();
     _stockController.dispose();
     _notesController.dispose();
@@ -81,8 +104,13 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   Widget build(BuildContext context) {
     final mutation = ref.watch(beanMutationProvider);
     final isSaving = mutation.isLoading;
-    final sortedTags = [...RoasteryNoteTag.values]
+    final sortedBuiltInTags = [...RoasteryNoteTag.values]
       ..sort((left, right) => left.label.compareTo(right.label));
+    final customTags =
+        _selectedTags.where((tag) => !RoasteryNoteTag.isBuiltIn(tag)).toList()
+          ..sort();
+    final tagLimitReached =
+        _selectedTags.length >= BeanValidation.maximumTagCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -97,19 +125,40 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             children: [
               AppTextField(
                 controller: _nameController,
-                label: 'Nama *',
+                label: 'Nama biji',
                 errorText: _errors['name'],
                 enabled: !isSaving,
                 textInputAction: TextInputAction.next,
                 onChanged: (_) => _clearError('name'),
               ),
               const SizedBox(height: AppSpacing.s20),
-              _SectionLabel(label: 'Spesies *', errorText: _errors['species']),
+              AppTextField(
+                controller: _originController,
+                label: 'Asal (negara atau daerah)',
+                enabled: !isSaving,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.s20),
+              AppTextField(
+                controller: _roasteryController,
+                label: 'Roastery',
+                enabled: !isSaving && !_isSelfRoasted,
+                textInputAction: TextInputAction.next,
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  'Roasting sendiri',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                value: _isSelfRoasted,
+                onChanged: isSaving ? null : _toggleSelfRoasted,
+              ),
+              const SizedBox(height: AppSpacing.s20),
+              _SectionLabel(label: 'Spesies', errorText: _errors['species']),
               const SizedBox(height: AppSpacing.s8),
-              Wrap(
-                spacing: AppSpacing.s8,
-                runSpacing: AppSpacing.s8,
-                children: BeanSpecies.values
+              _chipWrap(
+                BeanSpecies.values
                     .map(
                       (species) => AppChip(
                         label: species.label,
@@ -121,8 +170,18 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                     )
                     .toList(),
               ),
+              const SizedBox(height: AppSpacing.s20),
+              const _SectionLabel(label: 'Tipe'),
+              const SizedBox(height: AppSpacing.s8),
+              _optionalChips<BeanType>(
+                values: BeanType.values,
+                selected: _beanType,
+                label: (value) => value.label,
+                enabled: !isSaving,
+                onChanged: (value) => setState(() => _beanType = value),
+              ),
               if (_species == BeanSpecies.campuran) ...[
-                const SizedBox(height: AppSpacing.s16),
+                const SizedBox(height: AppSpacing.s20),
                 _SectionLabel(
                   label: 'Persen arabika: ${_arabicaPercent ?? 0}%',
                   errorText: _errors['arabicaPercent'],
@@ -144,40 +203,6 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.s20),
-              const _SectionLabel(label: 'Tipe'),
-              const SizedBox(height: AppSpacing.s8),
-              _optionalChips<BeanType>(
-                values: BeanType.values,
-                selected: _beanType,
-                label: (value) => value.label,
-                enabled: !isSaving,
-                onChanged: (value) => setState(() => _beanType = value),
-              ),
-              const SizedBox(height: AppSpacing.s20),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  'Roasting sendiri',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                value: _isSelfRoasted,
-                onChanged: isSaving ? null : _toggleSelfRoasted,
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              AppTextField(
-                controller: _roasteryController,
-                label: 'Roastery',
-                enabled: !isSaving && !_isSelfRoasted,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.s20),
-              AppTextField(
-                controller: _originController,
-                label: 'Asal',
-                enabled: !isSaving,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.s20),
               const _SectionLabel(label: 'Proses'),
               const SizedBox(height: AppSpacing.s8),
               _optionalChips<BeanProcess>(
@@ -185,8 +210,20 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                 selected: _process,
                 label: (value) => value.label,
                 enabled: !isSaving,
-                onChanged: (value) => setState(() => _process = value),
+                onChanged: _selectProcess,
               ),
+              if (_process == BeanProcess.lainnya) ...[
+                const SizedBox(height: AppSpacing.s16),
+                AppTextField(
+                  controller: _processCustomController,
+                  label: 'Nama proses lainnya',
+                  errorText: _errors['processCustom'],
+                  enabled: !isSaving,
+                  maxLength: BeanValidation.maximumCustomProcessLength,
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => _clearError('processCustom'),
+                ),
+              ],
               const SizedBox(height: AppSpacing.s20),
               const _SectionLabel(label: 'Tingkat sangrai'),
               const SizedBox(height: AppSpacing.s8),
@@ -215,43 +252,83 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                       : () => setState(() => _roastDate = null),
                 ),
               const SizedBox(height: AppSpacing.s20),
-              AppTextField(
-                controller: _priceController,
-                label: 'Harga per kg',
-                hintText: 'Opsional',
-                errorText: _errors['price'],
-                enabled: !isSaving,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => _clearError('price'),
+              _SectionLabel(
+                label: 'Ukuran kemasan',
+                errorText: _errors['packSize'],
               ),
-              const SizedBox(height: AppSpacing.s16),
-              _SectionLabel(label: 'Mata uang', errorText: _errors['currency']),
               const SizedBox(height: AppSpacing.s8),
-              Wrap(
-                spacing: AppSpacing.s8,
-                runSpacing: AppSpacing.s8,
-                children: _currencies
-                    .map(
-                      (currency) => AppChip(
-                        label: currency,
-                        selected: _currency == currency,
-                        onSelected: isSaving
-                            ? null
-                            : (selected) {
-                                setState(() {
-                                  _currency = selected ? currency : null;
-                                  _errors = Map.of(_errors)..remove('currency');
-                                });
-                              },
+              _chipWrap([
+                ..._standardPackSizes.map(
+                  (size) => AppChip(
+                    label: '${_formatEditableNumber(size)} g',
+                    selected: !_customPackSelected && _packSizeG == size,
+                    onSelected: isSaving
+                        ? null
+                        : (selected) => _selectStandardPack(size, selected),
+                  ),
+                ),
+                AppChip(
+                  label: 'Lainnya',
+                  selected: _customPackSelected,
+                  onSelected: isSaving ? null : _selectCustomPack,
+                ),
+              ]),
+              if (_customPackSelected) ...[
+                const SizedBox(height: AppSpacing.s16),
+                AppTextField(
+                  key: const Key('bean-custom-pack-field'),
+                  controller: _customPackController,
+                  label: 'Ukuran kemasan lainnya (g)',
+                  errorText: _errors['packSize'],
+                  enabled: !isSaving,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textInputAction: TextInputAction.next,
+                  onChanged: _onCustomPackChanged,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.s20),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: AppTextField(
+                      controller: _priceController,
+                      label: 'Harga kemasan',
+                      hintText: 'Opsional',
+                      errorText: _errors['price'],
+                      enabled: !isSaving,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
-                    )
-                    .toList(),
+                      textInputAction: TextInputAction.next,
+                      onChanged: (_) => _clearError('price'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Expanded(
+                    child: AppDropdownField<String>(
+                      label: 'Mata uang',
+                      items: _currencies,
+                      itemLabel: (currency) => currency,
+                      value: _currency,
+                      errorText: _errors['currency'],
+                      enabled: !isSaving,
+                      onChanged: (currency) {
+                        setState(() {
+                          _currency = currency;
+                          _errors = Map.of(_errors)..remove('currency');
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.s20),
               AppTextField(
+                key: const Key('bean-stock-field'),
                 controller: _stockController,
                 label: 'Stok awal (g)',
                 errorText: _errors['stock'],
@@ -260,26 +337,50 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                   decimal: true,
                 ),
                 textInputAction: TextInputAction.next,
-                onChanged: (_) => _clearError('stock'),
+                onChanged: (_) {
+                  _stockEditedManually = true;
+                  _clearError('stock');
+                },
               ),
               const SizedBox(height: AppSpacing.s20),
-              const _SectionLabel(label: 'Tasting notes roastery'),
-              const SizedBox(height: AppSpacing.s8),
-              Wrap(
-                spacing: AppSpacing.s8,
-                runSpacing: AppSpacing.s8,
-                children: sortedTags
-                    .map(
-                      (tag) => AppChip(
-                        label: tag.label,
-                        selected: _selectedTags.contains(tag),
-                        onSelected: isSaving
-                            ? null
-                            : (selected) => _toggleTag(tag, selected),
-                      ),
-                    )
-                    .toList(),
+              _SectionLabel(
+                label: 'Tasting notes roastery',
+                errorText: _errors['tags'],
               ),
+              const SizedBox(height: AppSpacing.s8),
+              _chipWrap([
+                ...sortedBuiltInTags.map((tag) {
+                  final selected = _selectedTags.contains(tag.databaseValue);
+                  return AppChip(
+                    label: tag.label,
+                    selected: selected,
+                    onSelected: isSaving || (!selected && tagLimitReached)
+                        ? null
+                        : (value) => _toggleBuiltInTag(tag, value),
+                  );
+                }),
+                AppChip(
+                  label: '+ Tambah sendiri',
+                  onSelected: isSaving || tagLimitReached
+                      ? null
+                      : (_) => _addCustomTag(),
+                ),
+                ...customTags.map(
+                  (tag) => AppChip(
+                    label: tag,
+                    onDeleted: isSaving ? null : () => _removeTag(tag),
+                  ),
+                ),
+              ]),
+              if (tagLimitReached) ...[
+                const SizedBox(height: AppSpacing.s8),
+                Text(
+                  'Maksimal ${BeanValidation.maximumTagCount} tag per biji.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+                ),
+              ],
               const SizedBox(height: AppSpacing.s16),
               AppTextField(
                 controller: _notesController,
@@ -324,10 +425,8 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     required bool enabled,
     required ValueChanged<T?> onChanged,
   }) {
-    return Wrap(
-      spacing: AppSpacing.s8,
-      runSpacing: AppSpacing.s8,
-      children: values
+    return _chipWrap(
+      values
           .map(
             (value) => AppChip(
               label: label(value),
@@ -338,6 +437,14 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             ),
           )
           .toList(),
+    );
+  }
+
+  Widget _chipWrap(List<Widget> children) {
+    return Wrap(
+      spacing: AppSpacing.s8,
+      runSpacing: AppSpacing.s8,
+      children: children,
     );
   }
 
@@ -360,14 +467,106 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     });
   }
 
-  void _toggleTag(RoasteryNoteTag tag, bool selected) {
+  void _selectProcess(BeanProcess? process) {
+    setState(() {
+      _process = process;
+      if (process != BeanProcess.lainnya) {
+        _processCustomController.clear();
+      }
+      _errors = Map.of(_errors)..remove('processCustom');
+    });
+  }
+
+  void _selectStandardPack(double size, bool selected) {
+    setState(() {
+      _customPackSelected = false;
+      _customPackController.clear();
+      _packSizeG = selected ? size : null;
+      _errors = Map.of(_errors)..remove('packSize');
+      if (selected) {
+        _autofillStock(size);
+      }
+    });
+  }
+
+  void _selectCustomPack(bool selected) {
+    setState(() {
+      _customPackSelected = selected;
+      _packSizeG = null;
+      if (!selected) {
+        _customPackController.clear();
+      }
+      _errors = Map.of(_errors)..remove('packSize');
+    });
+  }
+
+  void _onCustomPackChanged(String value) {
+    _clearError('packSize');
+    final size = double.tryParse(value.trim().replaceAll(',', '.'));
+    if (size != null && size > 0) {
+      setState(() => _autofillStock(size));
+    }
+  }
+
+  void _autofillStock(double size) {
+    if (!_stockEditedManually) {
+      _stockController.text = _formatEditableNumber(size);
+      _errors = Map.of(_errors)..remove('stock');
+    }
+  }
+
+  void _toggleBuiltInTag(RoasteryNoteTag tag, bool selected) {
     setState(() {
       _selectedTags = {..._selectedTags};
       if (selected) {
-        _selectedTags.add(tag);
+        _selectedTags.add(tag.databaseValue);
       } else {
-        _selectedTags.remove(tag);
+        _selectedTags.remove(tag.databaseValue);
       }
+      _errors = Map.of(_errors)..remove('tags');
+    });
+  }
+
+  Future<void> _addCustomTag() async {
+    if (_selectedTags.length >= BeanValidation.maximumTagCount) {
+      setState(() {
+        _errors = {
+          ..._errors,
+          'tags': 'Maksimal ${BeanValidation.maximumTagCount} tag per biji.',
+        };
+      });
+      return;
+    }
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => const AppInputDialog(
+        title: 'Tambah tasting note',
+        fieldLabel: 'Nama tag',
+        primaryLabel: 'Tambahkan',
+        maxLength: BeanValidation.maximumCustomTagLength,
+      ),
+    );
+    if (value == null || !mounted) {
+      return;
+    }
+    final error = BeanValidation.validateCustomTag(
+      value,
+      existingTags: _selectedTags,
+    );
+    if (error != null) {
+      setState(() => _errors = {..._errors, 'tags': error});
+      return;
+    }
+    setState(() {
+      _selectedTags = {..._selectedTags, BeanValidation.normalizeTag(value)};
+      _errors = Map.of(_errors)..remove('tags');
+    });
+  }
+
+  void _removeTag(String tag) {
+    setState(() {
+      _selectedTags = {..._selectedTags}..remove(tag);
+      _errors = Map.of(_errors)..remove('tags');
     });
   }
 
@@ -383,25 +582,27 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       confirmText: 'Pilih',
     );
     if (selected != null && mounted) {
-      setState(() {
-        _roastDate = _formatDate(selected);
-      });
+      setState(() => _roastDate = _formatDate(selected));
     }
   }
 
   Future<void> _submit() async {
+    final packSizeText = _selectedPackSizeText;
     final errors = BeanValidation.validate(
       name: _nameController.text,
       species: _species,
       stockText: _stockController.text,
       priceText: _priceController.text,
+      packSizeText: packSizeText,
+      customPackSelected: _customPackSelected,
       currency: _currency,
       arabicaPercent: _arabicaPercent,
+      process: _process,
+      processCustom: _processCustomController.text,
+      tags: _selectedTags,
     );
     if (errors.isNotEmpty) {
-      setState(() {
-        _errors = errors;
-      });
+      setState(() => _errors = errors);
       return;
     }
 
@@ -415,8 +616,12 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       isSelfRoasted: _isSelfRoasted,
       origin: _originController.text,
       process: _process,
+      processCustom: _processCustomController.text,
       roastLevel: _roastLevel,
       roastDate: _roastDate,
+      packSizeG: packSizeText.isEmpty
+          ? null
+          : BeanValidation.parseNumber(packSizeText),
       priceOriginal: priceText.isEmpty
           ? null
           : BeanValidation.parseNumber(priceText),
@@ -433,11 +638,17 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     }
   }
 
+  String get _selectedPackSizeText {
+    if (_customPackSelected) {
+      return _customPackController.text;
+    }
+    final size = _packSizeG;
+    return size == null ? '' : _formatEditableNumber(size);
+  }
+
   void _clearError(String field) {
     if (_errors.containsKey(field)) {
-      setState(() {
-        _errors = Map.of(_errors)..remove(field);
-      });
+      setState(() => _errors = Map.of(_errors)..remove(field));
     }
   }
 

@@ -85,19 +85,32 @@ enum RoasteryNoteTag {
   final String databaseValue;
   final String label;
 
-  static List<RoasteryNoteTag> fromDatabase(String? value) {
+  static String labelForValue(String value) {
+    for (final tag in values) {
+      if (tag.databaseValue == value) {
+        return tag.label;
+      }
+    }
+    return value;
+  }
+
+  static bool isBuiltIn(String value) {
+    return values.any((tag) => tag.databaseValue == value);
+  }
+}
+
+abstract final class BeanTagValues {
+  static List<String> fromDatabase(String? value) {
     if (value == null || value.trim().isEmpty) {
       return const [];
     }
-    final tagsByValue = {for (final tag in values) tag.databaseValue: tag};
     final tags = value
         .split(',')
-        .map((item) => tagsByValue[item.trim()])
-        .whereType<RoasteryNoteTag>()
+        .map((item) => item.trim().toLowerCase())
+        .where((item) => item.isNotEmpty)
+        .toSet()
         .toList();
-    tags.sort(
-      (left, right) => left.databaseValue.compareTo(right.databaseValue),
-    );
+    tags.sort();
     return tags;
   }
 }
@@ -127,8 +140,10 @@ class Bean {
     this.roastery,
     this.origin,
     this.process,
+    this.processCustom,
     this.roastLevel,
     this.roastDate,
+    this.packSizeG,
     this.priceOriginal,
     this.currency,
     this.roasteryNotesText,
@@ -145,13 +160,15 @@ class Bean {
   final bool isSelfRoasted;
   final String? origin;
   final BeanProcess? process;
+  final String? processCustom;
   final RoastLevel? roastLevel;
   final String? roastDate;
+  final double? packSizeG;
   final double? priceOriginal;
   final String? currency;
   final double initialStockG;
   final double remainingStockG;
-  final List<RoasteryNoteTag> roasteryNotesTags;
+  final List<String> roasteryNotesTags;
   final String? roasteryNotesText;
   final String? bestBrewId;
   final bool archived;
@@ -174,13 +191,15 @@ class Bean {
       isSelfRoasted: map['is_self_roasted'] == 1,
       origin: map['origin'] as String?,
       process: BeanProcess.fromDatabase(map['process'] as String?),
+      processCustom: map['process_custom'] as String?,
       roastLevel: RoastLevel.fromDatabase(map['roast_level'] as String?),
       roastDate: map['roast_date'] as String?,
+      packSizeG: (map['pack_size_g'] as num?)?.toDouble(),
       priceOriginal: (map['price_original'] as num?)?.toDouble(),
       currency: map['currency'] as String?,
       initialStockG: (map['initial_stock_g']! as num).toDouble(),
       remainingStockG: (map['remaining_stock_g']! as num).toDouble(),
-      roasteryNotesTags: RoasteryNoteTag.fromDatabase(
+      roasteryNotesTags: BeanTagValues.fromDatabase(
         map['roastery_notes_tags'] as String?,
       ),
       roasteryNotesText: map['roastery_notes_text'] as String?,
@@ -206,8 +225,10 @@ class BeanDraft {
     this.roastery,
     this.origin,
     this.process,
+    this.processCustom,
     this.roastLevel,
     this.roastDate,
+    this.packSizeG,
     this.priceOriginal,
     this.currency,
     this.roasteryNotesText,
@@ -221,11 +242,13 @@ class BeanDraft {
   final bool isSelfRoasted;
   final String? origin;
   final BeanProcess? process;
+  final String? processCustom;
   final RoastLevel? roastLevel;
   final String? roastDate;
+  final double? packSizeG;
   final double? priceOriginal;
   final String? currency;
   final double initialStockG;
-  final List<RoasteryNoteTag> roasteryNotesTags;
+  final List<String> roasteryNotesTags;
   final String? roasteryNotesText;
 }

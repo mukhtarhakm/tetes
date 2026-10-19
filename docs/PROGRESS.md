@@ -7,7 +7,7 @@ Perbarui di akhir setiap sesi.
 | Sprint | Fokus | Spec | Status | Catatan |
 |---|---|---|---|---|
 | 1 | Fondasi, login online buatan sendiri, biometrik, navigasi | 00, 01 | Selesai | Fitur 00 selesai. Fitur 01: server (register, login, logout, pembatasan percobaan) dan Flutter (register, login, session, guard, logout, biometrik) sudah diimplementasikan. Fitur 01 lolos uji di HP  |
-| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Fitur 02 Sesi A selesai: repository, form, daftar, dan detail biji tanpa kurs |
+| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Fitur 02 tanpa kurs diperbarui dengan ukuran kemasan, proses khusus, dan tag buatan sendiri |
 | 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Belum mulai | |
 | 4 | Jurnal | 04 | Belum mulai | |
 | 5 | Sinkronisasi dan AI | 05 | Belum mulai | |
@@ -18,7 +18,9 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-19: Fitur 02 Sesi A selesai diimplementasikan tanpa kurs. Tab Seduh sekarang menampilkan daftar biji aktif dengan keadaan memuat, kosong, galat, dan berhasil. Form tambah/ubah mendukung seluruh field profil, validasi harga dan stok nonnegatif, spesies campuran dengan persen arabika, roasting sendiri, tanggal roasting, serta tag notes yang disimpan terurut. Detail menampilkan profil, stok tersisa dari query seduhan aktif, harga asli, notes, dan pengaturan terbaik sementara. Insert, update, dan arsip selalu memakai `user_id` session aktif, memperbarui `updated_at`, serta menyetel `sync_status = pending`. Biji hanya dapat diarsipkan dan tidak memiliki hard-delete karena tabel `beans` tidak mempunyai kolom `deleted` dan sinkronisasi memerlukan rekam data yang tetap ada. Kolom kurs tetap kosong, termasuk untuk IDR, sampai Sesi B. Seluruh 50 tes lulus dan `flutter analyze` bersih.
+2026-10-19: `AppChip` kini mengikuti lebar isi sehingga kelompok chip tersusun berdampingan, dan mata uang pada form biji memakai dropdown pil sejajar dengan harga kemasan.
+2026-10-19: Tampilan `AppChip` diperjelas dengan latar `surface` dan garis `divider` pada chip terang yang tidak aktif; seluruh kelompok chip form biji memakai `Wrap` dan jarak token tanpa memotong teks.
+2026-10-19: Fitur 02 tanpa kurs diperbarui. Migrasi SQLite v2 menambahkan `pack_size_g` dan `process_custom` tanpa mengubah migrasi 1; instalasi baru dan upgrade v1 menghasilkan skema akhir yang sama. Form mengikuti urutan baru, harga berarti harga satu kemasan, ukuran kemasan dapat dipilih lewat chip atau diisi sendiri, dan stok terisi otomatis sampai diedit manual. Proses Lainnya serta tag notes buatan sendiri divalidasi, disimpan terurut, dan tetap dapat diedit. Detail aman untuk biji lama yang belum memiliki ukuran kemasan. Kolom kurs tetap kosong sampai sesi kurs. Biji tetap hanya dapat diarsipkan, bukan hard-delete. Seluruh 59 tes lulus dan `flutter analyze` bersih.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)

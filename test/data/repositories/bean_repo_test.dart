@@ -73,14 +73,13 @@ void main() {
         species: BeanSpecies.campuran,
         arabicaPercent: 70,
         isSelfRoasted: true,
+        process: BeanProcess.lainnya,
+        processCustom: 'anaerobik',
+        packSizeG: 250,
         priceOriginal: 100000,
         currency: 'IDR',
         initialStockG: 250,
-        roasteryNotesTags: const [
-          RoasteryNoteTag.manis,
-          RoasteryNoteTag.asam,
-          RoasteryNoteTag.cokelat,
-        ],
+        roasteryNotesTags: const ['manis', 'beri merah', 'asam'],
       ),
     );
 
@@ -92,18 +91,17 @@ void main() {
 
     expect(row['is_self_roasted'], 1);
     expect(row['roastery'], BeanDefaults.selfRoasteryName);
-    expect(row['roastery_notes_tags'], 'asam,cokelat,manis');
+    expect(row['pack_size_g'], 250);
+    expect(row['process'], 'lainnya');
+    expect(row['process_custom'], 'anaerobik');
+    expect(row['roastery_notes_tags'], 'asam,beri merah,manis');
     expect(row['fx_rate'], isNull);
     expect(row['fx_date'], isNull);
     expect(row['price_idr_per_kg'], isNull);
     expect(row['sync_status'], 'pending');
 
     final bean = await repository.findById(userId: 'user-1', id: beanId);
-    expect(bean!.roasteryNotesTags.map((tag) => tag.databaseValue), [
-      'asam',
-      'cokelat',
-      'manis',
-    ]);
+    expect(bean!.roasteryNotesTags, ['asam', 'beri merah', 'manis']);
 
     await database.update(
       'beans',
@@ -123,6 +121,34 @@ void main() {
     )).single;
     expect(updatedRow['sync_status'], 'pending');
   });
+
+  test(
+    'biji lama dengan harga tanpa ukuran kemasan tetap dapat dibaca',
+    () async {
+      await database.insert('beans', {
+        'id': 'legacy-bean',
+        'user_id': 'user-1',
+        'name': 'Biji lama',
+        'species': 'arabika',
+        'price_original': 75000,
+        'currency': 'IDR',
+        'initial_stock_g': 200,
+        'roastery_notes_tags': 'cokelat,unik lama',
+        'created_at': '2026-10-19T00:00:00Z',
+        'updated_at': '2026-10-19T00:00:00Z',
+      });
+
+      final bean = await repository.findById(
+        userId: 'user-1',
+        id: 'legacy-bean',
+      );
+
+      expect(bean, isNotNull);
+      expect(bean!.packSizeG, isNull);
+      expect(bean.priceOriginal, 75000);
+      expect(bean.roasteryNotesTags, ['cokelat', 'unik lama']);
+    },
+  );
 }
 
 BeanDraft _draft({String name = 'Biji Uji', double stock = 200}) {

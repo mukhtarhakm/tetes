@@ -3,9 +3,12 @@ import 'package:sqflite/sqflite.dart';
 typedef DatabaseMigration = Future<void> Function(DatabaseExecutor database);
 
 abstract final class DatabaseMigrations {
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
 
-  static final Map<int, DatabaseMigration> _migrations = {1: _migration1};
+  static final Map<int, DatabaseMigration> _migrations = {
+    1: _migration1,
+    2: _migration2,
+  };
 
   static Future<void> create(Database database, int version) {
     return migrate(database, 0, version);
@@ -183,5 +186,10 @@ abstract final class DatabaseMigrations {
     await database.execute(
       'CREATE INDEX idx_events_user_time ON events(user_id, start_utc)',
     );
+  }
+
+  static Future<void> _migration2(DatabaseExecutor database) async {
+    await database.execute('ALTER TABLE beans ADD COLUMN pack_size_g REAL');
+    await database.execute('ALTER TABLE beans ADD COLUMN process_custom TEXT');
   }
 }
