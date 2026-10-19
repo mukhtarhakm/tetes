@@ -88,6 +88,9 @@ class _FailingSessionStorage implements SessionStorage {
   Future<StoredSession?> readSession() async => null;
 
   @override
+  Future<List<String>> readPendingRevokeTokens() async => const [];
+
+  @override
   Future<void> saveSession({
     required String token,
     required String userId,
@@ -95,4 +98,7 @@ class _FailingSessionStorage implements SessionStorage {
   }) {
     throw const SessionStorageException();
   }
+
+  @override
+  Future<void> writePendingRevokeTokens(List<String> tokens) async {}
 }

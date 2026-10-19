@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SessionStorageException implements Exception {
@@ -26,6 +28,10 @@ abstract interface class SessionStorage {
   Future<StoredSession?> readSession();
 
   Future<void> clearSession();
+
+  Future<List<String>> readPendingRevokeTokens();
+
+  Future<void> writePendingRevokeTokens(List<String> tokens);
 }
 
 class SecureSessionStorage implements SessionStorage {
@@ -34,6 +40,7 @@ class SecureSessionStorage implements SessionStorage {
   static const _tokenKey = 'session_token';
   static const _userIdKey = 'user_id';
   static const _expiresAtKey = 'expires_at';
+  static const _pendingRevokeTokenKey = 'pending_revoke_token';
 
   final FlutterSecureStorage _storage;
 
@@ -87,6 +94,41 @@ class SecureSessionStorage implements SessionStorage {
         _storage.delete(key: _userIdKey),
         _storage.delete(key: _expiresAtKey),
       ]);
+    } catch (_) {
+      throw const SessionStorageException();
+    }
+  }
+
+  @override
+  Future<List<String>> readPendingRevokeTokens() async {
+    try {
+      final value = await _storage.read(key: _pendingRevokeTokenKey);
+      if (value == null) {
+        return const [];
+      }
+
+      final decoded = jsonDecode(value);
+      if (decoded is! List ||
+          decoded.any((token) => token is! String || token.isEmpty)) {
+        throw const FormatException();
+      }
+      return List<String>.unmodifiable(decoded.cast<String>());
+    } catch (_) {
+      throw const SessionStorageException();
+    }
+  }
+
+  @override
+  Future<void> writePendingRevokeTokens(List<String> tokens) async {
+    try {
+      if (tokens.isEmpty) {
+        await _storage.delete(key: _pendingRevokeTokenKey);
+        return;
+      }
+      await _storage.write(
+        key: _pendingRevokeTokenKey,
+        value: jsonEncode(tokens),
+      );
     } catch (_) {
       throw const SessionStorageException();
     }

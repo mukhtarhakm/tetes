@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../data/remote/auth_client.dart';
 import 'auth_providers.dart';
 import 'session_controller.dart';
@@ -33,11 +34,14 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<bool> login({required String username, required String password}) {
-    return _submit(
-      () async => (await ref.read(
+    return _submit(() async {
+      await ref
+          .read(sessionRevocationQueueProvider)
+          .retryPending(totalTimeout: AppConfig.pendingRevokeRetryTimeout);
+      return (await ref.read(
         userRepositoryProvider.future,
-      )).login(username: username, password: password),
-    );
+      )).login(username: username, password: password);
+    });
   }
 
   void clearErrors() {

@@ -34,6 +34,29 @@ class UserRepository {
     return session.user.id;
   }
 
+  Future<int> countPendingSyncData(String userId) async {
+    final rows = await _database.rawQuery('''
+      SELECT SUM(pending_count) AS total
+      FROM (
+        SELECT COUNT(*) AS pending_count FROM beans
+          WHERE user_id = ? AND sync_status = 'pending'
+        UNION ALL
+        SELECT COUNT(*) FROM brews
+          WHERE user_id = ? AND sync_status = 'pending'
+        UNION ALL
+        SELECT COUNT(*) FROM events
+          WHERE user_id = ? AND sync_status = 'pending'
+        UNION ALL
+        SELECT COUNT(*) FROM game_scores
+          WHERE user_id = ? AND sync_status = 'pending'
+        UNION ALL
+        SELECT COUNT(*) FROM feedback
+          WHERE user_id = ? AND sync_status = 'pending'
+      )
+      ''', List.filled(5, userId));
+    return (rows.single['total'] as num?)?.toInt() ?? 0;
+  }
+
   Future<void> _persistAuthentication(AuthSession session) async {
     try {
       await _database.rawInsert(

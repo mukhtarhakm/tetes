@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../session/session_decision.dart';
+import '../session/session_revocation_queue.dart';
 import 'auth_providers.dart';
 
 enum SessionStatus { authenticated, unauthenticated }
@@ -29,6 +32,19 @@ class SessionController extends AsyncNotifier<SessionState> {
   Future<SessionState> build() async {
     final storage = ref.watch(sessionStorageProvider);
     final storedSession = await storage.readSession();
+    final pendingTokens = await storage.readPendingRevokeTokens();
+    final interruptedLogout =
+        storedSession != null && pendingTokens.contains(storedSession.token);
+    if (interruptedLogout) {
+      await storage.clearSession();
+    }
+    unawaited(ref.watch(sessionRevocationQueueProvider).retryPending());
+    if (interruptedLogout) {
+      return const SessionState.unauthenticated(
+        message:
+            'Kamu sudah keluar. Sesi di server akan dicabut saat tersambung.',
+      );
+    }
     final decision = decideSession(storedSession, now: DateTime.now().toUtc());
 
     return switch (decision.type) {
@@ -48,6 +64,24 @@ class SessionController extends AsyncNotifier<SessionState> {
     state = AsyncData(SessionState.authenticated(userId));
   }
 
+  Future<void> logout() async {
+    final storage = ref.read(sessionStorageProvider);
+    final storedSession = await storage.readSession();
+    final token = storedSession?.token;
+
+    if (token != null) {
+      await ref.read(sessionRevocationQueueProvider).enqueue(token);
+    }
+    await storage.clearSession();
+    state = const AsyncData(
+      SessionState.unauthenticated(message: 'Kamu sudah keluar.'),
+    );
+
+    if (token != null) {
+      unawaited(_finishLogoutRevocation(token));
+    }
+  }
+
   Future<void> forceLogout() async {
     try {
       await ref.read(sessionStorageProvider).clearSession();
@@ -63,5 +97,24 @@ class SessionController extends AsyncNotifier<SessionState> {
   Future<SessionState> _clearInvalidSession({required String message}) async {
     await ref.read(sessionStorageProvider).clearSession();
     return SessionState.unauthenticated(message: message);
+  }
+
+  Future<void> _finishLogoutRevocation(String token) async {
+    final result = await ref
+        .read(sessionRevocationQueueProvider)
+        .revokeQueuedToken(token);
+    if (result != RevocationResult.deferred) {
+      return;
+    }
+
+    final current = state.asData?.value;
+    if (current?.status == SessionStatus.unauthenticated) {
+      state = const AsyncData(
+        SessionState.unauthenticated(
+          message:
+              'Kamu sudah keluar. Sesi di server akan dicabut saat tersambung.',
+        ),
+      );
+    }
   }
 }

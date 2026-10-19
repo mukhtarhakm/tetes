@@ -58,7 +58,11 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
-class AuthClient {
+abstract interface class SessionRevocationClient {
+  Future<void> revokeSession({required String token, Duration? requestTimeout});
+}
+
+class AuthClient implements SessionRevocationClient {
   AuthClient({
     http.Client? client,
     this.baseUrl = AppConfig.functionsBaseUrl,
@@ -91,6 +95,49 @@ class AuthClient {
       username: username,
       password: password,
     );
+  }
+
+  @override
+  Future<void> revokeSession({
+    required String token,
+    Duration? requestTimeout,
+  }) async {
+    late http.Response response;
+    try {
+      response = await _client
+          .post(
+            Uri.parse('$baseUrl/auth-logout'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'x-session-token': token,
+            },
+            body: '{}',
+          )
+          .timeout(requestTimeout ?? timeout);
+    } on TimeoutException {
+      throw const AuthException(
+        type: AuthFailureType.timeout,
+        message: 'Server membutuhkan waktu terlalu lama. Silakan coba lagi.',
+      );
+    } on SocketException {
+      throw const AuthException(
+        type: AuthFailureType.network,
+        message: 'Tidak dapat terhubung ke internet.',
+      );
+    } on http.ClientException {
+      throw const AuthException(
+        type: AuthFailureType.network,
+        message: 'Tidak dapat terhubung ke internet.',
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw const AuthException(
+        type: AuthFailureType.server,
+        message: 'Sesi server belum dapat dicabut.',
+      );
+    }
   }
 
   void close() {

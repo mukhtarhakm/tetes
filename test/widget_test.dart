@@ -98,16 +98,21 @@ void main() {
 class _FakeSessionStorage implements SessionStorage {
   _FakeSessionStorage(this._session);
 
-  final StoredSession? _session;
+  StoredSession? _session;
   bool wasCleared = false;
+  List<String> pendingTokens = [];
 
   @override
   Future<void> clearSession() async {
     wasCleared = true;
+    _session = null;
   }
 
   @override
   Future<StoredSession?> readSession() async => _session;
+
+  @override
+  Future<List<String>> readPendingRevokeTokens() async => [...pendingTokens];
 
   @override
   Future<void> saveSession({
@@ -115,4 +120,9 @@ class _FakeSessionStorage implements SessionStorage {
     required String userId,
     required String expiresAt,
   }) async {}
+
+  @override
+  Future<void> writePendingRevokeTokens(List<String> tokens) async {
+    pendingTokens = [...tokens];
+  }
 }

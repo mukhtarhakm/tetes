@@ -57,6 +57,42 @@ void main() {
     expect(capturedRequest.url.path, endsWith('/auth-register'));
   });
 
+  test('logout mengirim token di header dan body JSON kosong', () async {
+    late http.Request capturedRequest;
+    final client = AuthClient(
+      client: MockClient((request) async {
+        capturedRequest = request;
+        return http.Response('{"ok":true}', 200);
+      }),
+      baseUrl: 'https://example.com/functions/v1',
+    );
+
+    await client.revokeSession(token: 'token-rahasia');
+
+    expect(capturedRequest.url.path, endsWith('/auth-logout'));
+    expect(capturedRequest.headers['x-session-token'], 'token-rahasia');
+    expect(capturedRequest.headers.containsKey('apikey'), isFalse);
+    expect(capturedRequest.headers.containsKey('x-debug-timing'), isFalse);
+    expect(jsonDecode(capturedRequest.body), isEmpty);
+  });
+
+  test('logout hanya menganggap status 200 berhasil', () async {
+    final client = AuthClient(
+      client: MockClient((_) async => http.Response('{"ok":false}', 401)),
+    );
+
+    await expectLater(
+      client.revokeSession(token: 'token-rahasia'),
+      throwsA(
+        isA<AuthException>().having(
+          (error) => error.type,
+          'type',
+          AuthFailureType.server,
+        ),
+      ),
+    );
+  });
+
   test('400 memetakan galat per kolom', () async {
     final client = _clientForResponse(400, {
       'error': {
