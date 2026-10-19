@@ -8,6 +8,7 @@ import '../../core/ui/app_dialog.dart';
 import '../../core/ui/state_views.dart';
 import '../../features/auth/state/auth_providers.dart';
 import '../../features/auth/state/session_controller.dart';
+import '../../features/beans/screens/bean_list_screen.dart';
 import '../router/app_routes.dart';
 import '../theme/tokens.dart';
 
@@ -39,16 +40,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          _TabEmptyView(
-            title: 'Seduh',
-            message: 'Belum ada seduhan. Alat bantu seduh akan hadir di sini.',
-            icon: Icons.coffee_rounded,
-            // Sementara untuk menguji rute layar contoh Langkah 2.
-            actionLabel: 'Lihat komponen dasar',
-            onActionPressed: () {
-              Navigator.of(context).pushNamed(AppRoutes.foundationPreview);
-            },
-          ),
+          const BeanListScreen(),
           const _TabEmptyView(
             title: 'Jurnal',
             message: 'Riwayat seduhanmu akan muncul di sini.',
@@ -156,15 +148,11 @@ class _TabEmptyView extends StatelessWidget {
     required this.title,
     required this.message,
     required this.icon,
-    this.actionLabel,
-    this.onActionPressed,
   });
 
   final String title;
   final String message;
   final IconData icon;
-  final String? actionLabel;
-  final VoidCallback? onActionPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -176,8 +164,6 @@ class _TabEmptyView extends StatelessWidget {
           title: title,
           message: message,
           icon: icon,
-          actionLabel: actionLabel,
-          onActionPressed: onActionPressed,
         ),
       ),
     );

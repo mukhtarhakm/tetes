@@ -7,7 +7,7 @@ Perbarui di akhir setiap sesi.
 | Sprint | Fokus | Spec | Status | Catatan |
 |---|---|---|---|---|
 | 1 | Fondasi, login online buatan sendiri, biometrik, navigasi | 00, 01 | Selesai | Fitur 00 selesai. Fitur 01: server (register, login, logout, pembatasan percobaan) dan Flutter (register, login, session, guard, logout, biometrik) sudah diimplementasikan. Fitur 01 lolos uji di HP  |
-| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Belum mulai | |
+| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Fitur 02 Sesi A selesai: repository, form, daftar, dan detail biji tanpa kurs |
 | 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Belum mulai | |
 | 4 | Jurnal | 04 | Belum mulai | |
 | 5 | Sinkronisasi dan AI | 05 | Belum mulai | |
@@ -18,7 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-19: Fitur 01 selesai diimplementasikan. Server: auth-register, auth-login (pembatasan 5 percobaan per 15 menit), auth-logout idempoten, dan helper session. Waktu hash PBKDF2 600.000 iterasi sekitar 110 ms di Edge Function. Flutter: layar Register dan Login, secure storage untuk session, guard session yang bisa dibuka offline, logout nyata dengan antrean pencabutan tertunda, dan biometrik lewat local_auth (tawaran setelah login, gerbang saat membuka aplikasi, "Pakai password" memakai alur logout). 41 tes lulus dan flutter analyze bersih. Biometrik lolos uji di HP. Berikutnya: Fitur 02 (biji dan kurs).
+2026-10-19: Fitur 02 Sesi A selesai diimplementasikan tanpa kurs. Tab Seduh sekarang menampilkan daftar biji aktif dengan keadaan memuat, kosong, galat, dan berhasil. Form tambah/ubah mendukung seluruh field profil, validasi harga dan stok nonnegatif, spesies campuran dengan persen arabika, roasting sendiri, tanggal roasting, serta tag notes yang disimpan terurut. Detail menampilkan profil, stok tersisa dari query seduhan aktif, harga asli, notes, dan pengaturan terbaik sementara. Insert, update, dan arsip selalu memakai `user_id` session aktif, memperbarui `updated_at`, serta menyetel `sync_status = pending`. Biji hanya dapat diarsipkan dan tidak memiliki hard-delete karena tabel `beans` tidak mempunyai kolom `deleted` dan sinkronisasi memerlukan rekam data yang tetap ada. Kolom kurs tetap kosong, termasuk untuk IDR, sampai Sesi B. Seluruh 50 tes lulus dan `flutter analyze` bersih.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)

@@ -46,6 +46,7 @@ abstract final class AppSizes {
   static const statePreviewHeight = 260.0;
   static const dialogMaxWidth = 420.0;
   static const progressStroke = 2.0;
+  static const chipHeight = 36.0;
 }
 
 abstract final class AppInsets {
@@ -65,6 +66,14 @@ abstract final class AppInsets {
     vertical: AppSpacing.s8,
   );
   static const bottomNavigationItem = EdgeInsets.all(AppSpacing.s4);
+  static const chip = EdgeInsets.symmetric(
+    horizontal: AppSpacing.s12,
+    vertical: AppSpacing.s8,
+  );
+  static const statusPill = EdgeInsets.symmetric(
+    horizontal: AppSpacing.s12,
+    vertical: AppSpacing.s4,
+  );
 }
 
 abstract final class AppShadows {

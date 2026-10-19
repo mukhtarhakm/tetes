@@ -65,10 +65,7 @@ void main() {
     );
     await _pumpAsyncUi(tester);
 
-    expect(
-      find.text('Belum ada seduhan. Alat bantu seduh akan hadir di sini.'),
-      findsOneWidget,
-    );
+    expect(find.text('Biji kopi'), findsOneWidget);
     expect(find.text('Masuk ke Tetes'), findsNothing);
   });
 
@@ -106,10 +103,7 @@ void main() {
 
     expect(find.text('Buka Tetes'), findsOneWidget);
     expect(find.text('Coba lagi'), findsOneWidget);
-    expect(
-      find.text('Belum ada seduhan. Alat bantu seduh akan hadir di sini.'),
-      findsNothing,
-    );
+    expect(find.text('Biji kopi'), findsNothing);
     expect(authenticator.authenticationAttempts, 1);
 
     await tester.pump();
@@ -151,10 +145,7 @@ void main() {
 
     expect(find.text('Pakai password'), findsOneWidget);
     expect(find.text('Coba lagi'), findsNothing);
-    expect(
-      find.text('Belum ada seduhan. Alat bantu seduh akan hadir di sini.'),
-      findsNothing,
-    );
+    expect(find.text('Biji kopi'), findsNothing);
   });
 
   testWidgets('session kedaluwarsa dibersihkan dan menampilkan pesan', (
