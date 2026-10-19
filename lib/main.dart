@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
       title: 'Tetes',
       theme: AppTheme.light,
       themeMode: ThemeMode.light,
-      initialRoute: AppRoutes.home,
+      initialRoute: AppRoutes.login,
       routes: AppRouter.routes,
     );
   }

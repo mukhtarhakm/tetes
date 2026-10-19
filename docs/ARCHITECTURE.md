@@ -67,6 +67,7 @@ lib/
   data/
     db/                     pembuka database, migrasi, DAO
     repositories/           BeanRepo, BrewRepo, EventRepo, ScoreRepo, FeedbackRepo, UserRepo
+    secure/                 penyimpanan token session dan data sensitif lokal
     sync/                   SyncClient, antrean, pemetaan baris <-> JSON
     remote/                 AuthClient, FxClient, AiClient
   features/
@@ -419,8 +420,8 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 |---|---|
 | Versi Flutter / Dart | Flutter 3.44.8 / Dart 3.12.2 |
 | Package ID | `com.raismukhtar.tetes` |
-| Versi paket utama | `flutter_riverpod` 3.4.3, `sqflite` 2.4.4+2, `path` 1.9.1; tes database: `sqflite_common_ffi` 2.4.4 |
-| URL proyek Supabase | (isi, bukan rahasia) |
+| Versi paket utama | `flutter_riverpod` 3.4.3, `sqflite` 2.4.4+2, `path` 1.9.1, `http` 1.6.0, `flutter_secure_storage` 11.2.0; tes database: `sqflite_common_ffi` 2.4.4 |
+| URL proyek Supabase | `https://osqznapcbeceaizpvccc.supabase.co` (bukan rahasia) |
 | Model LLM | (isi dari AI Studio, disimpan sebagai environment `AI_MODEL`) |
 | API kurs | (isi setelah diuji) |
 | Platform uji | HP Android 16 (API 36) |

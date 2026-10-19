@@ -1,0 +1,26 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../../../data/db/database_provider.dart';
+import '../../../data/remote/auth_client.dart';
+import '../../../data/repositories/user_repo.dart';
+import '../../../data/secure/session_storage.dart';
+
+final authClientProvider = Provider<AuthClient>((ref) {
+  final client = AuthClient();
+  ref.onDispose(client.close);
+  return client;
+});
+
+final sessionStorageProvider = Provider<SessionStorage>((ref) {
+  return const SecureSessionStorage(FlutterSecureStorage());
+});
+
+final userRepositoryProvider = FutureProvider<UserRepository>((ref) async {
+  final database = await ref.watch(databaseProvider.future);
+  return UserRepository(
+    database,
+    ref.watch(authClientProvider),
+    ref.watch(sessionStorageProvider),
+  );
+});

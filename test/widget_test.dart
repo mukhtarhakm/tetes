@@ -17,7 +17,7 @@ void main() {
     await database.close();
   });
 
-  testWidgets('menampilkan navigasi setelah database siap', (tester) async {
+  testWidgets('menampilkan login setelah database siap', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [databaseProvider.overrideWithValue(AsyncData(database))],
@@ -26,10 +26,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Seduh'), findsWidgets);
-    expect(
-      find.text('Belum ada seduhan. Alat bantu seduh akan hadir di sini.'),
-      findsOneWidget,
-    );
+    expect(find.text('Masuk ke Tetes'), findsOneWidget);
+    expect(find.text('Username'), findsOneWidget);
+    expect(find.text('Masuk'), findsOneWidget);
   });
 }

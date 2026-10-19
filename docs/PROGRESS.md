@@ -18,7 +18,7 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
-2026-10-18: Fitur 01 sisi server langkah 3 siap diuji. Migrasi baru menambahkan RPC atomik `increment_login_attempt(p_username, p_window_start)` khusus service role. `auth-login` memeriksa batas sebelum PBKDF2, memberi lima respons `401` lalu `429`, menjalankan PBKDF2 pura-pura untuk username yang tidak ada, memakai perbandingan waktu-konstan, dan membuat session 7 hari saat berhasil. `auth-logout` mencabut session secara idempoten, sedangkan `_shared/session.ts` menyiapkan validasi session bagi fungsi sinkronisasi dan AI. Belum dilakukan `db push` atau deploy; pengujian dilakukan melalui Supabase CLI dan curl.
+2026-10-19: Fitur 01 sisi Flutter untuk Register dan Login selesai diimplementasikan. `AuthClient` memanggil Edge Function tanpa `apikey` atau header debug, memetakan galat server/jaringan/timeout, dan memakai batas waktu 20 detik. Register serta login sukses meng-upsert cache profil SQLite, menyimpan token, `user_id`, dan `expires_at` melalui secure storage, lalu membuka shell utama. Form memakai validasi klien, komponen bersama, state Riverpod tanpa password, serta pesan `429` dalam menit. Seluruh 19 tes lulus, `flutter analyze` bersih, dan APK debug berhasil dibangun tanpa perubahan konfigurasi Gradle. Guard session penuh, biometrik, dan logout nyata belum dikerjakan.
 
 ## Masalah terbuka
 (bug yang belum beres, hal yang menunggu jawaban dosen)
