@@ -76,7 +76,106 @@ void main() {
 
     expect(input.split('|')[7], 'asam,cokelat,seimbang');
   });
+
+  test('daftar kosong adalah rantai utuh dengan nol entri', () {
+    expect(verifyChain(const []), 'utuh (0 entri)');
+  });
+
+  test('rantai utuh tetap menghitung entri dibatalkan', () {
+    final first = _chainEntry(
+      seq: 1,
+      data: _hashData(),
+      prevHash: '0',
+      hash: entry1Hash,
+    );
+    final second = _chainEntry(
+      seq: 2,
+      data: _secondHashData(),
+      prevHash: entry1Hash,
+      hash: entry2Hash,
+      status: 'dibatalkan',
+    );
+
+    expect(hashEntry(first.data, first.prevHash), entry1Hash);
+    expect(hashEntry(second.data, second.prevHash), entry2Hash);
+    expect(verifyChain([first, second]), 'utuh (2 entri)');
+  });
+
+  test('nilai inti yang diubah memutus rantai di entri pertama yang gagal', () {
+    final entries = [
+      _chainEntry(seq: 1, data: _hashData(), prevHash: '0', hash: entry1Hash),
+      _chainEntry(
+        seq: 2,
+        data: _secondHashData(totalTimeS: 186),
+        prevHash: entry1Hash,
+        hash: entry2Hash,
+      ),
+    ];
+
+    expect(verifyChain(entries), 'rantai putus di seq 2');
+  });
+
+  test('celah seq melaporkan seq yang seharusnya ada', () {
+    final entries = [
+      _chainEntry(seq: 1, data: _hashData(), prevHash: '0', hash: entry1Hash),
+      _chainEntry(
+        seq: 3,
+        data: _secondHashData(),
+        prevHash: entry1Hash,
+        hash: entry2Hash,
+      ),
+    ];
+
+    expect(verifyChain(entries), 'rantai putus di seq 2');
+  });
+
+  test('prev_hash yang tidak cocok memutus rantai', () {
+    const wrongPrevHash = 'f';
+    final entries = [
+      _chainEntry(seq: 1, data: _hashData(), prevHash: '0', hash: entry1Hash),
+      _chainEntry(
+        seq: 2,
+        data: _secondHashData(),
+        prevHash: wrongPrevHash,
+        hash: hashEntry(_secondHashData(), wrongPrevHash),
+      ),
+    ];
+
+    expect(verifyChain(entries), 'rantai putus di seq 2');
+  });
 }
+
+BrewHashData _hashData() => (
+  beanId: '11111111-1111-4111-8111-111111111111',
+  doseG: 15,
+  ratio: 16,
+  waterTempC: 92,
+  grind: Grind.sedang.databaseValue,
+  totalTimeS: 195,
+  tasteScore: 3,
+  tasteTags: const ['asam', 'cokelat'],
+  brewedAtUtc: '2026-10-17T08:30:00Z',
+);
+
+BrewHashData _secondHashData({int totalTimeS = 185}) => (
+  beanId: '11111111-1111-4111-8111-111111111111',
+  doseG: 15,
+  ratio: 15,
+  waterTempC: 90,
+  grind: Grind.sedang.databaseValue,
+  totalTimeS: totalTimeS,
+  tasteScore: 4,
+  tasteTags: const ['cokelat', 'seimbang'],
+  brewedAtUtc: '2026-10-18T08:30:00Z',
+);
+
+BrewChainEntry _chainEntry({
+  required int seq,
+  required BrewHashData data,
+  required String prevHash,
+  required String hash,
+  String status = 'aktif',
+}) => (seq: seq, data: data, prevHash: prevHash, hash: hash, status: status);
 
 String _input({
   required double doseG,

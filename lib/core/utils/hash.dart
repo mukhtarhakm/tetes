@@ -33,6 +33,63 @@ String sha256Hex(String input) {
   return sha256.convert(utf8.encode(input)).toString();
 }
 
+typedef BrewHashData = ({
+  String beanId,
+  double doseG,
+  double ratio,
+  int waterTempC,
+  String grind,
+  int totalTimeS,
+  int tasteScore,
+  Iterable<String> tasteTags,
+  String brewedAtUtc,
+});
+
+typedef BrewChainEntry = ({
+  int seq,
+  BrewHashData data,
+  String prevHash,
+  String hash,
+  String status,
+});
+
+String hashEntry(BrewHashData data, String prevHash) {
+  return sha256Hex(
+    buildHashInput(
+      beanId: data.beanId,
+      doseG: data.doseG,
+      ratio: data.ratio,
+      waterTempC: data.waterTempC,
+      grind: data.grind,
+      totalTimeS: data.totalTimeS,
+      tasteScore: data.tasteScore,
+      tasteTags: data.tasteTags,
+      brewedAtUtc: data.brewedAtUtc,
+      prevHash: prevHash,
+    ),
+  );
+}
+
+String verifyChain(Iterable<BrewChainEntry> entries) {
+  var expectedSeq = 1;
+  var previousHash = '0';
+  for (final entry in entries) {
+    if (entry.seq != expectedSeq || entry.prevHash != previousHash) {
+      return 'rantai putus di seq $expectedSeq';
+    }
+    try {
+      if (entry.hash != hashEntry(entry.data, entry.prevHash)) {
+        return 'rantai putus di seq $expectedSeq';
+      }
+    } on ArgumentError {
+      return 'rantai putus di seq $expectedSeq';
+    }
+    previousHash = entry.hash;
+    expectedSeq++;
+  }
+  return 'utuh (${expectedSeq - 1} entri)';
+}
+
 String _formatRatio(double ratio) {
   if (!ratio.isFinite) {
     throw ArgumentError.value(ratio, 'ratio', 'Rasio harus berupa angka.');
