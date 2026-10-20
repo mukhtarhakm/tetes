@@ -13,6 +13,8 @@ final brewRepositoryProvider = FutureProvider<BrewRepository>((ref) async {
   return BrewRepository(database);
 });
 
+final initialBrewPlanProvider = Provider<BrewPlan?>((ref) => null);
+
 final brewSetupControllerProvider = AsyncNotifierProvider.autoDispose
     .family<BrewSetupController, BrewSetupState, String?>(
       BrewSetupController.new,
@@ -78,7 +80,10 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     if (initialBean == null) {
       return BrewSetupState(beans: beans);
     }
-    final plan = await _loadPlan(userId: userId, bean: initialBean);
+    final customPlan = ref.watch(initialBrewPlanProvider);
+    final plan = (customPlan != null && customPlan.beanId == initialBean.id)
+        ? customPlan
+        : await _loadPlan(userId: userId, bean: initialBean);
     return BrewSetupState(
       beans: beans,
       selectedBeanId: initialBean.id,

@@ -9,6 +9,7 @@ import '../../core/ui/state_views.dart';
 import '../../features/auth/state/auth_providers.dart';
 import '../../features/auth/state/session_controller.dart';
 import '../../features/beans/screens/bean_list_screen.dart';
+import '../../features/journal/screens/journal_screen.dart';
 import '../router/app_routes.dart';
 import '../theme/tokens.dart';
 
@@ -33,6 +34,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   int _currentIndex = 0;
   bool _logoutFlowActive = false;
+  bool _journalVisited = false;
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +43,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         index: _currentIndex,
         children: [
           const BeanListScreen(),
-          const _TabEmptyView(
-            title: 'Jurnal',
-            message: 'Riwayat seduhanmu akan muncul di sini.',
-            icon: Icons.menu_book_outlined,
-          ),
+          _journalVisited ? const JournalScreen() : const SizedBox.shrink(),
           const _TabEmptyView(
             title: 'Eksplor',
             message: 'Agenda, toko, kurs, dan game akan hadir di sini.',
@@ -74,6 +72,9 @@ class _AppShellState extends ConsumerState<AppShell> {
 
           setState(() {
             _currentIndex = index;
+            if (index == 1) {
+              _journalVisited = true;
+            }
           });
         },
       ),

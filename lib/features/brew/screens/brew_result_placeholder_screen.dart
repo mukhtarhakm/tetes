@@ -12,6 +12,7 @@ import '../../../data/repositories/brew_repo.dart';
 import '../../auth/state/session_controller.dart';
 import '../../beans/bean_model.dart';
 import '../../beans/state/bean_providers.dart';
+import '../../journal/state/journal_controller.dart';
 import '../brew_session_result.dart';
 import '../state/brew_setup_controller.dart';
 
@@ -133,6 +134,8 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
         drawdownS: drawdownS,
         notes: notes.text,
       );
+      ref.invalidate(journalBrewsProvider);
+      ref.invalidate(beanListProvider);
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
       ScaffoldMessenger.of(context).showSnackBar(

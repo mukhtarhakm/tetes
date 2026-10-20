@@ -18,12 +18,22 @@ import '../widgets/brew_water_chart.dart';
 import 'brew_session_screen.dart';
 
 class BrewSetupScreen extends ConsumerWidget {
-  const BrewSetupScreen({this.initialBeanId, super.key});
+  const BrewSetupScreen({this.initialBeanId, this.initialPlan, super.key});
 
   final String? initialBeanId;
+  final BrewPlan? initialPlan;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (initialPlan != null) {
+      return ProviderScope(
+        overrides: [
+          initialBrewPlanProvider.overrideWithValue(initialPlan),
+        ],
+        child: BrewSetupScreen(initialBeanId: initialPlan!.beanId),
+      );
+    }
+
     final provider = brewSetupControllerProvider(initialBeanId);
     final setup = ref.watch(provider);
 

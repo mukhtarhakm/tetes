@@ -6,6 +6,7 @@ import '../../features/beans/bean_model.dart';
 import '../../features/brew/brew_calculator.dart';
 import '../../features/brew/brew_plan.dart';
 import '../../features/brew/brew_session_result.dart';
+import '../../features/journal/journal_model.dart';
 
 class BrewSaveException implements Exception {
   const BrewSaveException(this.message);
@@ -14,6 +15,13 @@ class BrewSaveException implements Exception {
 
 double? brewCost(double doseG, double? priceIdrPerKg) =>
     priceIdrPerKg == null ? null : doseG * priceIdrPerKg / 1000;
+
+String escapeSqlLike(String input) {
+  return input
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
+}
 
 class BrewRepository {
   const BrewRepository(this._database);
@@ -295,5 +303,301 @@ class BrewRepository {
     } on TypeError {
       return null;
     }
+  }
+
+  /// Aturan pencarian dan filter jurnal seduhan:
+  /// 1. Selalu dibatasi user_id aktif dengan parameter terikat.
+  /// 2. Entri dibatalkan disembunyikan secara bawaan kecuali includeCancelled = true.
+  /// 3. Pencarian satu kolom (nama biji, roastery, tag rasa, catatan) meng-escape '%' dan '_' dengan ESCAPE '\'.
+  /// 4. Filter biji: mencocokkan salah satu dari biji yang dipilih (OR / IN).
+  /// 5. Filter tag: entri yang memuat salah satu tag terpilih (tag utuh):
+  ///    (',' || br.taste_tags || ',') LIKE '%,tag,%' ESCAPE '\'.
+  /// 6. Rentang tanggal: batas dihitung dari waktu lokal lalu diubah ke UTC ISO 8601 string.
+  ///    Rentang tanggal kustom inklusif sampai akhir hari (23:59:59 lokal -> UTC).
+  /// 7. Semua urutan diakhiri seq DESC sebagai pemutus seri, dan cost_idr kosong selalu di akhir pada pengurutan biaya.
+  Future<List<BrewJournalItem>> findJournalBrews({
+    required String userId,
+    String? searchQuery,
+    Set<String>? beanIds,
+    int? minTasteScore,
+    Set<String>? tasteTags,
+    String? startBrewedAtUtc,
+    String? endBrewedAtUtc,
+    BrewSortOption sortOption = BrewSortOption.newest,
+    bool includeCancelled = false,
+  }) async {
+    final whereClauses = <String>['br.user_id = ?'];
+    final whereArgs = <Object?>[userId];
+
+    if (!includeCancelled) {
+      whereClauses.add("br.status = 'aktif'");
+    }
+
+    final trimmedSearch = searchQuery?.trim();
+    if (trimmedSearch != null && trimmedSearch.isNotEmpty) {
+      final escaped = escapeSqlLike(trimmedSearch);
+      final pattern = '%$escaped%';
+      whereClauses.add('''
+        (
+          b.name LIKE ? ESCAPE '\\' OR
+          (b.roastery IS NOT NULL AND b.roastery LIKE ? ESCAPE '\\') OR
+          br.taste_tags LIKE ? ESCAPE '\\' OR
+          (br.notes IS NOT NULL AND br.notes LIKE ? ESCAPE '\\')
+        )
+      ''');
+      whereArgs.addAll([pattern, pattern, pattern, pattern]);
+    }
+
+    // Filter biji: salah satu dari yang dipilih (OR)
+    if (beanIds != null && beanIds.isNotEmpty) {
+      final placeholders = List.filled(beanIds.length, '?').join(', ');
+      whereClauses.add('br.bean_id IN ($placeholders)');
+      whereArgs.addAll(beanIds);
+    }
+
+    // Filter skor minimal
+    if (minTasteScore != null) {
+      whereClauses.add('br.taste_score >= ?');
+      whereArgs.add(minTasteScore);
+    }
+
+    // Filter tag: entri yang memuat salah satu tag terpilih (tag utuh)
+    if (tasteTags != null && tasteTags.isNotEmpty) {
+      final tagConditions = <String>[];
+      for (final tag in tasteTags) {
+        final escaped = escapeSqlLike(tag);
+        tagConditions.add("(',' || br.taste_tags || ',') LIKE ? ESCAPE '\\'");
+        whereArgs.add('%,$escaped,%');
+      }
+      whereClauses.add('(${tagConditions.join(' OR ')})');
+    }
+
+    // Rentang tanggal kustom inklusif sampai akhir hari (diubah ke UTC)
+    if (startBrewedAtUtc != null) {
+      whereClauses.add('br.brewed_at_utc >= ?');
+      whereArgs.add(startBrewedAtUtc);
+    }
+    if (endBrewedAtUtc != null) {
+      whereClauses.add('br.brewed_at_utc <= ?');
+      whereArgs.add(endBrewedAtUtc);
+    }
+
+    // Semua urutan diakhiri seq DESC sebagai pemutus seri, dan cost_idr kosong selalu di akhir
+    final orderBy = switch (sortOption) {
+      BrewSortOption.newest =>
+        'br.brewed_at_utc DESC, br.seq DESC',
+      BrewSortOption.highestScore =>
+        'br.taste_score DESC, br.brewed_at_utc DESC, br.seq DESC',
+      BrewSortOption.cost =>
+        '(CASE WHEN br.cost_idr IS NULL THEN 1 ELSE 0 END) ASC, br.cost_idr DESC, br.brewed_at_utc DESC, br.seq DESC',
+    };
+
+    final whereString = whereClauses.join(' AND ');
+    final query = '''
+      SELECT
+        br.*,
+        b.name AS bean_name,
+        b.roastery AS bean_roastery,
+        CASE WHEN b.best_brew_id = br.id THEN 1 ELSE 0 END AS is_best_brew
+      FROM brews br
+      JOIN beans b ON br.bean_id = b.id
+      WHERE $whereString
+      ORDER BY $orderBy
+    ''';
+
+    final rows = await _database.rawQuery(query, whereArgs);
+    return rows.map((row) {
+      final grind =
+          Grind.tryFromDatabase(row['grind'] as String) ?? Grind.sedang;
+      final tags = (row['taste_tags'] as String?)
+              ?.split(',')
+              .where((t) => t.isNotEmpty)
+              .toList() ??
+          <String>[];
+      return BrewJournalItem(
+        id: row['id'] as String,
+        userId: row['user_id'] as String,
+        seq: (row['seq'] as num).toInt(),
+        beanId: row['bean_id'] as String,
+        beanName: row['bean_name'] as String,
+        beanRoastery: row['bean_roastery'] as String?,
+        isBestBrew: (row['is_best_brew'] as num).toInt() == 1,
+        brewedAtUtc: row['brewed_at_utc'] as String,
+        doseG: (row['dose_g'] as num).toDouble(),
+        ratio: (row['ratio'] as num).toDouble(),
+        waterTempC: (row['water_temp_c'] as num).toInt(),
+        grind: grind,
+        totalTimeS: (row['total_time_s'] as num).toInt(),
+        tasteScore: (row['taste_score'] as num).toInt(),
+        tasteTags: tags,
+        costIdr: (row['cost_idr'] as num?)?.toDouble(),
+        status: row['status'] as String,
+        syncStatus: row['sync_status'] as String,
+        hash: row['hash'] as String,
+      );
+    }).toList();
+  }
+
+  Future<BrewDetailData?> findBrewDetail({
+    required String userId,
+    required String brewId,
+  }) async {
+    final brewRows = await _database.rawQuery(
+      '''
+      SELECT
+        br.*,
+        b.name AS bean_name,
+        b.roastery AS bean_roastery,
+        b.roastery_notes_tags AS bean_notes_tags,
+        b.roastery_notes_text AS bean_notes_text,
+        b.archived AS bean_archived,
+        CASE WHEN b.best_brew_id = br.id THEN 1 ELSE 0 END AS is_best_brew
+      FROM brews br
+      JOIN beans b ON br.bean_id = b.id
+      WHERE br.id = ? AND br.user_id = ?
+      LIMIT 1
+    ''',
+      [brewId, userId],
+    );
+
+    if (brewRows.isEmpty) {
+      return null;
+    }
+    final row = brewRows.single;
+    final grind = Grind.tryFromDatabase(row['grind'] as String) ?? Grind.sedang;
+    final tasteTags = (row['taste_tags'] as String?)
+            ?.split(',')
+            .where((t) => t.isNotEmpty)
+            .toList() ??
+        <String>[];
+    final roasteryTags = (row['bean_notes_tags'] as String?)
+            ?.split(',')
+            .where((t) => t.isNotEmpty)
+            .toList() ??
+        <String>[];
+
+    final item = BrewJournalItem(
+      id: row['id'] as String,
+      userId: row['user_id'] as String,
+      seq: (row['seq'] as num).toInt(),
+      beanId: row['bean_id'] as String,
+      beanName: row['bean_name'] as String,
+      beanRoastery: row['bean_roastery'] as String?,
+      isBestBrew: (row['is_best_brew'] as num).toInt() == 1,
+      brewedAtUtc: row['brewed_at_utc'] as String,
+      doseG: (row['dose_g'] as num).toDouble(),
+      ratio: (row['ratio'] as num).toDouble(),
+      waterTempC: (row['water_temp_c'] as num).toInt(),
+      grind: grind,
+      totalTimeS: (row['total_time_s'] as num).toInt(),
+      tasteScore: (row['taste_score'] as num).toInt(),
+      tasteTags: tasteTags,
+      costIdr: (row['cost_idr'] as num?)?.toDouble(),
+      status: row['status'] as String,
+      syncStatus: row['sync_status'] as String,
+      hash: row['hash'] as String,
+    );
+
+    final stageRows = await _database.query(
+      'brew_stages',
+      where: 'brew_id = ?',
+      whereArgs: [brewId],
+      orderBy: 'position ASC',
+    );
+
+    final stages = stageRows.map((stageRow) {
+      return BrewDetailStage(
+        id: stageRow['id'] as String,
+        brewId: stageRow['brew_id'] as String,
+        position: (stageRow['position'] as num).toInt(),
+        name: BrewStageName.tryFromDatabase(stageRow['name'] as String) ??
+            BrewStageName.bloom,
+        targetStartS: (stageRow['target_start_s'] as num).toInt(),
+        targetDurationS: (stageRow['target_duration_s'] as num).toInt(),
+        targetWaterCumG: (stageRow['target_water_cum_g'] as num).toDouble(),
+        targetPourG: (stageRow['target_pour_g'] as num).toDouble(),
+        actualWaterG: (stageRow['actual_water_g'] as num?)?.toDouble(),
+        drawdownS: (stageRow['drawdown_s'] as num?)?.toInt(),
+      );
+    }).toList();
+
+    return BrewDetailData(
+      item: item,
+      notes: row['notes'] as String?,
+      aiAdvice: row['ai_advice'] as String?,
+      prevHash: row['prev_hash'] as String,
+      createdAt: row['created_at'] as String,
+      roasteryNotesTags: roasteryTags,
+      roasteryNotesText: row['bean_notes_text'] as String?,
+      isBeanArchived: (row['bean_archived'] as num).toInt() == 1,
+      stages: stages,
+    );
+  }
+
+  /// Membatalkan seduhan dalam satu transaksi:
+  /// - Hanya untuk entri milik userId aktif yang berstatus 'aktif'.
+  /// - Mengubah status='dibatalkan' dan sync_status='pending'.
+  /// - DILARANG menyentuh hash, prev_hash, seq, atau field yang di-hash.
+  /// - Menghitung ulang best_brew_id biji dari seduhan aktif milik userId (skor tertinggi, seri dimenangkan yang terbaru).
+  /// - Memperbarui best_brew_id (atau NULL jika habis), updated_at, dan sync_status='pending' pada beans.
+  Future<bool> cancelBrew({
+    required String userId,
+    required String brewId,
+  }) async {
+    final now = _utcNowWithoutMilliseconds();
+    return _database.transaction((txn) async {
+      final existing = await txn.query(
+        'brews',
+        columns: ['id', 'bean_id'],
+        where: 'id = ? AND user_id = ? AND status = ?',
+        whereArgs: [brewId, userId, 'aktif'],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        return false;
+      }
+      final beanId = existing.single['bean_id'] as String;
+
+      await txn.update(
+        'brews',
+        {
+          'status': 'dibatalkan',
+          'sync_status': 'pending',
+        },
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [brewId, userId],
+      );
+
+      final best = await txn.query(
+        'brews',
+        columns: ['id'],
+        where: 'user_id = ? AND bean_id = ? AND status = ?',
+        whereArgs: [userId, beanId, 'aktif'],
+        orderBy: 'taste_score DESC, brewed_at_utc DESC, seq DESC',
+        limit: 1,
+      );
+
+      final newBestBrewId = best.isEmpty ? null : best.single['id'] as String;
+
+      await txn.update(
+        'beans',
+        {
+          'best_brew_id': newBestBrewId,
+          'updated_at': now,
+          'sync_status': 'pending',
+        },
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [beanId, userId],
+      );
+
+      return true;
+    });
+  }
+
+  String _utcNowWithoutMilliseconds() {
+    return DateTime.now().toUtc().toIso8601String().replaceFirst(
+      RegExp(r'\.\d+Z$'),
+      'Z',
+    );
   }
 }
