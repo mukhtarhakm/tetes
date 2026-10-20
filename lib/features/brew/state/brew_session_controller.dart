@@ -65,6 +65,7 @@ class BrewSessionController {
   BrewSessionStatus? _pausedFrom;
   int _activeStageIndex = 0;
   BrewSessionResult? _result;
+  String? _brewedAtUtc;
 
   BrewSessionStatus get status => _status;
   int get activeStageIndex => _activeStageIndex;
@@ -92,6 +93,10 @@ class BrewSessionController {
       return BrewSessionAction.ignored;
     }
     _timeSource.reset();
+    _brewedAtUtc = DateTime.now().toUtc().toIso8601String().replaceFirst(
+      RegExp(r'\.\d+Z$'),
+      'Z',
+    );
     _timeSource.start();
     _status = BrewSessionStatus.running;
     return BrewSessionAction.started;
@@ -180,6 +185,7 @@ class BrewSessionController {
       plan: plan,
       drawdownS: drawdownSeconds,
       totalTimeS: endSeconds,
+      brewedAtUtc: _brewedAtUtc!,
     );
     return BrewSessionAction.completed;
   }

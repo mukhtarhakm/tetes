@@ -36,6 +36,8 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Belum ada tombol untuk mematikan biometrik. Dibuat di layar Profil (Fitur 07).
 - Build Android memakai kotlin.incremental=false di android/gradle.properties karena proyek (drive D) dan cache paket (drive C) berbeda drive. Developer Mode Windows aktif. Perbaikan permanen: satukan drive (PUB_CACHE atau lokasi proyek).
 - Bersih-bersih akhir proyek: hapus akun uji (misalnya rais_uji) beserta sesi dan baris login_attempts di Supabase, hapus fungsi hello, pastikan tidak ada berkas JSON uji atau rahasia di repo.
+- Perapian layout (nanti, tahap perapian): layar Hasil dan Atur Seduh; ganti nama berkas brew_result_placeholder_screen.dart karena sudah bukan placeholder.
+- Judul bagian di form biji ("Info biji", "Pengolahan", "Kemasan dan harga").
 
 ## Menunggu jawaban dosen
 - [ ] Tema (V60 pelatih/jurnal vs Brewmaster)
@@ -45,3 +47,5 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Daftar tangkapan layar untuk laporan
 (centang setelah diambil: login, biji, atur seduh, sesi, hasil, jurnal, bandingkan, verifikasi, event, peta, game, profil)
+
+- 2026-10-20: Fitur 03 Sesi C selesai: layar Hasil, penyimpanan seduhan atomik dengan hash chain, pengaturan terbaik, biaya, dan pengecekan stok tersedia.

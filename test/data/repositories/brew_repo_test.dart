@@ -6,6 +6,9 @@ import 'package:tetes/data/repositories/bean_repo.dart';
 import 'package:tetes/data/repositories/brew_repo.dart';
 import 'package:tetes/features/beans/bean_model.dart';
 import 'package:tetes/features/brew/brew_plan.dart';
+import 'package:tetes/features/brew/brew_calculator.dart';
+import 'package:tetes/features/brew/brew_session_result.dart';
+import 'package:tetes/core/utils/hash.dart';
 
 void main() {
   late Database database;
@@ -176,6 +179,192 @@ void main() {
     );
 
     expect(plan, isNull);
+  });
+
+  test(
+    'simpan dua seduhan membentuk rantai, tahap, biaya, dan pengaturan terbaik',
+    () async {
+      final beanId = await _createBean(beanRepository);
+      await database.update(
+        'beans',
+        {'price_idr_per_kg': 200000},
+        where: 'id = ?',
+        whereArgs: [beanId],
+      );
+      final plan = BrewCalculator.createDefault(beanId: beanId);
+      final result = BrewSessionResult(
+        plan: plan,
+        totalTimeS: 135,
+        drawdownS: 35,
+        brewedAtUtc: '2026-10-20T01:02:03Z',
+      );
+      final firstId = await brewRepository.save(
+        userId: 'user-1',
+        result: result,
+        tasteScore: 4,
+        tasteTags: [RoasteryNoteTag.manis],
+        actualWaterG: List.filled(plan.stages.length, null),
+        drawdownS: 35,
+      );
+      final secondId = await brewRepository.save(
+        userId: 'user-1',
+        result: result,
+        tasteScore: 4,
+        tasteTags: [RoasteryNoteTag.cokelat, RoasteryNoteTag.manis],
+        actualWaterG: List.filled(plan.stages.length, null),
+      );
+      final brews = await database.query('brews', orderBy: 'seq ASC');
+      expect(brews.map((row) => row['seq']), [1, 2]);
+      expect(brews.first['prev_hash'], '0');
+      expect(brews.last['prev_hash'], brews.first['hash']);
+      expect(brews.first['brewed_at_utc'], result.brewedAtUtc);
+      expect(brews.first['cost_idr'], brewCost(plan.doseG, 200000));
+      expect(brews.last['taste_tags'], 'cokelat,manis');
+      expect(await brewRepository.verifyUserChain('user-1'), 'utuh (2 entri)');
+      expect(
+        (await beanRepository.findById(
+          userId: 'user-1',
+          id: beanId,
+        ))!.bestBrewId,
+        secondId,
+      );
+      expect(
+        await brewRepository.remainingStockG(userId: 'user-1', beanId: beanId),
+        250 - plan.doseG * 2,
+      );
+      final stages = await database.query(
+        'brew_stages',
+        where: 'brew_id = ?',
+        whereArgs: [firstId],
+        orderBy: 'position',
+      );
+      expect(
+        stages.every(
+          (row) =>
+              row['actual_start_s'] == null && row['actual_duration_s'] == null,
+        ),
+        isTrue,
+      );
+      expect(stages.last['drawdown_s'], 35);
+      expect(
+        stages
+            .take(stages.length - 1)
+            .every((row) => row['drawdown_s'] == null),
+        isTrue,
+      );
+      expect(
+        hashEntry((
+          beanId: beanId,
+          doseG: plan.doseG,
+          ratio: plan.ratio,
+          waterTempC: plan.waterTempC,
+          grind: plan.grind.databaseValue,
+          totalTimeS: 135,
+          tasteScore: 4,
+          tasteTags: ['manis'],
+          brewedAtUtc: result.brewedAtUtc,
+        ), '0'),
+        brews.first['hash'],
+      );
+    },
+  );
+
+  test('gagal menyimpan tidak meninggalkan brews atau tahap', () async {
+    final plan = BrewCalculator.createDefault(beanId: 'hilang');
+    await expectLater(
+      brewRepository.save(
+        userId: 'user-1',
+        result: BrewSessionResult(
+          plan: plan,
+          totalTimeS: 100,
+          drawdownS: null,
+          brewedAtUtc: '2026-10-20T01:02:03Z',
+        ),
+        tasteScore: 3,
+        tasteTags: [RoasteryNoteTag.manis],
+        actualWaterG: List.filled(plan.stages.length, null),
+      ),
+      throwsA(isA<BrewSaveException>()),
+    );
+    expect(await database.query('brews'), isEmpty);
+    expect(await database.query('brew_stages'), isEmpty);
+  });
+
+  test(
+    'entri dibatalkan tetap menjadi pendahulu dan stok hanya menghitung aktif',
+    () async {
+      final beanId = await _createBean(beanRepository);
+      final plan = BrewCalculator.createDefault(beanId: beanId);
+      final result = BrewSessionResult(
+        plan: plan,
+        totalTimeS: 100,
+        drawdownS: null,
+        brewedAtUtc: '2026-10-20T01:02:03Z',
+      );
+      final first = await brewRepository.save(
+        userId: 'user-1',
+        result: result,
+        tasteScore: 3,
+        tasteTags: [RoasteryNoteTag.manis],
+        actualWaterG: List.filled(plan.stages.length, null),
+      );
+      await database.update(
+        'brews',
+        {'status': 'dibatalkan'},
+        where: 'id = ?',
+        whereArgs: [first],
+      );
+      await brewRepository.save(
+        userId: 'user-1',
+        result: result,
+        tasteScore: 4,
+        tasteTags: [RoasteryNoteTag.manis],
+        actualWaterG: List.filled(plan.stages.length, null),
+      );
+      final rows = await database.query('brews', orderBy: 'seq');
+      expect(rows.last['seq'], 2);
+      expect(rows.last['prev_hash'], rows.first['hash']);
+      expect(await brewRepository.verifyUserChain('user-1'), 'utuh (2 entri)');
+      expect(
+        await brewRepository.remainingStockG(userId: 'user-1', beanId: beanId),
+        250 - plan.doseG,
+      );
+      expect(
+        await brewRepository.isLowStock(userId: 'user-1', beanId: beanId),
+        isFalse,
+      );
+      await database.insert('settings', {
+        'user_id': 'user-1',
+        'key': 'low_stock_threshold_g',
+        'value': '240',
+      });
+      expect(
+        await brewRepository.isLowStock(userId: 'user-1', beanId: beanId),
+        isTrue,
+      );
+    },
+  );
+
+  test('biji terarsip ditolak tanpa data setengah jadi', () async {
+    final beanId = await _createBean(beanRepository);
+    await beanRepository.archive(userId: 'user-1', id: beanId);
+    final plan = BrewCalculator.createDefault(beanId: beanId);
+    await expectLater(
+      brewRepository.save(
+        userId: 'user-1',
+        result: BrewSessionResult(
+          plan: plan,
+          totalTimeS: 100,
+          drawdownS: null,
+          brewedAtUtc: '2026-10-20T01:02:03Z',
+        ),
+        tasteScore: 3,
+        tasteTags: [RoasteryNoteTag.manis],
+        actualWaterG: List.filled(plan.stages.length, null),
+      ),
+      throwsA(isA<BrewSaveException>()),
+    );
+    expect(await database.query('brews'), isEmpty);
   });
 }
 
