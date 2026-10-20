@@ -7,8 +7,10 @@ import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dialog.dart';
+import '../../../core/ui/score_chart.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../journal/screens/brew_detail_screen.dart';
 import '../bean_model.dart';
 import '../state/bean_providers.dart';
 import '../../brew/screens/brew_setup_screen.dart';
@@ -194,6 +196,124 @@ class _BeanDetailContent extends ConsumerWidget {
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.s16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Grafik Skor Rasa',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.s4),
+              Text(
+                'Tren skor rasa dari seduhan aktif biji ini.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.inkSoft,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.s16),
+              ref.watch(beanActiveBrewsProvider(bean.id)).when(
+                    data: (brews) {
+                      final scores = brews.map((b) => b.tasteScore).toList();
+                      return ScoreChart(scores: scores);
+                    },
+                    loading: () => const SizedBox(
+                      height: ScoreChartTokens.defaultHeight,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, _) => const SizedBox(
+                      height: ScoreChartTokens.defaultHeight,
+                      child: Center(child: Text('Gagal memuat grafik skor.')),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Riwayat Seduhan',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              ref.watch(beanHistoryBrewsProvider(bean.id)).when(
+                    data: (brews) {
+                      if (brews.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.s12,
+                          ),
+                          child: Text(
+                            'Belum ada seduhan untuk biji ini.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: AppColors.inkSoft),
+                          ),
+                        );
+                      }
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: brews.length,
+                        separatorBuilder: (_, _) =>
+                            const Divider(color: AppColors.divider),
+                        itemBuilder: (context, index) {
+                          final item = brews[index];
+                          final ratioText = item.ratio % 1 == 0
+                              ? '1:${item.ratio.toInt()}'
+                              : '1:${item.ratio.toStringAsFixed(1)}';
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              '${_formatDate(item.brewedAtUtc)} • ★ ${item.tasteScore}/5',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              '${item.doseG.toStringAsFixed(1)}g • $ratioText • ${item.waterTempC}°C',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: AppColors.inkSoft),
+                            ),
+                            trailing: Wrap(
+                              spacing: AppSpacing.s4,
+                              children: [
+                                if (item.isCancelled)
+                                  const StatusPill(
+                                    label: 'Dibatalkan',
+                                    variant: StatusPillVariant.warning,
+                                  ),
+                                const Icon(Icons.chevron_right_rounded),
+                              ],
+                            ),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    BrewDetailScreen(brewId: item.id),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(AppSpacing.s16),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, _) =>
+                        const Text('Gagal memuat riwayat seduhan.'),
+                  ),
+            ],
+          ),
+        ),
         if (mutation.hasError) ...[
           const SizedBox(height: AppSpacing.s16),
           Text(
@@ -329,4 +449,24 @@ String? _packagePriceIdr(Bean bean) {
     return null;
   }
   return formatIdr(bean.priceOriginal! * bean.fxRate!);
+}
+
+String _formatDate(String utcString) {
+  final dt = DateTime.tryParse(utcString)?.toLocal();
+  if (dt == null) return utcString;
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+  return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
 }

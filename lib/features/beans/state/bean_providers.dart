@@ -4,6 +4,8 @@ import '../../../data/db/database_provider.dart';
 import '../../../data/remote/fx_client.dart';
 import '../../../data/repositories/bean_repo.dart';
 import '../../auth/state/session_controller.dart';
+import '../../brew/state/brew_setup_controller.dart';
+import '../../journal/journal_model.dart';
 import '../bean_model.dart';
 import '../fx_quote_service.dart';
 
@@ -43,6 +45,30 @@ final beanDetailProvider = FutureProvider.family<Bean?, String>((
   final repository = await ref.watch(beanRepositoryProvider.future);
   return repository.findById(userId: userId, id: id);
 });
+
+final beanActiveBrewsProvider =
+    FutureProvider.family<List<BrewJournalItem>, String>((ref, beanId) async {
+      final userId = await _activeUserId(ref);
+      final repository = await ref.watch(brewRepositoryProvider.future);
+      return repository.findBrewsForBean(
+        userId: userId,
+        beanId: beanId,
+        activeOnly: true,
+        chronological: true,
+      );
+    });
+
+final beanHistoryBrewsProvider =
+    FutureProvider.family<List<BrewJournalItem>, String>((ref, beanId) async {
+      final userId = await _activeUserId(ref);
+      final repository = await ref.watch(brewRepositoryProvider.future);
+      return repository.findBrewsForBean(
+        userId: userId,
+        beanId: beanId,
+        activeOnly: false,
+        chronological: false,
+      );
+    });
 
 final beanMutationProvider =
     AsyncNotifierProvider<BeanMutationController, void>(

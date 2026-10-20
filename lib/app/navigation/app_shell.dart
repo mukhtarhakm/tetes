@@ -10,6 +10,7 @@ import '../../features/auth/state/auth_providers.dart';
 import '../../features/auth/state/session_controller.dart';
 import '../../features/beans/screens/bean_list_screen.dart';
 import '../../features/journal/screens/journal_screen.dart';
+import '../../features/journal/state/journal_controller.dart';
 import '../router/app_routes.dart';
 import '../theme/tokens.dart';
 
@@ -74,6 +75,8 @@ class _AppShellState extends ConsumerState<AppShell> {
             _currentIndex = index;
             if (index == 1) {
               _journalVisited = true;
+            } else {
+              ref.read(journalSelectionProvider.notifier).reset();
             }
           });
         },

@@ -10,11 +10,19 @@ class JournalBrewCard extends StatelessWidget {
   const JournalBrewCard({
     required this.item,
     required this.onTap,
+    this.selectable = false,
+    this.selected = false,
+    this.onSelectChanged,
+    this.onLongPress,
     super.key,
   });
 
   final BrewJournalItem item;
   final VoidCallback onTap;
+  final bool selectable;
+  final bool selected;
+  final ValueChanged<bool?>? onSelectChanged;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -34,74 +42,68 @@ class JournalBrewCard extends StatelessWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Text(
+          item.beanName,
+          softWrap: true,
+          style: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        if (item.beanRoastery != null && item.beanRoastery!.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s4),
+          Text(
+            item.beanRoastery!,
+            softWrap: true,
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.inkSoft,
+            ),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.s8),
+        Wrap(
+          spacing: AppSpacing.s4,
+          runSpacing: AppSpacing.s4,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.beanName,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (item.beanRoastery != null &&
-                      item.beanRoastery!.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.s4),
-                    Text(
-                      item.beanRoastery!,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppColors.inkSoft,
-                      ),
-                    ),
-                  ],
-                ],
+            if (item.isBestBrew && !item.isCancelled)
+              const StatusPill(
+                label: 'Terbaik',
+                variant: StatusPillVariant.synced,
               ),
-            ),
-            const SizedBox(width: AppSpacing.s8),
-            Wrap(
-              spacing: AppSpacing.s4,
-              runSpacing: AppSpacing.s4,
-              alignment: WrapAlignment.end,
-              children: [
-                if (item.isBestBrew && !item.isCancelled)
-                  const StatusPill(
-                    label: 'Terbaik',
-                    variant: StatusPillVariant.synced,
-                  ),
-                if (item.isCancelled)
-                  const StatusPill(
-                    label: 'Dibatalkan',
-                    variant: StatusPillVariant.warning,
-                  ),
-                StatusPill(label: syncLabel, variant: syncVariant),
-              ],
-            ),
+            if (item.isCancelled)
+              const StatusPill(
+                label: 'Dibatalkan',
+                variant: StatusPillVariant.warning,
+              ),
+            StatusPill(label: syncLabel, variant: syncVariant),
           ],
         ),
-        const SizedBox(height: AppSpacing.s12),
+        const SizedBox(height: AppSpacing.s8),
         Row(
           children: [
             Icon(Icons.calendar_today_outlined,
                 size: AppSizes.navigationIcon, color: AppColors.inkSoft),
             const SizedBox(width: AppSpacing.s4),
-            Text(
-              _formatLocalBrewedAt(item.brewedAtUtc),
-              style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+            Expanded(
+              child: Text(
+                _formatLocalBrewedAt(item.brewedAtUtc),
+                style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+              ),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.s12),
         Container(
+          width: double.infinity,
           padding: AppInsets.chip,
           decoration: BoxDecoration(
             color: AppColors.background,
             borderRadius: BorderRadius.circular(AppRadius.navigation),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          child: Wrap(
+            spacing: AppSpacing.s16,
+            runSpacing: AppSpacing.s8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _ParamColumn(label: 'Rasio', value: ratioText),
               _ParamColumn(label: 'Suhu', value: '${item.waterTempC}°C'),
@@ -130,14 +132,35 @@ class JournalBrewCard extends StatelessWidget {
       ],
     );
 
+    final cardWidget = AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (selectable) ...[
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.s8),
+              child: Checkbox(
+                value: selected,
+                onChanged: onSelectChanged,
+                activeColor: AppColors.primary,
+                checkColor: AppColors.ink,
+              ),
+            ),
+          ],
+          Expanded(child: content),
+        ],
+      ),
+    );
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        onTap: onTap,
+        onTap: selectable ? () => onSelectChanged?.call(!selected) : onTap,
+        onLongPress: onLongPress,
         child: Opacity(
           opacity: item.isCancelled ? 0.5 : 1.0,
-          child: AppCard(child: content),
+          child: cardWidget,
         ),
       ),
     );
@@ -191,6 +214,8 @@ class _ParamColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,

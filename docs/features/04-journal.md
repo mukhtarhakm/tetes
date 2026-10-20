@@ -6,7 +6,7 @@
 **Dokumen wajib dibaca:** DATA_MODEL.md (brews, query contoh), ARCHITECTURE.md (bagian 5.2)
 
 ## Layar
-Tab Jurnal punya dua sub-tab: **Seduhan** dan **Biji**.
+Tab Jurnal berupa satu daftar seduhan (sub-tab Biji dihapus, daftar biji tetap di tab Seduh).
 
 ### Sub-tab Seduhan
 - **Daftar:** kartu per seduhan: tanggal dan jam, nama biji, rasio dan suhu, skor rasa, tag, status sinkronisasi (tersinkron, menunggu, galat), penanda pengaturan terbaik, tampilan pudar bila dibatalkan. Terbaru di atas.

@@ -159,3 +159,52 @@ final brewDetailProvider =
       final repo = await ref.watch(brewRepositoryProvider.future);
       return repo.findBrewDetail(userId: userId, brewId: brewId);
     });
+
+class JournalSelectionState {
+  const JournalSelectionState({
+    this.isActive = false,
+    this.selectedIds = const {},
+  });
+
+  final bool isActive;
+  final Set<String> selectedIds;
+
+  bool isSelected(String id) => selectedIds.contains(id);
+}
+
+class JournalSelectionNotifier extends Notifier<JournalSelectionState> {
+  @override
+  JournalSelectionState build() => const JournalSelectionState();
+
+  void activate([String? initialId]) {
+    state = JournalSelectionState(
+      isActive: true,
+      selectedIds: initialId != null ? {initialId} : const {},
+    );
+  }
+
+  void reset() {
+    state = const JournalSelectionState();
+  }
+
+  /// Mengembalikan true bila berhasil diubah, false jika ditolak karena sudah 2 pilihan.
+  bool toggle(String id) {
+    if (state.selectedIds.contains(id)) {
+      final updated = Set<String>.from(state.selectedIds)..remove(id);
+      state = JournalSelectionState(isActive: true, selectedIds: updated);
+      return true;
+    } else {
+      if (state.selectedIds.length >= 2) {
+        return false;
+      }
+      final updated = Set<String>.from(state.selectedIds)..add(id);
+      state = JournalSelectionState(isActive: true, selectedIds: updated);
+      return true;
+    }
+  }
+}
+
+final journalSelectionProvider =
+    NotifierProvider<JournalSelectionNotifier, JournalSelectionState>(
+  JournalSelectionNotifier.new,
+);

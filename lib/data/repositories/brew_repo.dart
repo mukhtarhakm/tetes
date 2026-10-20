@@ -534,6 +534,66 @@ class BrewRepository {
     );
   }
 
+  Future<List<BrewJournalItem>> findBrewsForBean({
+    required String userId,
+    required String beanId,
+    bool activeOnly = false,
+    bool chronological = false,
+  }) async {
+    final where = activeOnly
+        ? 'br.user_id = ? AND br.bean_id = ? AND br.status = ?'
+        : 'br.user_id = ? AND br.bean_id = ?';
+    final args = activeOnly ? [userId, beanId, 'aktif'] : [userId, beanId];
+    final order = chronological
+        ? 'br.brewed_at_utc ASC, br.seq ASC'
+        : 'br.brewed_at_utc DESC, br.seq DESC';
+
+    final rows = await _database.rawQuery(
+      '''
+      SELECT
+        br.*,
+        b.name AS bean_name,
+        b.roastery AS bean_roastery,
+        CASE WHEN b.best_brew_id = br.id THEN 1 ELSE 0 END AS is_best_brew
+      FROM brews br
+      JOIN beans b ON br.bean_id = b.id
+      WHERE $where
+      ORDER BY $order
+      ''',
+      args,
+    );
+    return rows.map((row) {
+      final grind =
+          Grind.tryFromDatabase(row['grind'] as String) ?? Grind.sedang;
+      final tags = (row['taste_tags'] as String?)
+              ?.split(',')
+              .where((t) => t.isNotEmpty)
+              .toList() ??
+          <String>[];
+      return BrewJournalItem(
+        id: row['id'] as String,
+        userId: row['user_id'] as String,
+        seq: (row['seq'] as num).toInt(),
+        beanId: row['bean_id'] as String,
+        beanName: row['bean_name'] as String,
+        beanRoastery: row['bean_roastery'] as String?,
+        isBestBrew: (row['is_best_brew'] as num).toInt() == 1,
+        brewedAtUtc: row['brewed_at_utc'] as String,
+        doseG: (row['dose_g'] as num).toDouble(),
+        ratio: (row['ratio'] as num).toDouble(),
+        waterTempC: (row['water_temp_c'] as num).toInt(),
+        grind: grind,
+        totalTimeS: (row['total_time_s'] as num).toInt(),
+        tasteScore: (row['taste_score'] as num).toInt(),
+        tasteTags: tags,
+        costIdr: (row['cost_idr'] as num?)?.toDouble(),
+        status: row['status'] as String,
+        syncStatus: row['sync_status'] as String,
+        hash: row['hash'] as String,
+      );
+    }).toList();
+  }
+
   /// Membatalkan seduhan dalam satu transaksi:
   /// - Hanya untuk entri milik userId aktif yang berstatus 'aktif'.
   /// - Mengubah status='dibatalkan' dan sync_status='pending'.

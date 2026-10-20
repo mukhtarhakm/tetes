@@ -75,7 +75,7 @@ class BeanListScreen extends ConsumerWidget {
                           itemCount: items.length,
                           separatorBuilder: (_, _) =>
                               const SizedBox(height: AppSpacing.s16),
-                          itemBuilder: (context, index) => _BeanCard(
+                          itemBuilder: (context, index) => BeanCard(
                             bean: items[index],
                             onTap: () => _openDetail(context, items[index].id),
                           ),
@@ -115,8 +115,8 @@ class BeanListScreen extends ConsumerWidget {
   }
 }
 
-class _BeanCard extends StatelessWidget {
-  const _BeanCard({required this.bean, required this.onTap});
+class BeanCard extends StatelessWidget {
+  const BeanCard({required this.bean, required this.onTap, super.key});
 
   final Bean bean;
   final VoidCallback onTap;
@@ -180,9 +180,10 @@ class _BeanCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.s8),
               Text(
-                bean.bestBrewId == null
-                    ? 'Belum ada pengaturan seduh terbaik.'
-                    : 'Pengaturan seduh terbaik tersedia.',
+                bean.bestBrewSummary ??
+                    (bean.bestBrewId == null
+                        ? 'Belum ada pengaturan seduh terbaik.'
+                        : 'Pengaturan seduh terbaik tersedia.'),
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),

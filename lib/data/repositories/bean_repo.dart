@@ -21,9 +21,15 @@ class BeanRepository implements FxCacheStore {
           SUM(CASE WHEN br.status = 'aktif' THEN br.dose_g ELSE 0 END),
           0
         ) AS remaining_stock_g,
-        COUNT(br.id) AS brew_count
+        COUNT(br.id) AS brew_count,
+        best_br.ratio AS best_brew_ratio,
+        best_br.water_temp_c AS best_brew_water_temp_c,
+        best_br.taste_score AS best_brew_taste_score,
+        COALESCE(CAST(s.value AS REAL), 15.0) AS low_stock_threshold_g
       FROM beans b
       LEFT JOIN brews br ON br.bean_id = b.id
+      LEFT JOIN brews best_br ON best_br.id = b.best_brew_id AND best_br.status = 'aktif'
+      LEFT JOIN settings s ON s.user_id = b.user_id AND s.key = 'low_stock_threshold_g'
       WHERE b.user_id = ? AND b.archived = 0
       GROUP BY b.id
       ORDER BY b.updated_at DESC, b.name COLLATE NOCASE ASC
@@ -41,9 +47,15 @@ class BeanRepository implements FxCacheStore {
           SUM(CASE WHEN br.status = 'aktif' THEN br.dose_g ELSE 0 END),
           0
         ) AS remaining_stock_g,
-        COUNT(br.id) AS brew_count
+        COUNT(br.id) AS brew_count,
+        best_br.ratio AS best_brew_ratio,
+        best_br.water_temp_c AS best_brew_water_temp_c,
+        best_br.taste_score AS best_brew_taste_score,
+        COALESCE(CAST(s.value AS REAL), 15.0) AS low_stock_threshold_g
       FROM beans b
       LEFT JOIN brews br ON br.bean_id = b.id
+      LEFT JOIN brews best_br ON best_br.id = b.best_brew_id AND best_br.status = 'aktif'
+      LEFT JOIN settings s ON s.user_id = b.user_id AND s.key = 'low_stock_threshold_g'
       WHERE b.user_id = ? AND b.id = ?
       GROUP BY b.id
       LIMIT 1

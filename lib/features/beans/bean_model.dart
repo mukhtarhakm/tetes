@@ -151,6 +151,10 @@ class Bean {
     this.priceIdrPerKg,
     this.roasteryNotesText,
     this.bestBrewId,
+    this.bestBrewRatio,
+    this.bestBrewWaterTempC,
+    this.bestBrewTasteScore,
+    this.lowStockThresholdG = BeanDefaults.lowStockThresholdG,
   });
 
   final String id;
@@ -177,13 +181,29 @@ class Bean {
   final List<String> roasteryNotesTags;
   final String? roasteryNotesText;
   final String? bestBrewId;
+  final double? bestBrewRatio;
+  final int? bestBrewWaterTempC;
+  final int? bestBrewTasteScore;
+  final double lowStockThresholdG;
   final bool archived;
   final String createdAt;
   final String updatedAt;
   final String syncStatus;
   final int brewCount;
 
-  bool get isLowStock => remainingStockG < BeanDefaults.lowStockThresholdG;
+  bool get isLowStock => remainingStockG < lowStockThresholdG;
+
+  String? get bestBrewSummary {
+    if (bestBrewRatio == null ||
+        bestBrewWaterTempC == null ||
+        bestBrewTasteScore == null) {
+      return null;
+    }
+    final ratioText = bestBrewRatio! % 1 == 0
+        ? '1:${bestBrewRatio!.toInt()}'
+        : '1:${bestBrewRatio!.toStringAsFixed(1)}';
+    return 'Terbaik: $ratioText • $bestBrewWaterTempC°C • ★ $bestBrewTasteScore/5';
+  }
 
   factory Bean.fromMap(Map<String, Object?> map) {
     return Bean(
@@ -213,6 +233,11 @@ class Bean {
       ),
       roasteryNotesText: map['roastery_notes_text'] as String?,
       bestBrewId: map['best_brew_id'] as String?,
+      bestBrewRatio: (map['best_brew_ratio'] as num?)?.toDouble(),
+      bestBrewWaterTempC: (map['best_brew_water_temp_c'] as num?)?.toInt(),
+      bestBrewTasteScore: (map['best_brew_taste_score'] as num?)?.toInt(),
+      lowStockThresholdG: (map['low_stock_threshold_g'] as num?)?.toDouble() ??
+          BeanDefaults.lowStockThresholdG,
       archived: map['archived'] == 1,
       createdAt: map['created_at']! as String,
       updatedAt: map['updated_at']! as String,
