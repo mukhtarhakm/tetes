@@ -52,3 +52,7 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 (centang setelah diambil: login, biji, atur seduh, sesi, hasil, jurnal, bandingkan, verifikasi, event, peta, game, profil)
 
 - 2026-10-20: Fitur 03 Sesi C selesai: layar Hasil, penyimpanan seduhan atomik dengan hash chain, pengaturan terbaik, biaya, dan pengecekan stok tersedia.
+
+## 2026-10-20 - Fitur 05 langkah 1
+- Migrasi baru menyiapkan tabel beans, brews, brew_stages serta RPC atomik untuk upsert biji dan insert seduhan.
+- Edge Function sync-push dan helper hash server dengan dua vektor uji disiapkan; belum diterapkan ke server dan menunggu uji deploy/curl.

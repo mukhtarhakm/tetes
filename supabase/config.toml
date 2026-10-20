@@ -439,3 +439,8 @@ entrypoint = "./functions/auth-login/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/auth-logout/index.ts"
+
+[functions.sync-push]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/sync-push/index.ts"
