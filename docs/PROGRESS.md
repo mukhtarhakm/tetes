@@ -56,3 +56,8 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 ## 2026-10-20 - Fitur 05 langkah 1
 - Migrasi baru menyiapkan tabel beans, brews, brew_stages serta RPC atomik untuk upsert biji dan insert seduhan.
 - Edge Function sync-push dan helper hash server dengan dua vektor uji disiapkan; belum diterapkan ke server dan menunggu uji deploy/curl.
+
+## 2026-10-20 - Fitur 05 langkah 2
+- Klien push Flutter untuk beans, brews, dan brew_stages selesai: batch 100/50, status lokal, ringkasan UTC, dan penanganan galat/401.
+- Profil menampilkan status dan tombol sinkron manual; pemicu otomatis aktif saat session valid dan setelah seduhan disimpan atau dibatalkan.
+- Sinkronisasi pull, AI, events, game_scores, dan feedback belum dikerjakan.

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/utils/hash.dart';
@@ -25,6 +27,9 @@ String escapeSqlLike(String input) {
 
 class BrewRepository {
   const BrewRepository(this._database);
+
+  static final _changes = StreamController<String>.broadcast();
+  static Stream<String> get changes => _changes.stream;
 
   final Database _database;
 
@@ -147,6 +152,7 @@ class BrewRepository {
     } on DatabaseException {
       throw const BrewSaveException('Seduhan gagal disimpan. Coba lagi.');
     }
+    _changes.add(userId);
     return id;
   }
 
@@ -384,8 +390,7 @@ class BrewRepository {
 
     // Semua urutan diakhiri seq DESC sebagai pemutus seri, dan cost_idr kosong selalu di akhir
     final orderBy = switch (sortOption) {
-      BrewSortOption.newest =>
-        'br.brewed_at_utc DESC, br.seq DESC',
+      BrewSortOption.newest => 'br.brewed_at_utc DESC, br.seq DESC',
       BrewSortOption.highestScore =>
         'br.taste_score DESC, br.brewed_at_utc DESC, br.seq DESC',
       BrewSortOption.cost =>
@@ -393,7 +398,8 @@ class BrewRepository {
     };
 
     final whereString = whereClauses.join(' AND ');
-    final query = '''
+    final query =
+        '''
       SELECT
         br.*,
         b.name AS bean_name,
@@ -409,7 +415,8 @@ class BrewRepository {
     return rows.map((row) {
       final grind =
           Grind.tryFromDatabase(row['grind'] as String) ?? Grind.sedang;
-      final tags = (row['taste_tags'] as String?)
+      final tags =
+          (row['taste_tags'] as String?)
               ?.split(',')
               .where((t) => t.isNotEmpty)
               .toList() ??
@@ -465,12 +472,14 @@ class BrewRepository {
     }
     final row = brewRows.single;
     final grind = Grind.tryFromDatabase(row['grind'] as String) ?? Grind.sedang;
-    final tasteTags = (row['taste_tags'] as String?)
+    final tasteTags =
+        (row['taste_tags'] as String?)
             ?.split(',')
             .where((t) => t.isNotEmpty)
             .toList() ??
         <String>[];
-    final roasteryTags = (row['bean_notes_tags'] as String?)
+    final roasteryTags =
+        (row['bean_notes_tags'] as String?)
             ?.split(',')
             .where((t) => t.isNotEmpty)
             .toList() ??
@@ -510,7 +519,8 @@ class BrewRepository {
         id: stageRow['id'] as String,
         brewId: stageRow['brew_id'] as String,
         position: (stageRow['position'] as num).toInt(),
-        name: BrewStageName.tryFromDatabase(stageRow['name'] as String) ??
+        name:
+            BrewStageName.tryFromDatabase(stageRow['name'] as String) ??
             BrewStageName.bloom,
         targetStartS: (stageRow['target_start_s'] as num).toInt(),
         targetDurationS: (stageRow['target_duration_s'] as num).toInt(),
@@ -548,8 +558,7 @@ class BrewRepository {
         ? 'br.brewed_at_utc ASC, br.seq ASC'
         : 'br.brewed_at_utc DESC, br.seq DESC';
 
-    final rows = await _database.rawQuery(
-      '''
+    final rows = await _database.rawQuery('''
       SELECT
         br.*,
         b.name AS bean_name,
@@ -559,13 +568,12 @@ class BrewRepository {
       JOIN beans b ON br.bean_id = b.id
       WHERE $where
       ORDER BY $order
-      ''',
-      args,
-    );
+      ''', args);
     return rows.map((row) {
       final grind =
           Grind.tryFromDatabase(row['grind'] as String) ?? Grind.sedang;
-      final tags = (row['taste_tags'] as String?)
+      final tags =
+          (row['taste_tags'] as String?)
               ?.split(',')
               .where((t) => t.isNotEmpty)
               .toList() ??
@@ -605,7 +613,7 @@ class BrewRepository {
     required String brewId,
   }) async {
     final now = _utcNowWithoutMilliseconds();
-    return _database.transaction((txn) async {
+    final cancelled = await _database.transaction((txn) async {
       final existing = await txn.query(
         'brews',
         columns: ['id', 'bean_id'],
@@ -620,10 +628,7 @@ class BrewRepository {
 
       await txn.update(
         'brews',
-        {
-          'status': 'dibatalkan',
-          'sync_status': 'pending',
-        },
+        {'status': 'dibatalkan', 'sync_status': 'pending'},
         where: 'id = ? AND user_id = ?',
         whereArgs: [brewId, userId],
       );
@@ -652,6 +657,8 @@ class BrewRepository {
 
       return true;
     });
+    if (cancelled) _changes.add(userId);
+    return cancelled;
   }
 
   String _utcNowWithoutMilliseconds() {
