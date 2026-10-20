@@ -45,7 +45,7 @@ void main() {
     expect(find.text('Coba lagi'), findsOneWidget);
   });
 
-  testWidgets('keadaan berhasil menampilkan tahap aktif dan tombol manual', (
+  testWidgets('keadaan berhasil menampilkan tahap aktif dan tombol mulai', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -76,6 +76,7 @@ void main() {
     await tester.drag(find.byType(ListView), const Offset(0, -800));
     await tester.pumpAndSettle();
     expect(find.text('Mulai timer'), findsOneWidget);
+    expect(find.text('Tahap berikutnya'), findsNothing);
   });
 
   testWidgets('tombol batal selalu meminta konfirmasi', (tester) async {
@@ -94,7 +95,7 @@ void main() {
     expect(find.text('Lanjut seduh'), findsOneWidget);
   });
 
-  testWidgets('tahap terakhir menampilkan tombol Selesai', (tester) async {
+  testWidgets('drawdown menampilkan Air habis dan Lewati', (tester) async {
     final time = _FakeTimeSource();
     await tester.pumpWidget(
       _app(
@@ -129,14 +130,18 @@ void main() {
     expect(_animatedBackground(AppColors.stage2), findsOneWidget);
     time.seconds = 70;
     await tester.pump(sessionUiRefreshInterval);
-    final finishButton = find.widgetWithText(AppButton, 'Selesai');
+    time.seconds = 100;
+    await tester.pump(sessionUiRefreshInterval);
+    final finishButton = find.widgetWithText(AppButton, 'Air habis');
     await tester.ensureVisible(finishButton);
 
     expect(finishButton, findsOneWidget);
-    expect(find.text('Air habis'), findsNothing);
+    expect(find.text('Lewati'), findsOneWidget);
+    expect(find.text('Tahap berikutnya'), findsNothing);
+    expect(find.text('Selesai'), findsWidgets);
   });
 
-  testWidgets('tenggat tahap terakhir otomatis membuka placeholder hasil', (
+  testWidgets('batas drawdown otomatis membuka placeholder hasil', (
     tester,
   ) async {
     final time = _FakeTimeSource();
@@ -154,17 +159,138 @@ void main() {
     await tester.tap(find.text('Mulai timer'));
     await tester.pump();
 
-    time.seconds = 100;
+    time.seconds = 700;
     await tester.pump(sessionUiRefreshInterval);
     await tester.pumpAndSettle();
 
     expect(find.text('Hasil seduh'), findsWidgets);
-    expect(find.textContaining('01:40'), findsOneWidget);
-    expect(find.textContaining('Lewat'), findsNothing);
+    expect(find.textContaining('11:40'), findsOneWidget);
+    expect(find.textContaining('dilewati'), findsOneWidget);
+  });
+
+  testWidgets('Air habis membawa drawdown dan total ke hasil', (tester) async {
+    final time = _FakeTimeSource();
+    await tester.pumpWidget(
+      _app(
+        _screen(
+          BrewCalculator.createDefault(beanId: 'bean-1'),
+          timeSource: time,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pump();
+    await tester.tap(find.text('Mulai timer'));
+    await tester.pump();
+    time.seconds = 135;
+    await tester.pump(sessionUiRefreshInterval);
+    await tester.ensureVisible(find.text('Air habis'));
+    await tester.tap(find.text('Air habis'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('02:15'), findsOneWidget);
+    expect(find.textContaining('00:35'), findsOneWidget);
+  });
+
+  testWidgets('Lewati membawa drawdown null ke hasil', (tester) async {
+    final time = _FakeTimeSource();
+    await tester.pumpWidget(
+      _app(
+        _screen(
+          BrewCalculator.createDefault(beanId: 'bean-1'),
+          timeSource: time,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pump();
+    await tester.tap(find.text('Mulai timer'));
+    await tester.pump();
+    time.seconds = 112;
+    await tester.pump(sessionUiRefreshInterval);
+    await tester.ensureVisible(find.text('Lewati'));
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
+    await tester.pump();
+    await tester.tap(find.text('Lewati'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('01:52'), findsOneWidget);
+    expect(find.textContaining('dilewati'), findsOneWidget);
+  });
+
+  testWidgets('jeda menghentikan timer dan umpan balik', (tester) async {
+    final time = _FakeTimeSource();
+    var sounds = 0;
+    final feedback = _feedback(onTransition: () => sounds++);
+    await tester.pumpWidget(
+      _app(
+        _screen(
+          BrewCalculator.createDefault(beanId: 'bean-1'),
+          timeSource: time,
+          feedback: feedback,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pump();
+    await tester.tap(find.text('Mulai timer'));
+    await tester.pump();
+    expect(sounds, 1);
+
+    time.advance(20);
+    await tester.tap(find.text('Jeda'));
+    await tester.pump();
+    time.advance(50);
+    await tester.pump(sessionUiRefreshInterval);
+    expect(time.seconds, 20);
+    expect(sounds, 1);
+    await tester.tap(find.text('Lanjut'));
+    await tester.pump();
+    time.advance(20);
+    await tester.pump(sessionUiRefreshInterval);
+    expect(sounds, 2);
+  });
+
+  testWidgets('kembali setelah tahap terlewat tanpa memutar umpan balik', (
+    tester,
+  ) async {
+    final time = _FakeTimeSource();
+    var sounds = 0;
+    final feedback = _feedback(onTransition: () => sounds++);
+    await tester.pumpWidget(
+      _app(
+        _screen(
+          BrewCalculator.createDefault(beanId: 'bean-1'),
+          timeSource: time,
+          feedback: feedback,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -800));
+    await tester.pump();
+    await tester.tap(find.text('Mulai timer'));
+    await tester.pump();
+    expect(sounds, 1);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    time.seconds = 75;
+    await tester.pump(sessionUiRefreshInterval);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(sounds, 1);
+    expect(_animatedBackground(AppColors.stage3), findsOneWidget);
   });
 }
 
-Widget _screen(BrewPlan plan, {_FakeTimeSource? timeSource}) {
+Widget _screen(
+  BrewPlan plan, {
+  _FakeTimeSource? timeSource,
+  BrewStageFeedback? feedback,
+}) {
   return BrewSessionScreen(
     plan: plan,
     timeSource: timeSource ?? _FakeTimeSource(),
@@ -172,16 +298,19 @@ Widget _screen(BrewPlan plan, {_FakeTimeSource? timeSource}) {
       events: const Stream<AccelerometerEvent>.empty(),
     ),
     wakeLock: const _FakeWakeLock(),
-    feedback: BrewStageFeedback(
+    feedback: feedback ?? _feedback(),
+  );
+}
+
+BrewStageFeedback _feedback({void Function()? onTransition}) =>
+    BrewStageFeedback(
       vibrate: (_) async {},
       cancelVibration: () async {},
-      playTransitionSound: () async {},
+      playTransitionSound: () async => onTransition?.call(),
       playCompletionSound: () async {},
       stopSound: () async {},
       delay: (_) async {},
-    ),
-  );
-}
+    );
 
 Finder _animatedBackground(Color color) {
   return find.byWidgetPredicate(
@@ -219,6 +348,13 @@ BrewPlan _emptyPlan() {
 
 class _FakeTimeSource implements ElapsedTimeSource {
   int seconds = 0;
+  bool running = false;
+
+  void advance(int amount) {
+    if (running) {
+      seconds += amount;
+    }
+  }
 
   @override
   Duration get elapsed => Duration(seconds: seconds);
@@ -229,10 +365,10 @@ class _FakeTimeSource implements ElapsedTimeSource {
   }
 
   @override
-  void start() {}
+  void start() => running = true;
 
   @override
-  void stop() {}
+  void stop() => running = false;
 }
 
 class _FakeWakeLock implements BrewWakeLock {

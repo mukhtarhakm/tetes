@@ -15,137 +15,136 @@ void main() {
     );
   });
 
-  test('pindah otomatis tepat saat hitung mundur nol', () {
-    controller.start();
-    time.seconds = 39;
-
+  test('tahap berganti tepat pada target mulai dan masuk drawdown', () {
+    expect(controller.start(), BrewSessionAction.started);
+    time.advance(39);
     expect(controller.reconcile(), BrewSessionAction.ignored);
     expect(controller.activeStageIndex, 0);
 
-    time.seconds = 40;
+    time.advance(1);
     expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
     expect(controller.activeStageIndex, 1);
-    expect(controller.actualStages[0]!.actualStartS, 0);
-    expect(controller.actualStages[0]!.actualDurationS, 40);
     expect(controller.countdownSeconds, 30);
-  });
 
-  test(
-    'tombol berikutnya menutup lebih awal dan menggeser tenggat berikutnya',
-    () {
-      controller.start();
-      time.seconds = 25;
-
-      expect(controller.nextStage(), BrewSessionAction.stageAdvanced);
-
-      expect(controller.actualStages[0]!.actualStartS, 0);
-      expect(controller.actualStages[0]!.actualDurationS, 25);
-      expect(controller.activeStageIndex, 1);
-      expect(controller.countdownSeconds, 30);
-
-      time.seconds = 54;
-      expect(controller.reconcile(), BrewSessionAction.ignored);
-      expect(controller.activeStageIndex, 1);
-
-      time.seconds = 55;
-      expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
-      expect(controller.activeStageIndex, 2);
-      expect(controller.actualStages[1]!.actualStartS, 25);
-      expect(controller.actualStages[1]!.actualDurationS, 30);
-    },
-  );
-
-  test('Selesai lebih awal mencatat total waktu dan drawdown null', () {
-    controller.start();
-    time.seconds = 40;
-    controller.nextStage();
-    time.seconds = 70;
-    controller.nextStage();
-    time.seconds = 85;
-
-    expect(controller.finish(), BrewSessionAction.completed);
-
-    final result = controller.result!;
-    expect(result.totalTimeS, 85);
-    expect(result.stages, hasLength(3));
-    expect(result.stages.last.actualStartS, 70);
-    expect(result.stages.last.actualDurationS, 15);
-    expect(result.stages.every((stage) => stage.drawdownS == null), isTrue);
-  });
-
-  test('tahap terakhir menyelesaikan sesi otomatis tepat saat nol', () {
-    controller.start();
-    time.seconds = 40;
-    expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
-    time.seconds = 70;
+    time.advance(30);
     expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
     expect(controller.activeStageIndex, 2);
+    time.advance(30);
+    expect(controller.reconcile(), BrewSessionAction.drawdownStarted);
+    expect(controller.isDrawdown, isTrue);
+    expect(controller.drawdownElapsedSeconds, 0);
+    expect(controller.result, isNull);
+  });
 
-    time.seconds = 100;
+  test('Air habis mencatat drawdown dan total waktu aktif', () {
+    controller.start();
+    time.advance(100);
+    controller.reconcile();
+    time.advance(35);
+
+    expect(controller.finishDrawdown(), BrewSessionAction.completed);
+    expect(controller.result!.drawdownS, 35);
+    expect(controller.result!.totalTimeS, 135);
+    expect(controller.result!.plan.stages, hasLength(3));
+    expect(controller.finishDrawdown(), BrewSessionAction.ignored);
+  });
+
+  test('Lewati menyimpan drawdown null dan total waktu saat ditekan', () {
+    controller.start();
+    time.advance(112);
+    controller.reconcile();
+
+    expect(controller.skipDrawdown(), BrewSessionAction.completed);
+    expect(controller.result!.drawdownS, isNull);
+    expect(controller.result!.totalTimeS, 112);
+  });
+
+  test('batas drawdown 10 menit menutup tepat pada batas', () {
+    controller.start();
+    time.advance(699);
+    expect(controller.reconcile(), BrewSessionAction.drawdownStarted);
+    time.advance(1);
     expect(controller.reconcile(), BrewSessionAction.completed);
-    expect(controller.activeStageIndex, 2);
-    expect(controller.status, BrewSessionStatus.completed);
-    expect(controller.result!.totalTimeS, 100);
-    expect(controller.result!.stages.last.actualDurationS, 30);
-    expect(
-      controller.result!.stages.every((stage) => stage.drawdownS == null),
-      isTrue,
-    );
-    expect(controller.reconcile(), BrewSessionAction.ignored);
+    expect(controller.result!.drawdownS, isNull);
+    expect(controller.result!.totalTimeS, 700);
+    expect(time.running, isFalse);
   });
 
-  test('kembali dari latar belakang melewati dua tahap pada tenggatnya', () {
+  test('kembali terlambat dari latar belakang memakai batas 10 menit', () {
     controller.start();
-    time.seconds = 75;
+    time.advance(725);
 
+    expect(controller.reconcile(), BrewSessionAction.completed);
+    expect(controller.result!.totalTimeS, 700);
+    expect(controller.result!.drawdownS, isNull);
+  });
+
+  test('jeda menggeser tahap dan tidak masuk total waktu', () {
+    controller.start();
+    time.advance(20);
+    expect(controller.pause(), BrewSessionAction.paused);
+    time.advance(50);
+    expect(controller.elapsedSeconds, 20);
+    expect(controller.reconcile(), BrewSessionAction.ignored);
+    expect(controller.resume(), BrewSessionAction.resumed);
+
+    time.advance(19);
+    expect(controller.reconcile(), BrewSessionAction.ignored);
+    time.advance(1);
+    expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
+    expect(time.wallSeconds, 90);
+    expect(controller.elapsedSeconds, 40);
+    time.advance(60);
+    expect(controller.reconcile(), BrewSessionAction.drawdownStarted);
+    expect(controller.skipDrawdown(), BrewSessionAction.completed);
+    expect(controller.result!.totalTimeS, 100);
+  });
+
+  test('jeda saat drawdown tidak menambah drawdown atau total', () {
+    controller.start();
+    time.advance(105);
+    controller.reconcile();
+    expect(controller.pause(), BrewSessionAction.paused);
+    time.advance(100);
+    expect(controller.drawdownElapsedSeconds, 5);
+    expect(controller.finishDrawdown(), BrewSessionAction.ignored);
+    expect(controller.resume(), BrewSessionAction.resumed);
+    time.advance(20);
+    expect(controller.finishDrawdown(), BrewSessionAction.completed);
+    expect(controller.result!.drawdownS, 25);
+    expect(controller.result!.totalTimeS, 125);
+  });
+
+  test('kembali setelah dua tahap terlewat langsung ke tahap sesuai waktu', () {
+    controller.start();
+    time.advance(75);
     expect(controller.reconcile(), BrewSessionAction.stageAdvanced);
     expect(controller.activeStageIndex, 2);
-    expect(controller.actualStages[0]!.actualStartS, 0);
-    expect(controller.actualStages[0]!.actualDurationS, 40);
-    expect(controller.actualStages[1]!.actualStartS, 40);
-    expect(controller.actualStages[1]!.actualDurationS, 30);
     expect(controller.activeStageElapsedSeconds, 5);
     expect(controller.reconcile(), BrewSessionAction.ignored);
+    time.advance(50);
+    expect(controller.reconcile(), BrewSessionAction.drawdownStarted);
+    expect(controller.drawdownElapsedSeconds, 25);
   });
 
-  test(
-    'kembali setelah tenggat terakhir selesai pada tenggat, bukan waktu kini',
-    () {
-      controller.start();
-      time.seconds = 125;
-
-      expect(controller.reconcile(), BrewSessionAction.completed);
-
-      final result = controller.result!;
-      expect(result.totalTimeS, 100);
-      expect(result.stages[0].actualDurationS, 40);
-      expect(result.stages[1].actualStartS, 40);
-      expect(result.stages[1].actualDurationS, 30);
-      expect(result.stages[2].actualStartS, 70);
-      expect(result.stages[2].actualDurationS, 30);
-      expect(result.stages.every((stage) => stage.drawdownS == null), isTrue);
-    },
-  );
-
-  test('goyang memulai sebelum sesi dan tidak memajukan setelah berjalan', () {
+  test('goyang hanya memulai sesi', () {
     expect(controller.handleShake(), BrewSessionAction.started);
-    expect(controller.activeStageIndex, 0);
-    time.seconds = 50;
-
+    time.advance(50);
     expect(controller.handleShake(), BrewSessionAction.ignored);
     expect(controller.activeStageIndex, 0);
-    expect(controller.elapsedSeconds, 50);
-    expect(controller.actualStages[0], isNull);
-    expect(controller.status, BrewSessionStatus.running);
-    expect(controller.result, isNull);
+    controller.pause();
+    expect(controller.handleShake(), BrewSessionAction.ignored);
+    controller.resume();
+    time.advance(50);
+    controller.reconcile();
+    expect(controller.handleShake(), BrewSessionAction.ignored);
+    expect(controller.isDrawdown, isTrue);
   });
 
   test('batal tidak menghasilkan hasil', () {
     controller.start();
-    time.seconds = 25;
-
+    time.advance(25);
     expect(controller.cancel(), BrewSessionAction.cancelled);
-    expect(controller.status, BrewSessionStatus.cancelled);
     expect(controller.result, isNull);
   });
 
@@ -163,7 +162,15 @@ void main() {
 
 class FakeTimeSource implements ElapsedTimeSource {
   int seconds = 0;
+  int wallSeconds = 0;
   bool running = false;
+
+  void advance(int amount) {
+    wallSeconds += amount;
+    if (running) {
+      seconds += amount;
+    }
+  }
 
   @override
   Duration get elapsed => Duration(seconds: seconds);

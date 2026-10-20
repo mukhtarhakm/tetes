@@ -20,7 +20,7 @@ class BrewResultPlaceholderScreen extends StatelessWidget {
           child: EmptyView(
             title: 'Hasil seduh',
             message:
-                'Hasil seduh (dikerjakan di sesi berikutnya). Waktu aktual ${_formatTime(result.totalTimeS)} sudah diterima.',
+                'Hasil seduh (dikerjakan di sesi berikutnya). Waktu total ${_formatTime(result.totalTimeS)}. Drawdown ${result.drawdownS == null ? 'dilewati' : _formatTime(result.drawdownS!)}.',
             icon: Icons.check_circle_outline_rounded,
           ),
         ),

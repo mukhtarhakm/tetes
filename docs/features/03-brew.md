@@ -21,17 +21,19 @@ Validasi: dosis, rasio, suhu sesuai DATA_MODEL.md bagian 4. Total target air tah
 
 ### Layar Sesi
 - Menampilkan tahap aktif (nama, target air, hitung mundur durasi target) dan timer total. Tahap lain terlihat sebagai daftar kecil.
-- Tombol besar "Tahap berikutnya". Tiap ketukan mencatat `actual_start_s` tahap berikutnya dan menutup `actual_duration_s` tahap sebelumnya.
-- Di tahap terakhir, tombol berubah menjadi "Air habis" untuk mencatat `drawdown_s` dan mengakhiri sesi.
+- Tahap berganti otomatis pada `target_start_s` berdasarkan waktu aktif sejak mulai. Tidak ada tombol pergantian tahap. `actual_start_s` dan `actual_duration_s` selalu `NULL`.
+- Setelah tuangan terakhir berakhir, sesi masuk fase drawdown dengan stopwatch. Tombol "Air habis" mencatat `drawdown_s` sejak akhir tuangan terakhir; "Lewati" mengakhiri dengan `drawdown_s = NULL`; batas 10 menit juga mengakhiri dengan `drawdown_s = NULL`.
+- Tombol "Jeda" menghentikan jam sesi; "Lanjut" meneruskannya. Jeda menggeser semua tenggat tahap berikutnya dan tidak masuk `total_time_s`. `total_time_s` dihitung dari mulai sampai sesi berakhir pada ketiga jalur drawdown, tanpa waktu jeda.
 - Getar dan suara pendek saat pergantian tahap atau saat target waktu tahap tercapai.
-- Accelerometer: goyang melebihi ambang memulai timer di awal. Di sesi, goyang tidak boleh memicu "tahap berikutnya" tanpa sengaja (hanya mulai dan reset). Beri jeda agar tidak terpicu berulang.
+- Tahap yang terlewat saat aplikasi di latar belakang direkonsiliasi sesuai waktu aktif tanpa memutar ulang getar atau suara.
+- Accelerometer: goyang melebihi ambang hanya memulai timer di awal; selama sesi goyang tidak memajukan tahap atau mengakhiri sesi. Beri jeda agar tidak terpicu berulang.
 - Tombol batal (dengan konfirmasi). Layar tetap menyala selama sesi.
 
 ## Bagian C (Sprint 3): Hasil
 
 ### Layar Hasil (urutan dari atas)
 1. Ringkasan: biji, dosis, rasio, suhu, grind, total waktu.
-2. Tabel plan vs realisasi per tahap: target dan aktual untuk air dan waktu. Kolom **air aktual** diisi manual. Waktu aktual dapat dikoreksi sebelum simpan.
+2. Tabel per tahap menampilkan target waktu dan target air serta **air aktual** yang diisi manual. Waktu aktual tahap tidak dicatat. Ringkasan menampilkan `total_time_s` dan `drawdown_s` bila ada.
 3. Skor rasa (bintang 1-5) dan tag rasa (pilih dari enum, minimal satu).
 4. Perbandingan: notes roastery (dari profil biji) berdampingan dengan tag rasa pengguna.
 5. Catatan bebas.
@@ -50,7 +52,7 @@ Dialog konfirmasi sebelum simpan: "Data seduhan tidak dapat diubah setelah disim
 ## Keadaan layar dan kasus pinggir
 - Tidak ada biji: arahkan ke tambah biji.
 - Aplikasi ditutup di tengah sesi: sesi yang belum disimpan boleh hilang. Tidak boleh ada entri setengah jadi.
-- Tahap terlewat atau lupa menekan tombol: pengguna dapat memperbaiki waktu di layar hasil.
+- Tahap terlewat saat aplikasi di latar belakang: tahap aktif mengikuti waktu target tanpa memutar ulang umpan balik yang terlewat.
 - Air aktual kosong: boleh disimpan, tampilkan sebagai "tidak diisi" dan jangan dihitung selisih.
 - Skor atau tag belum diisi: tombol Simpan nonaktif dengan penjelasan.
 
@@ -74,7 +76,8 @@ Dialog konfirmasi sebelum simpan: "Data seduhan tidak dapat diubah setelah disim
 **Sprint 3**
 - [ ] Sesi berjalan dengan timer tiap tahap, getar dan suara saat ganti tahap
 - [ ] Goyang HP memulai timer
-- [ ] Waktu aktual tiap tahap tercatat dan tampil di hasil
+- [ ] Tahap berganti otomatis pada waktu target, jeda menggeser tenggat, dan waktu aktual tiap tahap tetap `NULL`
+- [ ] Air habis, Lewati, dan batas drawdown 10 menit menghasilkan `total_time_s` yang benar tanpa waktu jeda
 - [ ] Simpan membuat entri dengan `seq`, `prev_hash`, dan `hash` yang benar
 - [ ] Dua entri berturut-turut: `prev_hash` entri kedua sama dengan `hash` entri pertama
 - [ ] Tes unit hash memakai kedua vektor uji dan lolos
@@ -82,7 +85,7 @@ Dialog konfirmasi sebelum simpan: "Data seduhan tidak dapat diubah setelah disim
 - [ ] Mengubah satu nilai langsung di database lalu menjalankan verifikasi menghasilkan "rantai putus"
 
 ## Cara uji
-Buat tiga seduhan dengan biji berbeda, termasuk satu dengan waktu yang dikoreksi. Periksa tabel `brews` dan `brew_stages`. Uji tamper dengan mengubah `taste_score` lewat alat inspeksi database.
+Buat tiga seduhan dengan biji berbeda: akhiri drawdown lewat Air habis, Lewati, dan batas 10 menit. Jeda salah satu sesi dan periksa `total_time_s` tidak menghitung jeda; periksa `actual_start_s` serta `actual_duration_s` selalu `NULL` di `brew_stages`. Uji tamper dengan mengubah `taste_score` lewat alat inspeksi database.
 
 ## Langkah pengerjaan yang disarankan
 1. Kalkulator dan pembentuk tahap (logika murni, dengan tes unit). Berhenti.

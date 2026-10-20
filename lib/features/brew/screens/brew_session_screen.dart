@@ -50,6 +50,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
   String? _hardwareWarning;
   bool _cancelDialogOpen = false;
   bool _leavingScreen = false;
+  bool _inForeground = true;
 
   @override
   void initState() {
@@ -72,8 +73,9 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _inForeground = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.resumed) {
-      _refreshRunningSession();
+      _refreshRunningSession(playFeedback: false);
     }
   }
 
@@ -123,8 +125,9 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
     final controller = _controller!;
     final plan = controller.plan;
     final activeStage = controller.activeStage;
-    final running = controller.status == BrewSessionStatus.running;
-    final isLast = controller.activeStageIndex == plan.stages.length - 1;
+    final ready = controller.status == BrewSessionStatus.ready;
+    final paused = controller.status == BrewSessionStatus.paused;
+    final drawdown = controller.isDrawdown;
     final activeStageColor = BrewStageColors.forPosition(activeStage.position);
     final activeStageSoftColor = BrewStageColors.softForPosition(
       activeStage.position,
@@ -141,25 +144,33 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
           child: Column(
             children: [
               Text(
-                running ? 'Tahap aktif' : 'Siap memulai',
+                ready
+                    ? 'Siap memulai'
+                    : drawdown
+                    ? 'Drawdown'
+                    : 'Tahap aktif',
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: AppSpacing.s8),
               Text(
-                activeStage.name.label,
+                drawdown ? 'Tunggu air habis' : activeStage.name.label,
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
               const SizedBox(height: AppSpacing.s16),
               Text(
-                running
-                    ? _formatCountdown(controller.countdownSeconds)
-                    : _formatTime(activeStage.durationSeconds),
+                drawdown
+                    ? _formatTime(controller.drawdownElapsedSeconds)
+                    : ready
+                    ? _formatTime(activeStage.durationSeconds)
+                    : _formatCountdown(controller.countdownSeconds),
                 style: Theme.of(context).textTheme.displayLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.s16),
               Text(
-                'Tuang ${_formatNumber(activeStage.targetPourG)} g • Kumulatif ${_formatNumber(plan.cumulativeWaterAt(controller.activeStageIndex))} g',
+                drawdown
+                    ? 'Tekan Air habis saat air selesai menetes.'
+                    : 'Tuang ${_formatNumber(activeStage.targetPourG)} g • Kumulatif ${_formatNumber(plan.cumulativeWaterAt(controller.activeStageIndex))} g',
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
@@ -240,7 +251,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
           ),
         ),
         const SizedBox(height: AppSpacing.s24),
-        if (!running) ...[
+        if (ready) ...[
           Text(
             'Mulai dengan tombol atau goyangkan perangkat.',
             style: Theme.of(context).textTheme.bodyLarge,
@@ -252,14 +263,27 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
             icon: Icons.play_arrow_rounded,
             onPressed: _startManually,
           ),
-        ] else
+        ] else ...[
           AppButton(
-            label: isLast ? 'Selesai' : 'Tahap berikutnya',
-            icon: isLast
-                ? Icons.check_circle_outline_rounded
-                : Icons.skip_next_rounded,
-            onPressed: isLast ? _finishSession : _advanceStage,
+            label: paused ? 'Lanjut' : 'Jeda',
+            icon: paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+            onPressed: _togglePause,
           ),
+          if (drawdown && !paused) ...[
+            const SizedBox(height: AppSpacing.s8),
+            AppButton(
+              label: 'Air habis',
+              icon: Icons.check_circle_outline_rounded,
+              onPressed: _finishDrawdown,
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            AppButton(
+              label: 'Lewati',
+              variant: AppButtonVariant.text,
+              onPressed: _skipDrawdown,
+            ),
+          ],
+        ],
         const SizedBox(height: AppSpacing.s8),
         AppButton(
           label: 'Batalkan sesi',
@@ -336,46 +360,68 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
     );
   }
 
-  void _refreshRunningSession() {
-    if (!mounted || _controller?.status != BrewSessionStatus.running) {
+  void _refreshRunningSession({bool playFeedback = true}) {
+    if (!mounted || !_inForeground || _controller == null) {
       return;
     }
     final action = _controller!.reconcile();
-    if (action == BrewSessionAction.stageAdvanced) {
+    if (playFeedback &&
+        (action == BrewSessionAction.stageAdvanced ||
+            action == BrewSessionAction.drawdownStarted)) {
       unawaited(_feedback.playTransition());
     } else if (action == BrewSessionAction.completed) {
       _uiTimer?.cancel();
-      unawaited(_finishAndOpenResult());
+      unawaited(_finishAndOpenResult(playFeedback: playFeedback));
       return;
     }
     setState(() {});
   }
 
-  void _advanceStage() {
-    final action = _controller!.nextStage();
-    if (action == BrewSessionAction.stageAdvanced) {
-      unawaited(_feedback.playTransition());
-      setState(() {});
-    } else if (action == BrewSessionAction.completed) {
+  void _togglePause() {
+    final controller = _controller!;
+    if (controller.status == BrewSessionStatus.paused) {
+      if (controller.resume() == BrewSessionAction.resumed) {
+        _startUiTimer();
+        setState(() {});
+      }
+      return;
+    }
+    final action = controller.pause();
+    if (action == BrewSessionAction.completed) {
       _uiTimer?.cancel();
       unawaited(_finishAndOpenResult());
+    } else if (action == BrewSessionAction.paused) {
+      _uiTimer?.cancel();
+      _feedback.cancel();
+      setState(() {});
     }
   }
 
-  void _finishSession() {
-    if (_controller!.finish() != BrewSessionAction.completed) {
+  void _finishDrawdown() => _endDrawdown(skip: false);
+
+  void _skipDrawdown() => _endDrawdown(skip: true);
+
+  void _endDrawdown({required bool skip}) {
+    final action = skip
+        ? _controller!.skipDrawdown()
+        : _controller!.finishDrawdown();
+    if (action != BrewSessionAction.completed) {
       return;
     }
     _uiTimer?.cancel();
     unawaited(_finishAndOpenResult());
   }
 
-  Future<void> _finishAndOpenResult() async {
+  Future<void> _finishAndOpenResult({bool playFeedback = true}) async {
     if (_leavingScreen) {
       return;
     }
     _leavingScreen = true;
-    await _feedback.playCompleted();
+    if (playFeedback) {
+      await _feedback.playCompleted();
+    } else {
+      _feedback.cancel();
+    }
     await _completeAndOpenResult();
   }
 
@@ -457,11 +503,18 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
 }
 
 String _stageStatus(BrewSessionController controller, int index) {
+  if (controller.isDrawdown) {
+    return 'Selesai';
+  }
   if (index < controller.activeStageIndex) {
     return 'Selesai';
   }
   if (index == controller.activeStageIndex) {
-    return controller.status == BrewSessionStatus.running ? 'Aktif' : 'Siap';
+    return controller.status == BrewSessionStatus.ready
+        ? 'Siap'
+        : controller.status == BrewSessionStatus.paused
+        ? 'Jeda'
+        : 'Aktif';
   }
   return 'Berikutnya';
 }

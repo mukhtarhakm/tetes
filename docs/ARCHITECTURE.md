@@ -42,6 +42,7 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
 | UUID | `uuid` | ID data aplikasi dibuat di Flutter; ID pengguna dan session dibuat server |
 | Biometrik | `local_auth` | Pembuka aplikasi saja |
 | Sensor | `sensors_plus` | Accelerometer (goyang), gyroscope (game) |
+| Umpan balik sesi | `vibration` + `flutter_ringtone_player` | Getar dan nada sistem saat pergantian tahap dan akhir sesi |
 | Notifikasi | `flutter_local_notifications` + `timezone` | Lokal, tanpa server |
 | Lokasi | `geolocator` | |
 | Peta | `flutter_map` + `latlong2` (OpenStreetMap) | Tanpa key |

@@ -102,7 +102,7 @@ CREATE TABLE brews (
   ratio              REAL NOT NULL,            -- 16 berarti 1:16
   water_temp_c       INTEGER NOT NULL,
   grind              TEXT NOT NULL,            -- enum grind
-  total_time_s       INTEGER NOT NULL,
+  total_time_s       INTEGER NOT NULL,         -- detik aktif dari mulai sampai sesi berakhir; tidak termasuk jeda
   taste_score        INTEGER NOT NULL,         -- 1-5
   taste_tags         TEXT NOT NULL,            -- dipisah koma, urut abjad
   notes              TEXT,                     -- tidak ikut hash
@@ -125,11 +125,13 @@ CREATE TABLE brew_stages (
   target_duration_s      INTEGER NOT NULL,
   target_water_cum_g     REAL NOT NULL,        -- air kumulatif target
   target_pour_g          REAL NOT NULL,
-  actual_start_s         INTEGER,
-  actual_duration_s      INTEGER,
+  actual_start_s         INTEGER,              -- selalu NULL; waktu aktual tahap tidak dicatat
+  actual_duration_s      INTEGER,              -- selalu NULL; waktu aktual tahap tidak dicatat
   actual_water_g         REAL,                 -- diisi manual
-  drawdown_s             INTEGER               -- hanya diisi di tahap terakhir
+  drawdown_s             INTEGER               -- hanya di tahap terakhir; NULL jika Lewati atau batas 10 menit
 );
+
+`brews.total_time_s` adalah jumlah detik dari mulai sampai sesi berakhir, **tidak termasuk waktu jeda**. Aturan ini berlaku untuk akhir melalui **Air habis**, **Lewati**, dan **batas drawdown 10 menit**. Nilai `total_time_s` ikut di-hash sesuai bagian 5.3. `brew_stages.actual_start_s` dan `actual_duration_s` selalu `NULL`; `drawdown_s` hanya diisi pada tahap terakhir bila pengguna menekan Air habis, dihitung dari akhir tuangan terakhir.
 
 CREATE TABLE events (
   id                TEXT PRIMARY KEY,
