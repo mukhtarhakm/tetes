@@ -449,3 +449,8 @@ entrypoint = "./functions/sync-push/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/sync-pull/index.ts"
+
+[functions.ai]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/ai/index.ts"

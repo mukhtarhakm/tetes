@@ -70,3 +70,10 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Klien pull untuk beans, brews, dan brew_stages selesai: session token, verifikasi hash sebelum tulis, transaksi per halaman, lanjut dari prefix lokal setelah halaman berikutnya gagal, dan ringkasan pull di settings.
 - Pull otomatis senyap sekali setelah login/register baru bila belum ada seduhan lokal; tombol tarik manual dan hasil terakhir tampil di Profil. Best brew dihitung ulang dari seduhan aktif lokal setelah pull selesai.
 - Tes SQLite dalam memori mencakup halaman jamak, prefix, hash salah, rollback, kegagalan halaman kedua lalu lanjut, konflik, isolasi pengguna, 401, dan kunci push/pull. Uji di HP masih menunggu.
+
+## 2026-10-21 - Fitur 05 langkah 4
+- Migrasi ai_usage dan RPC increment_ai_usage dibuat dengan RLS tanpa policy serta hak eksekusi hanya service_role; belum diterapkan ke database.
+- Edge Function ai untuk recommend/diagnose dibuat dengan validasi input dan keluaran, batas 20 permintaan per jam, Gemini dari environment, timeout 15 detik, retry keluaran sekali, dan log terbatas pada jenis/durasi/kode. Fungsi belum di-deploy; uji curl server menunggu.
+- Tes validator Deno disiapkan; kasus keluaran dan alur permintaan diuji dengan runtime Node karena Deno tidak tersedia lokal. Integrasi Flutter dan uji di HP belum dikerjakan.
+- Perbaikan review: prompt recommend meminta jumlah tahap sesuai pouring_count, validator menolak jumlah yang berbeda, dan retry tetap memakai satu pemanggilan ai_usage per permintaan. Sepuluh tes validator dan alur lulus lewat Node; Deno belum tersedia lokal.
+- Setelah uji live recommend menghasilkan ai_invalid_output, prompt Gemini diperjelas agar mengikuti seluruh batas dan bentuk JSON yang sudah diwajibkan validator tanpa melonggarkannya. Tes mock memeriksa instruksi dan application/json yang benar-benar dikirim, keluaran sah setelah retry, serta satu pemanggilan ai_usage; uji live ulang belum dilakukan.
