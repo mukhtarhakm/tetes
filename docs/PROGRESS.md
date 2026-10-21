@@ -98,3 +98,15 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - 2026-10-21: Tampilan Agenda Event diringkas dengan waktu zona asal, WIB, penanda beda hari, hitung mundur, dan detail empat zona; tes utilitas serta analisis lulus, uji HP menunggu.
 
 - 2026-10-21: Fitur 06 sesi B menambahkan pengingat event dan seduh, notifikasi stok saat melintasi ambang, izin dan pengaturan Profil, serta pembatalan saat logout; build Android debug dan tes otomatis lulus, sedangkan uji notifikasi di HP asli masih menunggu.
+
+## 2026-10-21 - Fitur 07 sesi A, prototipe kontrol
+- Kartu Game di Eksplor membuka layar kalibrasi dan titik kontrol gyroscope. Kecepatan putar diintegrasikan memakai selisih cap waktu sensor, dengan peredaman, batas sudut, dan tiga sensitivitas yang tersimpan per pengguna di settings.
+- Sensor dibatalkan saat layar ditutup atau aplikasi ke latar belakang; game jeda dan meminta kalibrasi ulang saat dilanjutkan. Jika sensor gagal atau tidak mengirim data selama dua detik, game dinonaktifkan dengan pesan jelas. Belum ada level, zona, bar, getar/suara, skor, atau sinkronisasi.
+- Uji di HP asli untuk rasa kontrol dan ketersediaan gyroscope masih menunggu masukan pengguna sebelum melanjutkan.
+- Seluruh 233 tes Flutter lulus dan `flutter analyze --no-pub` bersih. Konfigurasi Android dan daftar paket tidak berubah.
+
+## 2026-10-21 - Fitur 07 sesi A, level dan skor lokal
+- Tiga level Steady Pour selesai dengan zona tetap/bergerak, hitung mundur, bar air, batas waktu, akurasi, bintang, hasil, penguncian level, dan skor tertinggi per pengguna.
+- Waktu game dan gerak zona memakai dt dari cap waktu gyroscope yang dibatasi saat ada jeda besar. Hanya keberhasilan sebelum batas waktu masuk game_scores dengan UUID v4, waktu UTC tanpa milidetik, dan sync_status pending; kegagalan tidak disimpan.
+- Jeda membatalkan langganan sensor dan umpan balik, lalu meminta kalibrasi ulang. Tes logika, sensor palsu, dan SQLite dalam memori mencakup batas waktu, ambang bintang, penyimpanan, MAX, dan isolasi pengguna. Seluruh 242 tes Flutter lulus; uji level di HP asli masih menunggu.
+- 2026-10-21: Arah kontrol Steady Pour kini mempertahankan horizontal dan membalik vertikal, Cara main serta petunjuk level 1 ditambahkan, orientasi potret dipulihkan ke aturan aplikasi saat latar belakang atau keluar, dan 247 tes Flutter serta flutter analyze lulus.

@@ -97,6 +97,7 @@ class _StateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -121,7 +122,9 @@ class _StateView extends StatelessWidget {
             message,
             style: Theme.of(
               context,
-            ).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
+            ).textTheme.bodyLarge?.copyWith(
+              color: isDark ? AppColors.onDark : AppColors.inkSoft,
+            ),
             textAlign: TextAlign.center,
           ),
           if (actionLabel != null) ...[

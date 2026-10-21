@@ -15,6 +15,7 @@ import '../../core/utils/event_time.dart';
 import '../../data/db/database_provider.dart';
 import '../../data/repositories/event_repo.dart';
 import '../auth/state/session_controller.dart';
+import '../game/game_prototype_screen.dart';
 import 'event_model.dart';
 
 final eventRepositoryProvider = FutureProvider<EventRepository>(
@@ -53,10 +54,15 @@ class ExploreScreen extends StatelessWidget {
           icon: Icons.currency_exchange_outlined,
         ),
         const SizedBox(height: AppSpacing.s12),
-        const _MenuCard(
+        _MenuCard(
           title: 'Game',
-          description: 'Latih ketepatan tuangan. Segera',
+          description: 'Coba kontrol tuangan dengan gyroscope.',
           icon: Icons.sports_esports_outlined,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const GamePrototypeScreen(),
+            ),
+          ),
         ),
       ],
     ),
