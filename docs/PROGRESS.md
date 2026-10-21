@@ -10,7 +10,7 @@ Perbarui di akhir setiap sesi.
 | 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Fitur 02 dan implementasi Fitur 03 bagian A selesai; tahap tanpa jeda memakai warna konsisten pada kartu, timeline, dan grafik; Atur Seduh menunggu uji manual di HP |
 | 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Selesai | Sesi B dan C selesai: tahap otomatis/drawdown/timer aktif, layar Hasil, penyimpanan atomik dengan hash chain, pengaturan terbaik, biaya, dan stok |
 | 4 | Jurnal | 04 | Sedang jalan | Fitur 04 Sesi A & B selesai: tab Jurnal (sub-tab Seduhan & Biji, perbandingan 2 seduhan dengan ringkasan murni & sorotan beda, grafik skor fl_chart tanpa seduhan dibatalkan, pembacaan stok & ambang batas tanpa N+1). Sesi berikutnya: jadikan pengaturan terbaik manual & bandingkan dua biji |
-| 5 | Sinkronisasi dan AI | 05 | Belum mulai | |
+| 5 | Sinkronisasi dan AI | 05 | Sedang jalan | Push/pull dan integrasi AI Flutter untuk Atur Seduh serta Hasil selesai; uji HP menunggu |
 | 6 | Event, notifikasi, LBS | 06 | Belum mulai | |
 | 7 | Game, profil, perapian | 07 | Belum mulai | |
 | 8 | Pengujian, laporan, presentasi | - | Belum mulai | |
@@ -72,8 +72,15 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Tes SQLite dalam memori mencakup halaman jamak, prefix, hash salah, rollback, kegagalan halaman kedua lalu lanjut, konflik, isolasi pengguna, 401, dan kunci push/pull. Uji di HP masih menunggu.
 
 ## 2026-10-21 - Fitur 05 langkah 4
-- Migrasi ai_usage dan RPC increment_ai_usage dibuat dengan RLS tanpa policy serta hak eksekusi hanya service_role; belum diterapkan ke database.
-- Edge Function ai untuk recommend/diagnose dibuat dengan validasi input dan keluaran, batas 20 permintaan per jam, Gemini dari environment, timeout 15 detik, retry keluaran sekali, dan log terbatas pada jenis/durasi/kode. Fungsi belum di-deploy; uji curl server menunggu.
-- Tes validator Deno disiapkan; kasus keluaran dan alur permintaan diuji dengan runtime Node karena Deno tidak tersedia lokal. Integrasi Flutter dan uji di HP belum dikerjakan.
+- Migrasi ai_usage dan RPC increment_ai_usage dibuat dengan RLS tanpa policy serta hak eksekusi hanya service_role.
+- Edge Function ai untuk recommend/diagnose dibuat dengan validasi input dan keluaran, batas 20 permintaan per jam, Gemini dari environment, timeout 15 detik, retry keluaran sekali, dan log terbatas pada jenis/durasi/kode. Uji live diagnose menghasilkan 200 dan input suhu di luar batas menghasilkan 400; uji di HP menunggu.
+- Tes validator Deno disiapkan; kasus keluaran dan alur permintaan diuji dengan runtime Node karena Deno tidak tersedia lokal.
 - Perbaikan review: prompt recommend meminta jumlah tahap sesuai pouring_count, validator menolak jumlah yang berbeda, dan retry tetap memakai satu pemanggilan ai_usage per permintaan. Sepuluh tes validator dan alur lulus lewat Node; Deno belum tersedia lokal.
 - Setelah uji live recommend menghasilkan ai_invalid_output, prompt Gemini diperjelas agar mengikuti seluruh batas dan bentuk JSON yang sudah diwajibkan validator tanpa melonggarkannya. Tes mock memeriksa instruksi dan application/json yang benar-benar dikirim, keluaran sah setelah retry, serta satu pemanggilan ai_usage; uji live ulang belum dilakukan.
+
+## 2026-10-21 - Fitur 05 langkah 5
+- AiClient Flutter mengirim recommend/diagnose dengan session token dari secure storage, batas 35 detik, pemetaan galat bahasa Indonesia dan keluar paksa pada 401. Riwayat AI dibatasi lima seduhan aktif milik pengguna dan biji terkait (seduhan terbaik serta terbaru).
+- Atur Seduh menerapkan rekomendasi hanya setelah tombol ditekan dan validasi rencana lokal lulus. Hasil menampilkan diagnosa serta saran yang dapat diterapkan secara manual ke seduhan berikutnya; hasil AI yang tidak bisa menjadi rencana lokal memakai fallback dengan pesan jelas. Tahap rencana berikutnya dihitung ulang. Respons terlambat setelah form berubah atau layar ditinggalkan tidak mengubah isian; 401 tetap mengakhiri sesi bila akun permintaan masih aktif.
+- Diagnosa AI yang valid disimpan sebagai teks JSON di brews.ai_advice saat seduhan disimpan, di luar hash, lalu dibaca sebagai saran di detail Jurnal. Jalur sync-push meneruskan teks JSON ini tanpa mengubahnya.
+- Seluruh 211 tes Flutter lulus dan flutter analyze bersih melalui runtime Flutter yang terpasang, termasuk tes 401 terlambat dan perubahan akun. Uji langsung di HP belum dilakukan. Pembuatan diagnosa dari Jurnal setelah seduhan tersimpan tidak termasuk langkah ini.
+- 2026-10-21: Atur Seduh kini menampilkan kartu ringkas perubahan rekomendasi AI, penanda kolom, dan pemulihan rencana lengkap; galat jaringan atau layanan memicu hitungan mundur 30 detik, status upstream 503/429 mendapat pesan sibuk, dan uji HP masih menunggu.

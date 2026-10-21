@@ -1,0 +1,17 @@
+warning: in the working copy of 'docs/PROGRESS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/data/repositories/brew_repo.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/features/brew/screens/brew_result_placeholder_screen.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/features/brew/screens/brew_setup_screen.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/features/brew/state/brew_setup_controller.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/features/journal/screens/brew_detail_screen.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/data/repositories/brew_repo_test.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/features/journal/journal_screen_test.dart', LF will be replaced by CRLF the next time Git touches it
+ docs/PROGRESS.md                                   |  15 [32m+[m[31m-[m
+ lib/data/repositories/brew_repo.dart               |  31 [32m++[m[31m-[m
+ .../screens/brew_result_placeholder_screen.dart    | 270 [32m+++++++++++++++++++[m[31m--[m
+ lib/features/brew/screens/brew_setup_screen.dart   | 217 [32m++++++++++++++[m[31m---[m
+ lib/features/brew/state/brew_setup_controller.dart | 262 [32m+++++++++++++++++++[m[31m-[m
+ .../journal/screens/brew_detail_screen.dart        |  23 [32m+[m[31m-[m
+ test/data/repositories/brew_repo_test.dart         |  52 [32m++++[m
+ test/features/journal/journal_screen_test.dart     |  40 [32m++[m[31m-[m
+ 8 files changed, 838 insertions(+), 72 deletions(-)

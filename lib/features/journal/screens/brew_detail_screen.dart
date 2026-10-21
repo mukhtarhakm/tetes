@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +11,7 @@ import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
 import '../../beans/state/bean_providers.dart';
+import '../../brew/ai_brew.dart';
 import '../../brew/screens/brew_setup_screen.dart';
 import '../../brew/state/brew_setup_controller.dart';
 import '../journal_model.dart';
@@ -75,6 +78,7 @@ class _BrewDetailContent extends ConsumerWidget {
       _ => ('Menunggu sync', StatusPillVariant.pending),
     };
     final shortHash = item.hash.length >= 8 ? item.hash.substring(0, 8) : item.hash;
+    final adviceText = _formatAdvice(data.aiAdvice);
 
     return ListView(
       padding: AppInsets.screen,
@@ -332,9 +336,7 @@ class _BrewDetailContent extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                data.aiAdvice != null && data.aiAdvice!.isNotEmpty
-                    ? data.aiAdvice!
-                    : 'Belum ada saran AI untuk seduhan ini.',
+                adviceText,
                 style: textTheme.bodyMedium?.copyWith(
                   color: data.aiAdvice != null && data.aiAdvice!.isNotEmpty
                       ? AppColors.ink
@@ -423,6 +425,21 @@ class _BrewDetailContent extends ConsumerWidget {
         builder: (_) => BrewSetupScreen(initialPlan: plan),
       ),
     );
+  }
+
+  static String _formatAdvice(String? advice) {
+    if (advice == null || advice.isEmpty) {
+      return 'Belum ada saran AI untuk seduhan ini.';
+    }
+    try {
+      final decoded = jsonDecode(advice);
+      if (decoded is Map<String, dynamic> && AiBrew.validDiagnosis(decoded)) {
+        return AiBrew.diagnosisSummary(decoded);
+      }
+    } catch (_) {
+      // Saran lama dapat tersimpan sebagai teks biasa.
+    }
+    return advice;
   }
 
   Future<void> _handleCancel(BuildContext context, WidgetRef ref) async {

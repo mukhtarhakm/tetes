@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,12 +49,13 @@ void main() {
   BrewDetailData testDetail({
     bool isBeanArchived = false,
     String status = 'aktif',
+    String? aiAdvice,
   }) {
     final item = testItem(status: status);
     return BrewDetailData(
       item: item,
       notes: 'Seduhan enak dan seimbang',
-      aiAdvice: 'Saran coba turunkan suhu 1 derajat',
+      aiAdvice: aiAdvice ?? 'Saran coba turunkan suhu 1 derajat',
       prevHash: '0',
       createdAt: '2026-10-18T10:00:00Z',
       roasteryNotesTags: const ['floral', 'buah'],
@@ -220,6 +223,41 @@ void main() {
       find.text('Biji kopi ini sudah diarsipkan dan tidak dapat diseduh lagi.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Saran AI JSON ditampilkan sebagai isi diagnosa', (tester) async {
+    final advice = jsonEncode({
+      'diagnosis': 'Ekstraksi kurang merata.',
+      'likely_causes': ['Air kurang panas.'],
+      'suggestions': [
+        {
+          'variable': 'water_temp_c',
+          'from': 93,
+          'to': 94,
+          'reason': 'Coba naikkan suhu satu derajat.',
+        },
+      ],
+      'note': 'Uji satu perubahan dulu.',
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          brewDetailProvider('brew-1').overrideWith(
+            (ref) => Future.value(testDetail(aiAdvice: advice)),
+          ),
+        ],
+        child: const MaterialApp(home: BrewDetailScreen(brewId: 'brew-1')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.textContaining('Ekstraksi kurang merata.'),
+      400,
+    );
+    expect(find.textContaining('Ekstraksi kurang merata.'), findsOneWidget);
+    expect(find.textContaining('Suhu air: 93 → 94'), findsOneWidget);
+    expect(find.textContaining('"likely_causes"'), findsNothing);
   });
 }
 

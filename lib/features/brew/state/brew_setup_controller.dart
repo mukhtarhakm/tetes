@@ -1,12 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/db/database_provider.dart';
+import '../../../data/remote/ai_client.dart';
 import '../../../data/repositories/brew_repo.dart';
+import '../../../data/secure/session_storage.dart';
+import '../../auth/session/force_logout.dart';
+import '../../auth/state/auth_providers.dart';
 import '../../auth/state/session_controller.dart';
 import '../../beans/bean_model.dart';
 import '../../beans/state/bean_providers.dart';
+import '../ai_brew.dart';
 import '../brew_calculator.dart';
 import '../brew_plan.dart';
+import 'ai_client_provider.dart';
 
 final brewRepositoryProvider = FutureProvider<BrewRepository>((ref) async {
   final database = await ref.watch(databaseProvider.future);
@@ -26,6 +34,9 @@ class BrewSetupState {
     this.selectedBeanId,
     this.plan,
     this.isPlanLoading = false,
+    this.isAiLoading = false,
+    this.aiCooldownSeconds = 0,
+    this.aiSuggestion,
     this.fieldErrors = const {},
     this.notice,
   });
@@ -34,6 +45,9 @@ class BrewSetupState {
   final String? selectedBeanId;
   final BrewPlan? plan;
   final bool isPlanLoading;
+  final bool isAiLoading;
+  final int aiCooldownSeconds;
+  final AppliedAiSuggestion? aiSuggestion;
   final Map<String, String> fieldErrors;
   final String? notice;
 
@@ -41,6 +55,7 @@ class BrewSetupState {
       selectedBeanId != null &&
       plan != null &&
       !isPlanLoading &&
+      !isAiLoading &&
       fieldErrors.isEmpty;
 
   BrewSetupState copyWith({
@@ -48,6 +63,9 @@ class BrewSetupState {
     Object? selectedBeanId = _unset,
     Object? plan = _unset,
     bool? isPlanLoading,
+    bool? isAiLoading,
+    int? aiCooldownSeconds,
+    Object? aiSuggestion = _unset,
     Map<String, String>? fieldErrors,
     Object? notice = _unset,
   }) {
@@ -58,6 +76,11 @@ class BrewSetupState {
           : selectedBeanId as String?,
       plan: identical(plan, _unset) ? this.plan : plan as BrewPlan?,
       isPlanLoading: isPlanLoading ?? this.isPlanLoading,
+      isAiLoading: isAiLoading ?? this.isAiLoading,
+      aiCooldownSeconds: aiCooldownSeconds ?? this.aiCooldownSeconds,
+      aiSuggestion: identical(aiSuggestion, _unset)
+          ? this.aiSuggestion
+          : aiSuggestion as AppliedAiSuggestion?,
       fieldErrors: fieldErrors ?? this.fieldErrors,
       notice: identical(notice, _unset) ? this.notice : notice as String?,
     );
@@ -68,9 +91,18 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
   BrewSetupController(this.initialBeanId);
 
   final String? initialBeanId;
+  int _revision = 0;
+  bool _disposed = false;
+  Timer? _aiCooldownTimer;
+  DateTime? _aiCooldownUntil;
 
   @override
   Future<BrewSetupState> build() async {
+    _disposed = false;
+    ref.onDispose(() {
+      _disposed = true;
+      _aiCooldownTimer?.cancel();
+    });
     final userId = await _activeUserId();
     final beanRepository = await ref.watch(beanRepositoryProvider.future);
     final beans = await beanRepository.listActive(userId);
@@ -92,12 +124,15 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
   }
 
   Future<void> selectBean(String? beanId) async {
+    _revision++;
     final current = _current;
     if (beanId == null) {
       state = AsyncData(
         current.copyWith(
           selectedBeanId: null,
           plan: null,
+          isAiLoading: false,
+          aiSuggestion: null,
           fieldErrors: const {},
           notice: null,
         ),
@@ -113,6 +148,8 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
         selectedBeanId: beanId,
         plan: null,
         isPlanLoading: true,
+        isAiLoading: false,
+        aiSuggestion: null,
         fieldErrors: const {},
         notice: null,
       ),
@@ -133,7 +170,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     final value = _parseDouble(input);
     final error = BrewValidation.dose(value);
     if (error != null) {
-      _setFieldError('dose', error);
+      _setFieldError('dose', error, aiField: AiPlanField.dose);
       return;
     }
     final current = _current;
@@ -143,6 +180,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     }
     _applyPlanChange(
       fieldKey: 'dose',
+      aiField: AiPlanField.dose,
       change: () => BrewCalculator.updateParameters(plan, doseG: value),
       clearStageErrors: value != plan.doseG,
       notice: value == plan.doseG
@@ -151,11 +189,157 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     );
   }
 
+  Future<void> recommend({required bool Function() isScreenCurrent}) async {
+    final current = _current;
+    final bean = current.beans
+        .where((item) => item.id == current.selectedBeanId)
+        .firstOrNull;
+    final plan = current.plan;
+    if (bean == null ||
+        plan == null ||
+        current.isAiLoading ||
+        (_aiCooldownUntil != null &&
+            DateTime.now().isBefore(_aiCooldownUntil!))) {
+      return;
+    }
+
+    final requestRevision = ++_revision;
+    state = AsyncData(current.copyWith(isAiLoading: true, notice: null));
+    var fallback = BrewCalculator.createDefault(beanId: bean.id);
+    final sessionStorage = ref.read(sessionStorageProvider);
+    final sessionController = ref.read(sessionControllerProvider.notifier);
+    String? requestUserId;
+
+    bool isLatest() => !_disposed && requestRevision == _revision;
+    void finish({
+      required BrewPlan nextPlan,
+      String? notice,
+      AppliedAiSuggestion? aiSuggestion,
+    }) {
+      if (!isLatest()) return;
+      final latest = _current;
+      state = AsyncData(
+        latest.copyWith(
+          plan: nextPlan,
+          isAiLoading: false,
+          fieldErrors: const {},
+          notice: notice,
+          aiSuggestion: aiSuggestion,
+        ),
+      );
+    }
+
+    void finishIfScreenLeft() {
+      if (!isLatest() || isScreenCurrent()) return;
+      state = AsyncData(_current.copyWith(isAiLoading: false));
+    }
+
+    try {
+      final session = await ref.read(sessionControllerProvider.future);
+      if (!isLatest() || !isScreenCurrent()) {
+        finishIfScreenLeft();
+        return;
+      }
+      if (session.status != SessionStatus.authenticated ||
+          session.userId == null) {
+        await forceLogoutOnUnauthorized(sessionController);
+        return;
+      }
+      final userId = session.userId!;
+      requestUserId = userId;
+      final repository = await ref.read(brewRepositoryProvider.future);
+      fallback = await _loadPlan(userId: userId, bean: bean);
+      final history = await repository.findAiHistory(
+        userId: userId,
+        beanId: bean.id,
+      );
+      if (!isLatest() || !isScreenCurrent()) {
+        finishIfScreenLeft();
+        return;
+      }
+      final response = await ref
+          .read(aiClientProvider)
+          .recommend(
+            userId: userId,
+            payload: AiBrew.recommendPayload(
+              bean: bean,
+              history: history,
+              pouringCount: plan.pouringCount,
+            ),
+          );
+      if (!isLatest() || !isScreenCurrent()) {
+        finishIfScreenLeft();
+        return;
+      }
+      final recommendation = AiBrew.recommendationFromResponse(
+        fallback: fallback,
+        requestedPouringCount: plan.pouringCount,
+        response: response,
+      );
+      finish(
+        nextPlan: recommendation.plan,
+        notice: recommendation.usedFallback
+            ? 'Saran AI tidak dapat dipakai. Pengaturan sederhana digunakan (bukan AI).'
+            : null,
+        aiSuggestion: recommendation.usedFallback
+            ? null
+            : AppliedAiSuggestion(
+                before: plan,
+                recommended: recommendation.plan,
+                note: recommendation.note,
+                hasHistory: history.isNotEmpty,
+              ),
+      );
+    } on AiException catch (error) {
+      if (error.failure == AiFailure.unauthorized) {
+        try {
+          final storedSession = await sessionStorage.readSession();
+          if (requestUserId != null && storedSession?.userId == requestUserId) {
+            await forceLogoutOnUnauthorized(sessionController);
+          }
+        } on SessionStorageException {
+          // Akun aktif tidak dapat dipastikan, jadi jangan hapus sesinya.
+        }
+        finishIfScreenLeft();
+        return;
+      }
+      if (error.failure == AiFailure.network ||
+          error.failure == AiFailure.rateLimited ||
+          error.failure == AiFailure.invalidOutput ||
+          error.failure == AiFailure.upstream ||
+          error.failure == AiFailure.timeout) {
+        _startAiCooldown();
+      }
+      if (!isLatest() || !isScreenCurrent()) {
+        finishIfScreenLeft();
+        return;
+      }
+      final message = error.upstreamStatus == 503 || error.upstreamStatus == 429
+          ? 'Layanan AI sedang sibuk, coba lagi sebentar.'
+          : error.message;
+      finish(
+        nextPlan: fallback,
+        notice:
+            '${AiBrew.fallbackRecommendation(fallback, reason: message).note} Aturan sederhana, bukan AI.',
+      );
+    } catch (_) {
+      if (!isLatest() || !isScreenCurrent()) {
+        finishIfScreenLeft();
+        return;
+      }
+      finish(
+        nextPlan: fallback,
+        notice:
+            'Saran AI tidak tersedia. Pengaturan sederhana digunakan (bukan AI).',
+      );
+    }
+  }
+
   void updateRatio(String input) {
     final value = _parseDouble(input);
     final error = BrewValidation.ratio(value);
     if (error != null) {
-      _setFieldError('ratio', error);
+      _setFieldError('ratio', error, aiField: AiPlanField.ratio);
       return;
     }
     final current = _current;
@@ -165,6 +349,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     }
     _applyPlanChange(
       fieldKey: 'ratio',
+      aiField: AiPlanField.ratio,
       change: () => BrewCalculator.updateParameters(plan, ratio: value),
       clearStageErrors: value != plan.ratio,
       notice: value == plan.ratio
@@ -177,7 +362,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     final value = int.tryParse(input.trim());
     final error = BrewValidation.temperature(value);
     if (error != null) {
-      _setFieldError('temperature', error);
+      _setFieldError('temperature', error, aiField: AiPlanField.temperature);
       return;
     }
     final plan = _current.plan;
@@ -186,6 +371,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     }
     _applyPlanChange(
       fieldKey: 'temperature',
+      aiField: AiPlanField.temperature,
       change: () => BrewCalculator.updateParameters(plan, waterTempC: value),
     );
   }
@@ -196,6 +382,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
       return;
     }
     _applyPlanChange(
+      aiField: AiPlanField.grind,
       change: () => BrewCalculator.updateParameters(plan, grind: grind),
     );
   }
@@ -203,7 +390,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
   void updatePouringCount(int count) {
     final error = BrewValidation.pouringCount(count);
     if (error != null) {
-      _setFieldError('pouring', error);
+      _setFieldError('pouring', error, aiField: AiPlanField.pouring);
       return;
     }
     final plan = _current.plan;
@@ -212,6 +399,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     }
     _applyPlanChange(
       fieldKey: 'pouring',
+      aiField: AiPlanField.pouring,
       change: () => BrewCalculator.updateParameters(plan, pouringCount: count),
       clearStageErrors: count != plan.pouringCount,
       notice: count == plan.pouringCount
@@ -296,6 +484,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
   void _applyPlanChange({
     required BrewPlan Function() change,
     String? fieldKey,
+    AiPlanField? aiField,
     String? notice,
     bool clearStageErrors = false,
   }) {
@@ -312,23 +501,82 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
         );
       }
       state = AsyncData(
-        current.copyWith(plan: nextPlan, fieldErrors: errors, notice: notice),
+        current.copyWith(
+          plan: nextPlan,
+          isAiLoading: false,
+          fieldErrors: errors,
+          notice: notice,
+          aiSuggestion: aiField == null
+              ? current.aiSuggestion
+              : current.aiSuggestion?.markEdited(aiField),
+        ),
       );
+      _revision++;
     } on BrewPlanException catch (error) {
       if (fieldKey != null) {
-        _setFieldError(fieldKey, error.message);
+        _setFieldError(fieldKey, error.message, aiField: aiField);
       }
     }
   }
 
-  void _setFieldError(String key, String message) {
+  void _setFieldError(String key, String message, {AiPlanField? aiField}) {
+    _revision++;
     final current = _current;
     state = AsyncData(
       current.copyWith(
+        isAiLoading: false,
         fieldErrors: {...current.fieldErrors, key: message},
+        notice: null,
+        aiSuggestion: aiField == null
+            ? current.aiSuggestion
+            : current.aiSuggestion?.markEdited(aiField),
+      ),
+    );
+  }
+
+  void restoreBeforeAi() {
+    final current = _current;
+    final suggestion = current.aiSuggestion;
+    if (suggestion == null) return;
+    _revision++;
+    state = AsyncData(
+      current.copyWith(
+        plan: suggestion.restore(),
+        aiSuggestion: null,
+        fieldErrors: const {},
         notice: null,
       ),
     );
+  }
+
+  void dismissAiSuggestion() {
+    final current = _current;
+    if (current.aiSuggestion == null) return;
+    state = AsyncData(current.copyWith(aiSuggestion: null));
+  }
+
+  void _startAiCooldown() {
+    if (_disposed) return;
+    _aiCooldownTimer?.cancel();
+    _aiCooldownUntil = DateTime.now().add(const Duration(seconds: 30));
+    state = AsyncData(_current.copyWith(aiCooldownSeconds: 30));
+    _aiCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_disposed) {
+        timer.cancel();
+        return;
+      }
+      final remaining = _aiCooldownUntil!.difference(DateTime.now());
+      final seconds = remaining.isNegative
+          ? 0
+          : (remaining.inMilliseconds / 1000).ceil();
+      if (seconds != _current.aiCooldownSeconds) {
+        state = AsyncData(_current.copyWith(aiCooldownSeconds: seconds));
+      }
+      if (seconds == 0) {
+        _aiCooldownUntil = null;
+        timer.cancel();
+      }
+    });
   }
 }
 

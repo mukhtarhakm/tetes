@@ -205,6 +205,7 @@ void main() {
         tasteTags: [RoasteryNoteTag.manis],
         actualWaterG: List.filled(plan.stages.length, null),
         drawdownS: 35,
+        aiAdvice: '{"diagnosis":"Seduhan seimbang."}',
       );
       final secondId = await brewRepository.save(
         userId: 'user-1',
@@ -218,6 +219,7 @@ void main() {
       expect(brews.first['prev_hash'], '0');
       expect(brews.last['prev_hash'], brews.first['hash']);
       expect(brews.first['brewed_at_utc'], result.brewedAtUtc);
+      expect(brews.first['ai_advice'], '{"diagnosis":"Seduhan seimbang."}');
       expect(brews.first['cost_idr'], brewCost(plan.doseG, 200000));
       expect(brews.last['taste_tags'], 'cokelat,manis');
       expect(await brewRepository.verifyUserChain('user-1'), 'utuh (2 entri)');
@@ -265,6 +267,56 @@ void main() {
           brewedAtUtc: result.brewedAtUtc,
         ), '0'),
         brews.first['hash'],
+      );
+    },
+  );
+
+  test(
+    'riwayat AI hanya best dan empat seduhan aktif terbaru milik user',
+    () async {
+      final beanId = await _createBean(beanRepository);
+      final plan = BrewCalculator.createDefault(beanId: beanId);
+      final result = BrewSessionResult(
+        plan: plan,
+        totalTimeS: 120,
+        drawdownS: null,
+        brewedAtUtc: '2026-10-20T01:02:03Z',
+      );
+      final ids = <String>[];
+      for (var index = 0; index < 8; index++) {
+        ids.add(
+          await brewRepository.save(
+            userId: 'user-1',
+            result: result,
+            tasteScore: index == 0 ? 5 : 3,
+            tasteTags: [RoasteryNoteTag.manis],
+            actualWaterG: List.filled(plan.stages.length, null),
+            notes: index == 0 ? 'Seduhan terbaik' : null,
+          ),
+        );
+      }
+      await brewRepository.cancelBrew(userId: 'user-1', brewId: ids[6]);
+
+      final history = await brewRepository.findAiHistory(
+        userId: 'user-1',
+        beanId: beanId,
+      );
+      expect(history.map((detail) => detail.item.id), [
+        ids[0],
+        ids[7],
+        ids[5],
+        ids[4],
+        ids[3],
+      ]);
+      expect(history.first.notes, 'Seduhan terbaik');
+      expect(history.first.stages, hasLength(plan.stages.length));
+      expect(
+        await brewRepository.findAiHistory(userId: 'user-2', beanId: beanId),
+        isEmpty,
+      );
+      expect(
+        await brewRepository.findAiHistory(userId: 'user-1', beanId: 'other'),
+        isEmpty,
       );
     },
   );

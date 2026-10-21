@@ -8,8 +8,10 @@ import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dropdown_field.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/ui/state_views.dart';
+import '../../../core/ui/status_pill.dart';
 import '../../beans/bean_model.dart';
 import '../../beans/screens/bean_form_screen.dart';
+import '../ai_brew.dart';
 import '../brew_plan.dart';
 import '../state/brew_setup_controller.dart';
 import '../widgets/brew_stage_colors.dart';
@@ -27,9 +29,7 @@ class BrewSetupScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (initialPlan != null) {
       return ProviderScope(
-        overrides: [
-          initialBrewPlanProvider.overrideWithValue(initialPlan),
-        ],
+        overrides: [initialBrewPlanProvider.overrideWithValue(initialPlan)],
         child: BrewSetupScreen(initialBeanId: initialPlan!.beanId),
       );
     }
@@ -119,17 +119,32 @@ class _BrewSetupContent extends ConsumerWidget {
             ),
           )
         else
-          _BrewForm(state: state, controller: controller),
+          _BrewForm(
+            state: state,
+            controller: controller,
+            onRecommend: () async {
+              await controller.recommend(
+                isScreenCurrent: () =>
+                    context.mounted &&
+                    ModalRoute.of(context)?.isCurrent == true,
+              );
+            },
+          ),
       ],
     );
   }
 }
 
 class _BrewForm extends StatelessWidget {
-  const _BrewForm({required this.state, required this.controller});
+  const _BrewForm({
+    required this.state,
+    required this.controller,
+    required this.onRecommend,
+  });
 
   final BrewSetupState state;
   final BrewSetupController controller;
+  final VoidCallback onRecommend;
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +152,39 @@ class _BrewForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        AppButton(
+          label: state.aiCooldownSeconds > 0
+              ? 'Coba lagi dalam ${state.aiCooldownSeconds} detik'
+              : 'Rekomendasikan dengan AI',
+          icon: Icons.auto_awesome_outlined,
+          variant: AppButtonVariant.secondary,
+          isLoading: state.isAiLoading,
+          onPressed:
+              state.isAiLoading ||
+                  state.aiCooldownSeconds > 0 ||
+                  state.fieldErrors.isNotEmpty
+              ? null
+              : onRecommend,
+        ),
+        if (state.isAiLoading) ...[
+          const SizedBox(height: AppSpacing.s8),
+          const AppCard(
+            child: Text('Meminta saran AI. Tunggu hingga 35 detik.'),
+          ),
+        ],
+        if (state.aiSuggestion case final suggestion?) ...[
+          const SizedBox(height: AppSpacing.s12),
+          _AiSuggestionCard(
+            key: ObjectKey(suggestion.recommended),
+            suggestion: suggestion,
+            onRestore: controller.restoreBeforeAi,
+          ),
+        ],
+        if (state.notice case final notice?) ...[
+          const SizedBox(height: AppSpacing.s12),
+          AppCard(variant: AppCardVariant.tinted, child: Text(notice)),
+        ],
+        const SizedBox(height: AppSpacing.s20),
         if (plan.fromBestBrew) ...[
           const AppChip(label: 'Dari pengaturan terbaik', selected: true),
           const SizedBox(height: AppSpacing.s16),
@@ -147,6 +195,7 @@ class _BrewForm extends StatelessWidget {
           value: _formatNumber(plan.doseG),
           errorText: state.fieldErrors['dose'],
           decimal: true,
+          fromAi: state.aiSuggestion?.highlights(AiPlanField.dose) ?? false,
           onChanged: controller.updateDose,
         ),
         const SizedBox(height: AppSpacing.s16),
@@ -156,6 +205,7 @@ class _BrewForm extends StatelessWidget {
           value: _formatNumber(plan.ratio),
           errorText: state.fieldErrors['ratio'],
           decimal: true,
+          fromAi: state.aiSuggestion?.highlights(AiPlanField.ratio) ?? false,
           onChanged: controller.updateRatio,
         ),
         const SizedBox(height: AppSpacing.s16),
@@ -164,6 +214,8 @@ class _BrewForm extends StatelessWidget {
           label: 'Suhu air (°C)',
           value: plan.waterTempC.toString(),
           errorText: state.fieldErrors['temperature'],
+          fromAi:
+              state.aiSuggestion?.highlights(AiPlanField.temperature) ?? false,
           onChanged: controller.updateTemperature,
         ),
         const SizedBox(height: AppSpacing.s16),
@@ -187,7 +239,10 @@ class _BrewForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.s20),
-        Text('Ukuran gilingan', style: Theme.of(context).textTheme.labelLarge),
+        _FormLabel(
+          label: 'Ukuran gilingan',
+          fromAi: state.aiSuggestion?.highlights(AiPlanField.grind) ?? false,
+        ),
         const SizedBox(height: AppSpacing.s8),
         Wrap(
           spacing: AppSpacing.s8,
@@ -203,7 +258,10 @@ class _BrewForm extends StatelessWidget {
               .toList(),
         ),
         const SizedBox(height: AppSpacing.s20),
-        Text('Jumlah pouring', style: Theme.of(context).textTheme.labelLarge),
+        _FormLabel(
+          label: 'Jumlah pouring',
+          fromAi: state.aiSuggestion?.highlights(AiPlanField.pouring) ?? false,
+        ),
         const SizedBox(height: AppSpacing.s8),
         Wrap(
           spacing: AppSpacing.s8,
@@ -226,10 +284,6 @@ class _BrewForm extends StatelessWidget {
             ).textTheme.bodySmall?.copyWith(color: AppColors.error),
           ),
         ],
-        if (state.notice case final notice?) ...[
-          const SizedBox(height: AppSpacing.s16),
-          AppCard(variant: AppCardVariant.tinted, child: Text(notice)),
-        ],
         const SizedBox(height: AppSpacing.s24),
         Text('Tahap seduh', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: AppSpacing.s12),
@@ -250,26 +304,116 @@ class _BrewForm extends StatelessWidget {
         AppCard(child: BrewWaterChart(plan: plan)),
         const SizedBox(height: AppSpacing.s24),
         AppButton(
-          label: 'Rekomendasikan dengan AI',
-          icon: Icons.auto_awesome_outlined,
-          variant: AppButtonVariant.secondary,
-          onPressed: null,
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        AppButton(
           label: 'Mulai Sesi',
           icon: Icons.play_arrow_rounded,
           onPressed: state.canStart
-              ? () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(
-                    builder: (_) => BrewSessionScreen(plan: plan),
-                  ),
-                )
+              ? () {
+                  controller.dismissAiSuggestion();
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => BrewSessionScreen(plan: plan),
+                    ),
+                  );
+                }
               : null,
         ),
       ],
     );
   }
+}
+
+class _AiSuggestionCard extends StatefulWidget {
+  const _AiSuggestionCard({
+    required this.suggestion,
+    required this.onRestore,
+    super.key,
+  });
+
+  final AppliedAiSuggestion suggestion;
+  final VoidCallback onRestore;
+
+  @override
+  State<_AiSuggestionCard> createState() => _AiSuggestionCardState();
+}
+
+class _AiSuggestionCardState extends State<_AiSuggestionCard> {
+  bool showDetails = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestion = widget.suggestion;
+    final changes = suggestion.changes;
+    return AppCard(
+      variant: AppCardVariant.tinted,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Saran AI', style: Theme.of(context).textTheme.titleLarge),
+          if (suggestion.note.trim().isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s8),
+            Text(suggestion.note),
+          ],
+          const SizedBox(height: AppSpacing.s12),
+          if (changes.isEmpty) ...[
+            const Text(
+              'AI menyarankan pengaturan yang sama dengan isian saat ini',
+            ),
+            if (!suggestion.hasHistory) ...[
+              const SizedBox(height: AppSpacing.s8),
+              const Text(
+                'Biji ini belum punya riwayat, jadi ini titik awal umum',
+              ),
+            ],
+          ] else
+            ...changes.map(
+              (change) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                child: Text(
+                  '${change.label}: ${change.before} ke ${change.after}',
+                ),
+              ),
+            ),
+          AppButton(
+            label: showDetails ? 'Tutup detail' : 'Lihat detail',
+            variant: AppButtonVariant.text,
+            expand: false,
+            onPressed: () => setState(() => showDetails = !showDetails),
+          ),
+          if (showDetails) ...[
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              'Tahap dibuat ulang: ${suggestion.recommended.pouringCount} pouring',
+            ),
+          ],
+          const SizedBox(height: AppSpacing.s8),
+          AppButton(
+            label: 'Kembalikan',
+            variant: AppButtonVariant.secondary,
+            onPressed: widget.onRestore,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormLabel extends StatelessWidget {
+  const _FormLabel({required this.label, required this.fromAi});
+
+  final String label;
+  final bool fromAi;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: AppSpacing.s8,
+    runSpacing: AppSpacing.s8,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Text(label, style: Theme.of(context).textTheme.labelLarge),
+      if (fromAi)
+        const StatusPill(label: 'AI', variant: StatusPillVariant.synced),
+    ],
+  );
 }
 
 class _StageCard extends StatelessWidget {
@@ -351,6 +495,7 @@ class _BrewNumberField extends StatefulWidget {
     this.errorText,
     this.decimal = false,
     this.enabled = true,
+    this.fromAi = false,
     super.key,
   });
 
@@ -359,6 +504,7 @@ class _BrewNumberField extends StatefulWidget {
   final String? errorText;
   final bool decimal;
   final bool enabled;
+  final bool fromAi;
   final ValueChanged<String> onChanged;
 
   @override
@@ -377,7 +523,8 @@ class _BrewNumberFieldState extends State<_BrewNumberField> {
   @override
   void didUpdateWidget(covariant _BrewNumberField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.value != oldWidget.value &&
+    if ((widget.value != oldWidget.value ||
+            (oldWidget.errorText != null && widget.errorText == null)) &&
         _normalized(_textController.text) != _normalized(widget.value)) {
       _textController.value = TextEditingValue(
         text: widget.value,
@@ -394,13 +541,21 @@ class _BrewNumberFieldState extends State<_BrewNumberField> {
 
   @override
   Widget build(BuildContext context) {
-    return AppTextField(
-      controller: _textController,
-      label: widget.label,
-      errorText: widget.errorText,
-      enabled: widget.enabled,
-      keyboardType: TextInputType.numberWithOptions(decimal: widget.decimal),
-      onChanged: widget.onChanged,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FormLabel(label: widget.label, fromAi: widget.fromAi),
+        const SizedBox(height: AppSpacing.s8),
+        AppTextField(
+          controller: _textController,
+          errorText: widget.errorText,
+          enabled: widget.enabled,
+          keyboardType: TextInputType.numberWithOptions(
+            decimal: widget.decimal,
+          ),
+          onChanged: widget.onChanged,
+        ),
+      ],
     );
   }
 }

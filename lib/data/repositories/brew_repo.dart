@@ -41,6 +41,7 @@ class BrewRepository {
     required List<double?> actualWaterG,
     int? drawdownS,
     String? notes,
+    String? aiAdvice,
   }) async {
     final plan = result.plan;
     final tags = tasteTags.map((tag) => tag.databaseValue).toSet().toList()
@@ -102,7 +103,7 @@ class BrewRepository {
             (beans.single['price_idr_per_kg'] as num?)?.toDouble(),
           ),
           'notes': notes?.trim().isEmpty == true ? null : notes?.trim(),
-          'ai_advice': null,
+          'ai_advice': aiAdvice,
           'status': 'aktif',
           'sync_status': 'pending',
           'created_at': now,
@@ -542,6 +543,34 @@ class BrewRepository {
       isBeanArchived: (row['bean_archived'] as num).toInt() == 1,
       stages: stages,
     );
+  }
+
+  Future<List<BrewDetailData>> findAiHistory({
+    required String userId,
+    required String beanId,
+  }) async {
+    final rows = await _database.rawQuery(
+      '''
+      SELECT br.id
+      FROM brews br
+      JOIN beans b ON b.id = br.bean_id
+      WHERE br.user_id = ? AND br.bean_id = ? AND b.user_id = ?
+        AND br.status = 'aktif'
+      ORDER BY CASE WHEN b.best_brew_id = br.id THEN 0 ELSE 1 END,
+        br.brewed_at_utc DESC, br.seq DESC
+      LIMIT 5
+    ''',
+      [userId, beanId, userId],
+    );
+    final history = <BrewDetailData>[];
+    for (final row in rows) {
+      final detail = await findBrewDetail(
+        userId: userId,
+        brewId: row['id'] as String,
+      );
+      if (detail != null) history.add(detail);
+    }
+    return history;
   }
 
   Future<List<BrewJournalItem>> findBrewsForBean({
