@@ -86,3 +86,5 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - 2026-10-21: Atur Seduh kini menampilkan kartu ringkas perubahan rekomendasi AI, penanda kolom, dan pemulihan rencana lengkap; galat jaringan atau layanan memicu hitungan mundur 30 detik, status upstream 503/429 mendapat pesan sibuk, dan uji HP masih menunggu.
 
 - Diagnosa AI dipindah ke Detail setelah seduhan tersimpan; Hasil hanya menyimpan seduhan, dan saran AI aktif disimpan tanpa mengubah rantai hash (uji HP masih diperlukan).
+
+- Fungsi AI kini menghapus temperature Gemini, membatasi total dua percobaan dalam 15 detik bersama, mencoba ulang HTTP 503 sekali, dan mencatat metadata kegagalan terbatas tanpa data pengguna.
