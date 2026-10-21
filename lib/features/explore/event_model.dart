@@ -6,6 +6,7 @@ class EventItem {
     required this.startUtc,
     required this.sourceZone,
     required this.reminderMinutes,
+    this.notifBaseId,
     this.location,
     this.notes,
   });
@@ -18,6 +19,7 @@ class EventItem {
   final DateTime startUtc;
   final String sourceZone;
   final String reminderMinutes;
+  final int? notifBaseId;
 
   factory EventItem.fromMap(Map<String, Object?> row) => EventItem(
     id: row['id'] as String,
@@ -28,6 +30,7 @@ class EventItem {
     startUtc: DateTime.parse(row['start_utc'] as String),
     sourceZone: row['source_zone'] as String,
     reminderMinutes: row['reminder_minutes'] as String,
+    notifBaseId: (row['notif_base_id'] as num?)?.toInt(),
   );
 }
 

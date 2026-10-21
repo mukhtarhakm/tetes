@@ -9,6 +9,7 @@ import '../../core/ui/app_dialog.dart';
 import '../../core/ui/app_text_field.dart';
 import '../../core/ui/state_views.dart';
 import '../../core/ui/status_pill.dart';
+import '../../core/notifications/notification_coordinator.dart';
 import '../../core/utils/event_display.dart';
 import '../../core/utils/event_time.dart';
 import '../../data/db/database_provider.dart';
@@ -307,6 +308,21 @@ class EventDetailScreen extends ConsumerWidget {
       await (await ref.read(
         eventRepositoryProvider.future,
       )).softDelete(userId, event.id);
+      try {
+        await (await ref.read(
+          notificationCoordinatorProvider.future,
+        )).rescheduleEvent(userId, event.notifBaseId);
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Event dihapus, tetapi pengingat belum diperbarui.',
+              ),
+            ),
+          );
+        }
+      }
       if (context.mounted) Navigator.pop(context, true);
     } catch (_) {
       if (context.mounted) {
@@ -519,10 +535,28 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       final userId = ref.read(sessionControllerProvider).asData?.value.userId;
       if (userId == null) throw StateError('Sesi tidak tersedia.');
       final repo = await ref.read(eventRepositoryProvider.future);
+      String eventId;
       if (widget.event == null) {
-        await repo.create(userId, draft);
+        eventId = await repo.create(userId, draft);
       } else {
         await repo.update(userId, widget.event!.id, draft);
+        eventId = widget.event!.id;
+      }
+      try {
+        final current = await repo.findById(userId, eventId);
+        await (await ref.read(
+          notificationCoordinatorProvider.future,
+        )).rescheduleEvent(userId, current?.notifBaseId);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Event tersimpan, tetapi pengingat belum diperbarui.',
+              ),
+            ),
+          );
+        }
       }
       if (mounted) Navigator.pop(context, true);
     } on ArgumentError catch (error) {

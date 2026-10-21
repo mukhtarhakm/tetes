@@ -7,6 +7,9 @@ import 'package:tetes/data/secure/session_storage.dart';
 import 'package:tetes/features/auth/biometric/biometric_authenticator.dart';
 import 'package:tetes/features/auth/state/auth_providers.dart';
 import 'package:tetes/main.dart';
+import 'package:tetes/core/notifications/notification_service.dart';
+import 'package:tetes/core/notifications/notification_coordinator.dart';
+import 'core/notifications/fake_notification_service.dart';
 
 void main() {
   late Database database;
@@ -26,6 +29,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
           databaseProvider.overrideWithValue(AsyncData(database)),
           sessionStorageProvider.overrideWithValue(_FakeSessionStorage(null)),
           biometricAuthenticatorProvider.overrideWithValue(
@@ -46,6 +52,12 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
+          notificationCoordinatorProvider.overrideWith(
+            (ref) async => FakeNotificationCoordinator(),
+          ),
           databaseProvider.overrideWithValue(AsyncData(database)),
           sessionStorageProvider.overrideWithValue(
             _FakeSessionStorage(
@@ -84,6 +96,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
           databaseProvider.overrideWithValue(AsyncData(database)),
           sessionStorageProvider.overrideWithValue(
             _FakeSessionStorage(
@@ -124,6 +139,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
           databaseProvider.overrideWithValue(AsyncData(database)),
           sessionStorageProvider.overrideWithValue(
             _FakeSessionStorage(
@@ -162,6 +180,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
           databaseProvider.overrideWithValue(AsyncData(database)),
           sessionStorageProvider.overrideWithValue(storage),
           biometricAuthenticatorProvider.overrideWithValue(

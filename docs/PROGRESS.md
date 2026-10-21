@@ -96,3 +96,5 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Tes waktu dan repository mencakup pergantian jam London, isolasi pengguna, status sinkronisasi, serta hapus lunak. Seluruh 220 tes Flutter lulus dan `flutter analyze` bersih; uji langsung di HP masih menunggu.
 
 - 2026-10-21: Tampilan Agenda Event diringkas dengan waktu zona asal, WIB, penanda beda hari, hitung mundur, dan detail empat zona; tes utilitas serta analisis lulus, uji HP menunggu.
+
+- 2026-10-21: Fitur 06 sesi B menambahkan pengingat event dan seduh, notifikasi stok saat melintasi ambang, izin dan pengaturan Profil, serta pembatalan saat logout; build Android debug dan tes otomatis lulus, sedangkan uji notifikasi di HP asli masih menunggu.

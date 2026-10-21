@@ -134,6 +134,11 @@ class _BeanRepository extends Fake implements BeanRepository {
 
 class _BrewRepository extends Fake implements BrewRepository {
   @override
+  Future<double> remainingStockG({
+    required String userId,
+    required String beanId,
+  }) async => 250;
+  @override
   Future<String> save({
     required String userId,
     required BrewSessionResult result,

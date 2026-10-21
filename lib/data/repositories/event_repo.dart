@@ -33,16 +33,73 @@ class EventRepository {
     draft.validate();
     final id = createUuidV4();
     final now = EventTime.utcText(DateTime.now());
-    await _database.insert('events', {
-      'id': id,
-      'user_id': userId,
-      ..._values(draft),
-      'deleted': 0,
-      'created_at': now,
-      'updated_at': now,
-      'sync_status': 'pending',
+    await _database.transaction((txn) async {
+      final baseId = await _nextNotificationBaseId(txn, userId);
+      await txn.insert('events', {
+        'id': id,
+        'user_id': userId,
+        ..._values(draft),
+        'notif_base_id': baseId,
+        'deleted': 0,
+        'created_at': now,
+        'updated_at': now,
+        'sync_status': 'pending',
+      });
     });
     return id;
+  }
+
+  Future<void> ensureNotificationBaseIds(String userId) async {
+    await _database.transaction((txn) async {
+      final rows = await txn.query(
+        'events',
+        columns: ['id'],
+        where: 'user_id = ? AND deleted = 0 AND notif_base_id IS NULL',
+        whereArgs: [userId],
+        orderBy: 'created_at ASC',
+      );
+      for (final row in rows) {
+        final baseId = await _nextNotificationBaseId(txn, userId);
+        await txn.update(
+          'events',
+          {
+            'notif_base_id': baseId,
+            'updated_at': EventTime.utcText(DateTime.now()),
+            'sync_status': 'pending',
+          },
+          where: 'id = ? AND user_id = ?',
+          whereArgs: [row['id'], userId],
+        );
+      }
+    });
+  }
+
+  Future<int> _nextNotificationBaseId(Transaction txn, String userId) async {
+    final rows = await txn.query(
+      'settings',
+      columns: ['value'],
+      where: 'user_id = ? AND key = ?',
+      whereArgs: [userId, 'next_event_notif_base_id'],
+      limit: 1,
+    );
+    final maxRows = await txn.rawQuery(
+      'SELECT MAX(notif_base_id) AS max_id FROM events WHERE user_id = ?',
+      [userId],
+    );
+    final stored = rows.isEmpty
+        ? 1
+        : int.tryParse(rows.single['value'] as String) ?? 1;
+    final existing = ((maxRows.single['max_id'] as num?)?.toInt() ?? 0) + 1;
+    final next = stored > existing ? stored : existing;
+    if (next > 99999999) {
+      throw StateError('Batas ID notifikasi event tercapai.');
+    }
+    await txn.insert('settings', {
+      'user_id': userId,
+      'key': 'next_event_notif_base_id',
+      'value': '${next + 1}',
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return next;
   }
 
   Future<void> update(String userId, String id, EventDraft draft) async {

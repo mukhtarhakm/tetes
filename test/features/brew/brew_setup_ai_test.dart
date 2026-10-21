@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:tetes/data/db/app_database.dart';
+import 'package:tetes/core/notifications/notification_service.dart';
+import '../../core/notifications/fake_notification_service.dart';
 import 'package:tetes/data/db/database_migrations.dart';
 import 'package:tetes/data/db/database_provider.dart';
 import 'package:tetes/data/remote/ai_client.dart';
@@ -187,6 +189,7 @@ Future<_Harness> _harness(MockClient httpClient) async {
   final client = AiClient(sessionStorage: storage, client: httpClient);
   final container = ProviderContainer(
     overrides: [
+      notificationServiceProvider.overrideWithValue(FakeNotificationService()),
       databaseProvider.overrideWithValue(AsyncData(database)),
       sessionStorageProvider.overrideWithValue(storage),
       aiClientProvider.overrideWithValue(client),

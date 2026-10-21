@@ -8,6 +8,7 @@ import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/ui/state_views.dart';
+import '../../../core/notifications/notification_coordinator.dart';
 import '../../../data/repositories/brew_repo.dart';
 import '../../auth/state/session_controller.dart';
 import '../../beans/bean_model.dart';
@@ -111,6 +112,10 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
     }
     try {
       final repo = await ref.read(brewRepositoryProvider.future);
+      final beforeStock = await repo.remainingStockG(
+        userId: userId!,
+        beanId: widget.result.plan.beanId,
+      );
       final brewId = await repo.save(
         userId: userId!,
         result: widget.result,
@@ -120,6 +125,32 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
         drawdownS: drawdownS,
         notes: notes.text,
       );
+      try {
+        final afterStock = await repo.remainingStockG(
+          userId: userId!,
+          beanId: widget.result.plan.beanId,
+        );
+        if (afterStock < beforeStock) {
+          await (await ref.read(
+            notificationCoordinatorProvider.future,
+          )).showStockCrossing(
+            userId: userId!,
+            beanName: bean?.name ?? 'biji',
+            beforeG: beforeStock,
+            afterG: afterStock,
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Seduhan tersimpan, tetapi notifikasi stok belum dikirim.',
+              ),
+            ),
+          );
+        }
+      }
       ref.invalidate(journalBrewsProvider);
       ref.invalidate(beanListProvider);
       if (!mounted) return;

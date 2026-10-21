@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tetes/core/notifications/notification_service.dart';
 import 'package:tetes/data/remote/auth_client.dart';
 import 'package:tetes/data/secure/session_storage.dart';
 import 'package:tetes/features/auth/session/session_revocation_queue.dart';
@@ -14,8 +15,10 @@ void main() {
     final response = Completer<void>();
     final client = _InspectingClient(storage, response.future);
     final queue = SessionRevocationQueue(client, storage);
+    final notifications = _FakeNotificationService();
     final container = ProviderContainer(
       overrides: [
+        notificationServiceProvider.overrideWithValue(notifications),
         sessionStorageProvider.overrideWithValue(storage),
         sessionRevocationQueueProvider.overrideWithValue(queue),
       ],
@@ -32,6 +35,7 @@ void main() {
     );
     expect(client.sawQueuedToken, isTrue);
     expect(storage.pendingTokens, ['token-1']);
+    expect(notifications.cancelCount, 1);
 
     response.complete();
     await Future<void>.delayed(Duration.zero);
@@ -45,6 +49,9 @@ void main() {
     final client = _InspectingClient(storage, Future.value());
     final container = ProviderContainer(
       overrides: [
+        notificationServiceProvider.overrideWithValue(
+          _FakeNotificationService(),
+        ),
         sessionStorageProvider.overrideWithValue(storage),
         sessionRevocationQueueProvider.overrideWithValue(
           SessionRevocationQueue(client, storage),
@@ -63,8 +70,10 @@ void main() {
   test('keluar paksa 401 tidak memasukkan token ke antrean', () async {
     final storage = _RecordingSessionStorage(_validSession());
     final client = _InspectingClient(storage, Future.value());
+    final notifications = _FakeNotificationService();
     final container = ProviderContainer(
       overrides: [
+        notificationServiceProvider.overrideWithValue(notifications),
         sessionStorageProvider.overrideWithValue(storage),
         sessionRevocationQueueProvider.overrideWithValue(
           SessionRevocationQueue(client, storage),
@@ -78,7 +87,16 @@ void main() {
 
     expect(storage.pendingTokens, isEmpty);
     expect(client.callCount, 0);
+    expect(notifications.cancelCount, 1);
   });
+}
+
+class _FakeNotificationService extends NotificationService {
+  int cancelCount = 0;
+  @override
+  Future<void> cancelAll() async {
+    cancelCount++;
+  }
 }
 
 StoredSession _validSession() {

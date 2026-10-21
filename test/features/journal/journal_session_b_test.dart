@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:tetes/app/navigation/app_shell.dart';
+import 'package:tetes/core/notifications/notification_service.dart';
 import 'package:tetes/core/ui/score_chart.dart';
 import 'package:tetes/data/db/app_database.dart';
 import 'package:tetes/data/db/database_migrations.dart';
@@ -16,6 +17,8 @@ import 'package:tetes/features/journal/journal_model.dart';
 import 'package:tetes/features/journal/screens/brew_compare_screen.dart';
 import 'package:tetes/features/journal/screens/journal_screen.dart';
 import 'package:tetes/features/journal/state/journal_controller.dart';
+
+import '../../core/notifications/fake_notification_service.dart';
 
 void main() {
   late Database database;
@@ -225,6 +228,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            notificationServiceProvider.overrideWithValue(FakeNotificationService()),
             journalBrewsProvider.overrideWith((ref) => Future.value(items)),
             beanListProvider.overrideWith(() => _MockBeanListNotifier(const [])),
           ],
