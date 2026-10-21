@@ -41,6 +41,7 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Bersih-bersih akhir proyek: hapus akun uji (misalnya rais_uji) beserta sesi dan baris login_attempts di Supabase, hapus fungsi hello, pastikan tidak ada berkas JSON uji atau rahasia di repo.
 - Perapian layout (nanti, tahap perapian): layar Hasil dan Atur Seduh; ganti nama berkas brew_result_placeholder_screen.dart karena sudah bukan placeholder.
 - Judul bagian di form biji ("Info biji", "Pengolahan", "Kemasan dan harga").
+- uji live diagnosa dan penyimpanan ai_advice menunggu Gemini stabil; server dan klien sudah menangani 503 (percobaan ulang, pesan sibuk, cooldown, fallback).” Fitur AI tetap bisa dipakai lewat fallback aturan sederhana, jadi aplikasi tidak rusak.
 
 ## Menunggu jawaban dosen
 - [ ] Tema (V60 pelatih/jurnal vs Brewmaster)
@@ -88,3 +89,10 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Diagnosa AI dipindah ke Detail setelah seduhan tersimpan; Hasil hanya menyimpan seduhan, dan saran AI aktif disimpan tanpa mengubah rantai hash (uji HP masih diperlukan).
 
 - Fungsi AI kini menghapus temperature Gemini, membatasi total dua percobaan dalam 15 detik bersama, mencoba ulang HTTP 503 sekali, dan mencatat metadata kegagalan terbatas tanpa data pengguna.
+
+## 2026-10-21 - Fitur 06 sesi A
+- Tab Eksplor dan agenda event lokal selesai: tambah, ubah, hapus lunak, detail, daftar mendatang/lampau, serta tampilan WIB, WITA, WIT, dan London.
+- Zona IANA memakai timezone 0.11.2; jam London yang ambigu atau tidak ada ditolak dengan arahan memilih jam lain. Pengingat 1–3 pilihan disimpan berurutan menurun, belum dijadwalkan.
+- Tes waktu dan repository mencakup pergantian jam London, isolasi pengguna, status sinkronisasi, serta hapus lunak. Seluruh 220 tes Flutter lulus dan `flutter analyze` bersih; uji langsung di HP masih menunggu.
+
+- 2026-10-21: Tampilan Agenda Event diringkas dengan waktu zona asal, WIB, penanda beda hari, hitung mundur, dan detail empat zona; tes utilitas serta analisis lulus, uji HP menunggu.

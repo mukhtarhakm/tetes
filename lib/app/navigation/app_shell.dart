@@ -20,6 +20,7 @@ import '../../features/beans/screens/bean_list_screen.dart';
 import '../../features/beans/state/bean_providers.dart';
 import '../../features/journal/screens/journal_screen.dart';
 import '../../features/journal/state/journal_controller.dart';
+import '../../features/explore/explore_screen.dart';
 import '../router/app_routes.dart';
 import '../theme/tokens.dart';
 
@@ -246,11 +247,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           _journalVisited
               ? JournalScreen(key: ValueKey(_pullRevision))
               : const SizedBox.shrink(),
-          const _TabEmptyView(
-            title: 'Eksplor',
-            message: 'Agenda, toko, kurs, dan game akan hadir di sini.',
-            icon: Icons.explore_outlined,
-          ),
+          const ExploreScreen(),
           const _TabEmptyView(
             title: 'Saran & Kesan',
             message: 'Saran dan kesanmu akan dapat dikirim dari sini.',
