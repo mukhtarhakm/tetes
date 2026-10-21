@@ -64,6 +64,36 @@ class UserRepository {
     return _isSettingEnabled(userId, _biometricEnabledKey);
   }
 
+  Future<Map<String, Object?>?> profile(String userId) async {
+    final rows = await _database.query(
+      'users',
+      columns: ['id', 'username', 'photo_path', 'created_at'],
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<void> savePhotoPath(String userId, String fileName) async {
+    final changed = await _database.update(
+      'users',
+      {'photo_path': fileName},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    if (changed != 1) throw StateError('Profil pengguna tidak tersedia.');
+  }
+
+  Future<void> disableBiometric(String userId) {
+    return _upsertSetting(
+      _database,
+      userId: userId,
+      key: _biometricEnabledKey,
+      value: '0',
+    );
+  }
+
   Future<bool> wasBiometricPrompted(String userId) {
     return _isSettingEnabled(userId, _biometricPromptedKey);
   }

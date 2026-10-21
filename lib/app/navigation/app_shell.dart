@@ -4,13 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/ui/app_bottom_nav.dart';
-import '../../core/ui/app_button.dart';
-import '../../core/ui/app_card.dart';
 import '../../core/ui/app_dialog.dart';
-import '../../core/ui/state_views.dart';
-import '../../core/ui/status_pill.dart';
 import '../../core/notifications/notification_coordinator.dart';
-import '../../core/notifications/notification_profile_card.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/db/database_provider.dart';
 import '../../data/remote/sync_client.dart';
@@ -24,8 +19,9 @@ import '../../features/beans/state/bean_providers.dart';
 import '../../features/journal/screens/journal_screen.dart';
 import '../../features/journal/state/journal_controller.dart';
 import '../../features/explore/explore_screen.dart';
+import '../../features/feedback/feedback_screen.dart';
+import '../../features/profile/profile_screen.dart';
 import '../router/app_routes.dart';
-import '../theme/tokens.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -49,6 +45,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
   bool _logoutFlowActive = false;
   bool _journalVisited = false;
+  bool _feedbackVisited = false;
+  bool _profileVisited = false;
   StreamSubscription<String>? _brewChanges;
   Future<SyncService>? _syncService;
   SyncStatus? _syncStatus;
@@ -324,18 +322,16 @@ class _AppShellState extends ConsumerState<AppShell> {
               ? JournalScreen(key: ValueKey(_pullRevision))
               : const SizedBox.shrink(),
           const ExploreScreen(),
-          const _TabEmptyView(
-            title: 'Saran & Kesan',
-            message: 'Saran dan kesanmu akan dapat dikirim dari sini.',
-            icon: Icons.rate_review_outlined,
-          ),
-          _SyncProfile(
-            status: _syncStatus,
-            error: _syncError,
-            loading: _syncLoading,
-            onSync: _manualSync,
-            onPull: _manualPull,
-          ),
+          _feedbackVisited ? const FeedbackScreen() : const SizedBox.shrink(),
+          _profileVisited
+              ? ProfileScreen(
+                  syncStatus: _syncStatus,
+                  syncError: _syncError,
+                  syncLoading: _syncLoading,
+                  onSync: _manualSync,
+                  onPull: _manualPull,
+                )
+              : const SizedBox.shrink(),
         ],
       ),
       bottomNavigationBar: AppBottomNav(
@@ -349,6 +345,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 
           setState(() {
             _currentIndex = index;
+            if (index == 3) _feedbackVisited = true;
+            if (index == 4) _profileVisited = true;
             if (index == 1) {
               _journalVisited = true;
             } else {
@@ -420,136 +418,5 @@ class _AppShellState extends ConsumerState<AppShell> {
         });
       }
     }
-  }
-}
-
-class _SyncProfile extends StatelessWidget {
-  const _SyncProfile({
-    required this.status,
-    required this.error,
-    required this.loading,
-    required this.onSync,
-    required this.onPull,
-  });
-
-  final SyncStatus? status;
-  final String? error;
-  final bool loading;
-  final VoidCallback onSync;
-  final VoidCallback onPull;
-
-  @override
-  Widget build(BuildContext context) {
-    final accepted = status?.summary?['accepted'];
-    final acceptedCount = accepted is Map
-        ? ((accepted['beans'] as num?) ?? 0).toInt() +
-              ((accepted['brews'] as num?) ?? 0).toInt()
-        : 0;
-    final empty =
-        status != null &&
-        status!.pendingCount == 0 &&
-        status!.errorCount == 0 &&
-        status!.lastSyncAt == null;
-    return SafeArea(
-      bottom: false,
-      child: ListView(
-        padding: AppInsets.screen,
-        children: [
-          const NotificationProfileCard(),
-          const SizedBox(height: AppSpacing.s12),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Sinkronisasi',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                if (loading)
-                  const Text('Memuat status sinkronisasi...')
-                else if (error != null) ...[
-                  const StatusPill(
-                    label: 'Galat',
-                    variant: StatusPillVariant.error,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  Text(error!),
-                ] else if (empty) ...[
-                  const StatusPill(
-                    label: 'Kosong',
-                    variant: StatusPillVariant.pending,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  const Text('Belum ada data yang menunggu sinkronisasi.'),
-                ] else if (status != null) ...[
-                  StatusPill(
-                    label: '${status!.pendingCount} data menunggu',
-                    variant: status!.errorCount > 0
-                        ? StatusPillVariant.error
-                        : status!.pendingCount == 0
-                        ? StatusPillVariant.synced
-                        : StatusPillVariant.pending,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  if (status!.errorCount > 0)
-                    Text('${status!.errorCount} data perlu dicoba ulang.'),
-                  Text(
-                    status!.lastSyncAt == null
-                        ? 'Belum pernah sinkron.'
-                        : 'Terakhir: ${status!.lastSyncAt}',
-                  ),
-                  Text('Hasil terakhir: $acceptedCount diterima.'),
-                ] else
-                  const Text('Status sinkronisasi belum tersedia.'),
-                const SizedBox(height: AppSpacing.s8),
-                AppButton(
-                  label: 'Sinkronkan sekarang',
-                  onPressed: loading ? null : onSync,
-                ),
-                const SizedBox(height: AppSpacing.s8),
-                AppButton(
-                  label: 'Tarik data dari server',
-                  onPressed: loading ? null : onPull,
-                ),
-                if (status?.lastPullAt != null) ...[
-                  const SizedBox(height: AppSpacing.s8),
-                  Text('Tarik terakhir: ${status!.lastPullAt}'),
-                  Text(
-                    status!.pullSummary?['error'] is String
-                        ? 'Hasil tarik: ${status!.pullSummary!['error']}'
-                        : 'Hasil tarik: ${status!.pullSummary?['beans'] ?? 0} biji, ${status!.pullSummary?['brews'] ?? 0} seduhan.',
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TabEmptyView extends StatelessWidget {
-  const _TabEmptyView({
-    required this.title,
-    required this.message,
-    required this.icon,
-  });
-
-  final String title;
-  final String message;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: AppInsets.screen,
-        child: EmptyView(title: title, message: message, icon: icon),
-      ),
-    );
   }
 }

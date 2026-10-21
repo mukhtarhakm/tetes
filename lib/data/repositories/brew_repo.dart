@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:sqflite/sqflite.dart';
 
@@ -180,14 +181,16 @@ class BrewRepository {
       whereArgs: [userId],
       orderBy: 'seq ASC',
     );
-    return verifyChain(
-      rows.map(
-        (row) => (
-          seq: (row['seq'] as num).toInt(),
-          data: _hashData(row),
-          prevHash: row['prev_hash'] as String,
-          hash: row['hash'] as String,
-          status: row['status'] as String,
+    return Isolate.run(
+      () => verifyChain(
+        rows.map(
+          (row) => (
+            seq: (row['seq'] as num).toInt(),
+            data: _hashData(row),
+            prevHash: row['prev_hash'] as String,
+            hash: row['hash'] as String,
+            status: row['status'] as String,
+          ),
         ),
       ),
     );

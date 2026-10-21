@@ -42,6 +42,7 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Perapian layout (nanti, tahap perapian): layar Hasil dan Atur Seduh; ganti nama berkas brew_result_placeholder_screen.dart karena sudah bukan placeholder.
 - Judul bagian di form biji ("Info biji", "Pengolahan", "Kemasan dan harga").
 - uji live diagnosa dan penyimpanan ai_advice menunggu Gemini stabil; server dan klien sudah menangani 503 (percobaan ulang, pesan sibuk, cooldown, fallback).” Fitur AI tetap bisa dipakai lewat fallback aturan sederhana, jadi aplikasi tidak rusak.
+- score_chart.dart: ganti fontSize: 12 pada tooltip dengan gaya teks dari tema; cek bintang di tooltip tampil benar (★), bukan karakter rusak.
 
 ## Menunggu jawaban dosen
 - [ ] Tema (V60 pelatih/jurnal vs Brewmaster)
@@ -110,3 +111,6 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Waktu game dan gerak zona memakai dt dari cap waktu gyroscope yang dibatasi saat ada jeda besar. Hanya keberhasilan sebelum batas waktu masuk game_scores dengan UUID v4, waktu UTC tanpa milidetik, dan sync_status pending; kegagalan tidak disimpan.
 - Jeda membatalkan langganan sensor dan umpan balik, lalu meminta kalibrasi ulang. Tes logika, sensor palsu, dan SQLite dalam memori mencakup batas waktu, ambang bintang, penyimpanan, MAX, dan isolasi pengguna. Seluruh 242 tes Flutter lulus; uji level di HP asli masih menunggu.
 - 2026-10-21: Arah kontrol Steady Pour kini mempertahankan horizontal dan membalik vertikal, Cara main serta petunjuk level 1 ditambahkan, orientasi potret dipulihkan ke aturan aplikasi saat latar belakang atau keluar, dan 247 tes Flutter serta flutter analyze lulus.
+
+## 2026-10-22 - Fitur 07 sesi B
+- Profil kini menampilkan foto lokal dan akun, sakelar biometrik per pengguna, verifikasi integritas jurnal, serta kartu Sinkronisasi dan Notifikasi yang dipakai ulang; Saran & Kesan menyimpan dan menampilkan riwayat lokal per pengguna tanpa sinkronisasi server. Foto lama baru dihapus setelah foto baru dan path tersimpan. Seluruh 255 tes Flutter dan flutter analyze lulus; uji kamera, galeri, dan biometrik di HP asli masih menunggu.

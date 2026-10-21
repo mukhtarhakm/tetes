@@ -34,6 +34,52 @@ void main() {
     await database.close();
   });
 
+  test(
+    'verifikasi kosong, tamper, dan celah seq untuk pengguna aktif',
+    () async {
+      expect(await brewRepository.verifyUserChain('user-1'), 'utuh (0 entri)');
+      final beanId = await _createBean(beanRepository);
+      final plan = BrewCalculator.createDefault(beanId: beanId);
+      final result = BrewSessionResult(
+        plan: plan,
+        totalTimeS: 135,
+        drawdownS: 35,
+        brewedAtUtc: '2026-10-20T01:02:03Z',
+      );
+      for (var i = 0; i < 2; i++) {
+        await brewRepository.save(
+          userId: 'user-1',
+          result: result,
+          tasteScore: 4,
+          tasteTags: [RoasteryNoteTag.manis],
+          actualWaterG: List.filled(plan.stages.length, null),
+        );
+      }
+      expect(await brewRepository.verifyUserChain('user-1'), 'utuh (2 entri)');
+      expect(await brewRepository.verifyUserChain('user-2'), 'utuh (0 entri)');
+      await database.update(
+        'brews',
+        {'dose_g': 99},
+        where: 'user_id = ? AND seq = ?',
+        whereArgs: ['user-1', 2],
+      );
+      expect(
+        await brewRepository.verifyUserChain('user-1'),
+        'rantai putus di seq 2',
+      );
+    await database.update(
+      'brews',
+      {'seq': 3},
+      where: 'user_id = ? AND seq = ?',
+      whereArgs: ['user-1', 2],
+    );
+      expect(
+        await brewRepository.verifyUserChain('user-1'),
+      'rantai putus di seq 2',
+      );
+    },
+  );
+
   test('membaca pengaturan terbaik yang valid beserta tahapnya', () async {
     final beanId = await _createBean(beanRepository);
     await database.insert('brews', _brew(beanId: beanId));
