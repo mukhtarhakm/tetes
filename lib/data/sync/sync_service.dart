@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
 
+import '../../core/utils/hash.dart';
 import '../remote/sync_client.dart';
 
 typedef SyncUnauthorized = Future<void> Function();
@@ -12,12 +13,16 @@ class SyncStatus {
     required this.errorCount,
     this.lastSyncAt,
     this.summary,
+    this.lastPullAt,
+    this.pullSummary,
   });
 
   final int pendingCount;
   final int errorCount;
   final String? lastSyncAt;
   final Map<String, dynamic>? summary;
+  final String? lastPullAt;
+  final Map<String, dynamic>? pullSummary;
 }
 
 class SyncService {
@@ -52,8 +57,14 @@ class SyncService {
     final settings = await _database.query(
       'settings',
       columns: ['key', 'value'],
-      where: 'user_id = ? AND key IN (?, ?)',
-      whereArgs: [userId, 'last_sync_at', 'last_sync_summary'],
+      where: 'user_id = ? AND key IN (?, ?, ?, ?)',
+      whereArgs: [
+        userId,
+        'last_sync_at',
+        'last_sync_summary',
+        'last_pull_at',
+        'last_pull_summary',
+      ],
     );
     final values = {
       for (final row in settings) row['key'] as String: row['value'] as String,
@@ -68,12 +79,317 @@ class SyncService {
         // Ringkasan rusak tidak menghalangi sinkronisasi data utama.
       }
     }
+    Map<String, dynamic>? pullSummary;
+    try {
+      final decoded = jsonDecode(values['last_pull_summary'] ?? '');
+      if (decoded is Map<String, dynamic>) pullSummary = decoded;
+    } on FormatException {
+      // Ringkasan rusak tidak menghalangi sinkronisasi.
+    }
     return SyncStatus(
       pendingCount: (counts.single['pending_count'] as num).toInt(),
       errorCount: (counts.single['error_count'] as num).toInt(),
       lastSyncAt: values['last_sync_at'],
       summary: summary,
+      lastPullAt: values['last_pull_at'],
+      pullSummary: pullSummary,
     );
+  }
+
+  Future<SyncStatus> pull(String userId) async {
+    if (_running) {
+      throw const SyncException(
+        SyncFailure.badRequest,
+        'Sinkronisasi sedang berjalan.',
+      );
+    }
+    _running = true;
+    var beanCount = 0;
+    var brewCount = 0;
+    String? lastStatus;
+    final changedBeans = <String>{};
+    try {
+      final local = await _database.query(
+        'brews',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+        orderBy: 'seq ASC',
+      );
+      if (!verifyChain(local.map(_chainEntry)).startsWith('utuh')) {
+        throw const SyncException(
+          SyncFailure.badRequest,
+          'Rantai seduhan di HP tidak lolos verifikasi.',
+        );
+      }
+      final chain = [...local];
+      while (true) {
+        final last = chain.isEmpty ? null : chain.last;
+        final page = await _pull(
+          userId,
+          last == null ? 0 : last['seq'] as int,
+          last?['hash'] as String?,
+        );
+        lastStatus = page.status;
+        if (page.status == 'diverged') {
+          throw SyncException(
+            SyncFailure.badRequest,
+            'Data di HP dan server tidak cocok (seq terakhir server: ${page.serverLastSeq}).',
+          );
+        }
+        if (page.status == 'local_ahead' || page.status == 'up_to_date') break;
+        if (page.status == 'empty_server' && page.brews.isNotEmpty ||
+            page.status == 'pull' && page.brews.isEmpty) {
+          throw const SyncException(
+            SyncFailure.server,
+            'Respons tarik data tidak valid. Coba lagi.',
+          );
+        }
+        final incoming = page.brews.map(_brewRow).toList();
+        if (page.status == 'pull' &&
+            !verifyChain(
+              [...chain, ...incoming].map(_chainEntry),
+            ).startsWith('utuh')) {
+          throw const SyncException(
+            SyncFailure.server,
+            'Data dari server tidak lolos verifikasi.',
+          );
+        }
+        final inserted = await _database.transaction((txn) async {
+          var addedBeans = 0;
+          for (final bean in page.beans) {
+            final row = _beanRow(bean, userId);
+            final existing = await txn.query(
+              'beans',
+              columns: ['user_id'],
+              where: 'id = ?',
+              whereArgs: [row['id']],
+              limit: 1,
+            );
+            if (existing.isNotEmpty) {
+              if (existing.single['user_id'] != userId) {
+                throw const FormatException('bean owner');
+              }
+              continue;
+            }
+            await txn.insert('beans', row);
+            addedBeans++;
+          }
+          for (var i = 0; i < incoming.length; i++) {
+            final row = {
+              ...incoming[i],
+              'user_id': userId,
+              'sync_status': 'synced',
+            };
+            await txn.insert('brews', row);
+            changedBeans.add(row['bean_id'] as String);
+            for (final stage in _stageRows(
+              page.brews[i]['stages'],
+              row['id'] as String,
+            )) {
+              await txn.insert('brew_stages', stage);
+            }
+          }
+          return addedBeans;
+        });
+        beanCount += inserted;
+        brewCount += incoming.length;
+        chain.addAll(incoming);
+        if (!page.hasMore) break;
+      }
+      await _updateBestBrews(userId, changedBeans);
+      await _savePullSummary(userId, beanCount, brewCount, null, lastStatus);
+      return status(userId);
+    } on SyncException catch (error) {
+      await _savePullSummary(userId, beanCount, brewCount, error.message);
+      rethrow;
+    } catch (_) {
+      const error = SyncException(
+        SyncFailure.server,
+        'Tarik data gagal. Coba lagi.',
+      );
+      await _savePullSummary(userId, beanCount, brewCount, error.message);
+      throw error;
+    } finally {
+      _running = false;
+    }
+  }
+
+  Future<SyncPullResponse> _pull(String userId, int seq, String? hash) async {
+    try {
+      return await _client.pullData(
+        userId: userId,
+        lastSeq: seq,
+        lastHash: hash,
+      );
+    } on SyncException catch (error) {
+      if (error.failure == SyncFailure.unauthorized) await _onUnauthorized();
+      rethrow;
+    }
+  }
+
+  BrewChainEntry _chainEntry(Map<String, Object?> row) => (
+    seq: row['seq'] as int,
+    data: (
+      beanId: row['bean_id'] as String,
+      doseG: (row['dose_g'] as num).toDouble(),
+      ratio: (row['ratio'] as num).toDouble(),
+      waterTempC: row['water_temp_c'] as int,
+      grind: row['grind'] as String,
+      totalTimeS: row['total_time_s'] as int,
+      tasteScore: row['taste_score'] as int,
+      tasteTags: (row['taste_tags'] as String).split(','),
+      brewedAtUtc: row['brewed_at_utc'] as String,
+    ),
+    prevHash: row['prev_hash'] as String,
+    hash: row['hash'] as String,
+    status: row['status'] as String,
+  );
+
+  static const _beanColumns =
+      'id name species bean_type arabica_percent roastery is_self_roasted origin process process_custom roast_level roast_date pack_size_g price_original currency fx_rate fx_date price_idr_per_kg initial_stock_g roastery_notes_tags roastery_notes_text best_brew_id archived created_at updated_at';
+  static const _brewColumns =
+      'id seq bean_id brewed_at_utc dose_g ratio water_temp_c grind total_time_s taste_score taste_tags notes ai_advice cost_idr status prev_hash hash created_at';
+  static const _stageColumns =
+      'id brew_id position name target_start_s target_duration_s target_water_cum_g target_pour_g actual_start_s actual_duration_s actual_water_g drawdown_s';
+
+  Map<String, Object?> _beanRow(Map<String, dynamic> value, String userId) {
+    final row = {for (final key in _beanColumns.split(' ')) key: value[key]};
+    if (row['id'] is! String ||
+        row['name'] is! String ||
+        row['species'] is! String ||
+        row['created_at'] is! String ||
+        row['updated_at'] is! String ||
+        row['is_self_roasted'] is! bool ||
+        row['archived'] is! bool ||
+        row['initial_stock_g'] is! num) {
+      throw const FormatException('bean');
+    }
+    row['is_self_roasted'] = row['is_self_roasted'] == true ? 1 : 0;
+    row['archived'] = row['archived'] == true ? 1 : 0;
+    return {...row, 'user_id': userId, 'sync_status': 'synced'};
+  }
+
+  Map<String, Object?> _brewRow(Map<String, dynamic> value) {
+    final row = {for (final key in _brewColumns.split(' ')) key: value[key]};
+    if (row['id'] is! String ||
+        row['seq'] is! int ||
+        row['bean_id'] is! String ||
+        row['brewed_at_utc'] is! String ||
+        !RegExp(
+          r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$',
+        ).hasMatch(row['brewed_at_utc'] as String) ||
+        row['dose_g'] is! num ||
+        row['ratio'] is! num ||
+        row['water_temp_c'] is! int ||
+        row['grind'] is! String ||
+        row['total_time_s'] is! int ||
+        row['taste_score'] is! int ||
+        row['taste_tags'] is! String ||
+        row['prev_hash'] is! String ||
+        row['hash'] is! String ||
+        row['status'] is! String ||
+        row['created_at'] is! String) {
+      throw const SyncException(
+        SyncFailure.server,
+        'Data dari server tidak lolos verifikasi.',
+      );
+    }
+    return row;
+  }
+
+  List<Map<String, Object?>> _stageRows(Object? value, String brewId) {
+    if (value is! List || value.isEmpty || value.length > 5) {
+      throw const FormatException('stages');
+    }
+    final rows = <Map<String, Object?>>[];
+    for (var i = 0; i < value.length; i++) {
+      final stage = value[i];
+      if (stage is! Map<String, dynamic>) throw const FormatException('stage');
+      final row = {for (final key in _stageColumns.split(' ')) key: stage[key]};
+      if (row['id'] is! String ||
+          row['brew_id'] != brewId ||
+          row['position'] != i + 1 ||
+          row['name'] is! String ||
+          row['target_start_s'] is! int ||
+          row['target_duration_s'] is! int ||
+          row['target_water_cum_g'] is! num ||
+          row['target_pour_g'] is! num) {
+        throw const FormatException('stage');
+      }
+      rows.add(row);
+    }
+    return rows;
+  }
+
+  Future<void> _updateBestBrews(String userId, Set<String> beanIds) async {
+    if (beanIds.isEmpty) return;
+    final now = DateTime.now().toUtc().toIso8601String().replaceFirst(
+      RegExp(r'\.\d+Z$'),
+      'Z',
+    );
+    await _database.transaction((txn) async {
+      for (final beanId in beanIds) {
+        final best = await txn.query(
+          'brews',
+          columns: ['id'],
+          where: 'user_id = ? AND bean_id = ? AND status = ?',
+          whereArgs: [userId, beanId, 'aktif'],
+          orderBy: 'taste_score DESC, brewed_at_utc DESC, seq DESC',
+          limit: 1,
+        );
+        final bean = await txn.query(
+          'beans',
+          columns: ['best_brew_id'],
+          where: 'id = ? AND user_id = ?',
+          whereArgs: [beanId, userId],
+          limit: 1,
+        );
+        if (bean.isNotEmpty &&
+            bean.single['best_brew_id'] !=
+                (best.isEmpty ? null : best.single['id'])) {
+          await txn.update(
+            'beans',
+            {
+              'best_brew_id': best.isEmpty ? null : best.single['id'],
+              'updated_at': now,
+              'sync_status': 'pending',
+            },
+            where: 'id = ? AND user_id = ?',
+            whereArgs: [beanId, userId],
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> _savePullSummary(
+    String userId,
+    int beans,
+    int brews, [
+    String? error,
+    String? status,
+  ]) async {
+    final now = DateTime.now().toUtc().toIso8601String().replaceFirst(
+      RegExp(r'\.\d+Z$'),
+      'Z',
+    );
+    await _database.transaction((txn) async {
+      for (final item in {
+        'last_pull_at': now,
+        'last_pull_summary': jsonEncode({
+          'beans': beans,
+          'brews': brews,
+          'error': ?error,
+          'status': ?status,
+        }),
+      }.entries) {
+        await txn.insert('settings', {
+          'user_id': userId,
+          'key': item.key,
+          'value': item.value,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
   }
 
   Future<SyncStatus> run({

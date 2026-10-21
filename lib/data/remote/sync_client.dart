@@ -7,7 +7,14 @@ import 'package:http/http.dart' as http;
 import '../../core/config/app_config.dart';
 import '../secure/session_storage.dart';
 
-enum SyncFailure { network, timeout, badRequest, unauthorized, server }
+enum SyncFailure {
+  network,
+  timeout,
+  badRequest,
+  unauthorized,
+  tooManyBeans,
+  server,
+}
 
 class SyncException implements Exception {
   const SyncException(this.failure, this.message);
@@ -34,6 +41,22 @@ class SyncRejection {
   final String reason;
 }
 
+class SyncPullResponse {
+  const SyncPullResponse({
+    required this.status,
+    required this.serverLastSeq,
+    required this.hasMore,
+    required this.beans,
+    required this.brews,
+  });
+
+  final String status;
+  final int serverLastSeq;
+  final bool hasMore;
+  final List<Map<String, dynamic>> beans;
+  final List<Map<String, dynamic>> brews;
+}
+
 class SyncClient {
   SyncClient({
     required this.sessionStorage,
@@ -48,6 +71,107 @@ class SyncClient {
   final bool _ownsClient;
   final String baseUrl;
   final Duration timeout;
+
+  Future<SyncPullResponse> pullData({
+    required String userId,
+    required int lastSeq,
+    required String? lastHash,
+  }) async {
+    final session = await sessionStorage.readSession();
+    if (session == null || session.userId != userId) {
+      throw const SyncException(
+        SyncFailure.unauthorized,
+        'Sesi tidak sah. Masuk kembali.',
+      );
+    }
+    late http.Response response;
+    try {
+      response = await _client
+          .post(
+            Uri.parse('$baseUrl/sync-pull'),
+            headers: {
+              'Content-Type': 'application/json',
+              'x-session-token': session.token,
+            },
+            body: jsonEncode({'last_seq': lastSeq, 'last_hash': lastHash}),
+          )
+          .timeout(timeout);
+    } on TimeoutException {
+      throw const SyncException(
+        SyncFailure.timeout,
+        'Sinkronisasi terlalu lama. Coba lagi.',
+      );
+    } on SocketException {
+      throw const SyncException(
+        SyncFailure.network,
+        'Tidak dapat terhubung ke internet.',
+      );
+    } on http.ClientException {
+      throw const SyncException(
+        SyncFailure.network,
+        'Tidak dapat terhubung ke internet.',
+      );
+    }
+    switch (response.statusCode) {
+      case 400:
+        throw const SyncException(
+          SyncFailure.badRequest,
+          'Permintaan tarik data ditolak.',
+        );
+      case 401:
+        throw const SyncException(
+          SyncFailure.unauthorized,
+          'Sesi tidak sah. Masuk kembali.',
+        );
+      case 413:
+        throw const SyncException(
+          SyncFailure.tooManyBeans,
+          'Jumlah biji di server melebihi batas 500.',
+        );
+      case 200:
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is! Map<String, dynamic> ||
+              !const [
+                'pull',
+                'empty_server',
+                'up_to_date',
+                'local_ahead',
+                'diverged',
+              ].contains(decoded['status']) ||
+              decoded['server_last_seq'] is! int ||
+              decoded['has_more'] is! bool ||
+              decoded['beans'] is! List ||
+              decoded['brews'] is! List) {
+            throw const FormatException();
+          }
+          final beans = (decoded['beans'] as List).cast<Map<String, dynamic>>();
+          final brews = (decoded['brews'] as List).cast<Map<String, dynamic>>();
+          return SyncPullResponse(
+            status: decoded['status'] as String,
+            serverLastSeq: decoded['server_last_seq'] as int,
+            hasMore: decoded['has_more'] as bool,
+            beans: beans,
+            brews: brews,
+          );
+        } on FormatException {
+          throw const SyncException(
+            SyncFailure.server,
+            'Respons tarik data tidak valid. Coba lagi.',
+          );
+        } on TypeError {
+          throw const SyncException(
+            SyncFailure.server,
+            'Respons tarik data tidak valid. Coba lagi.',
+          );
+        }
+      default:
+        throw const SyncException(
+          SyncFailure.server,
+          'Server sinkronisasi sedang bermasalah. Coba lagi.',
+        );
+    }
+  }
 
   Future<SyncPushResponse> push({
     required String userId,

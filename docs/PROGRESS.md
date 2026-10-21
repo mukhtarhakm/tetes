@@ -61,3 +61,12 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Klien push Flutter untuk beans, brews, dan brew_stages selesai: batch 100/50, status lokal, ringkasan UTC, dan penanganan galat/401.
 - Profil menampilkan status dan tombol sinkron manual; pemicu otomatis aktif saat session valid dan setelah seduhan disimpan atau dibatalkan.
 - Sinkronisasi pull, AI, events, game_scores, dan feedback belum dikerjakan.
+
+## 2026-10-21 - Fitur 05 langkah 3
+- Edge Function sync-pull disiapkan untuk membaca beans dan rantai brews bertahap dengan pemeriksaan session, prefix hash, batas 500 biji, urutan stages, serta waktu seduh asli untuk verifikasi hash klien.
+- Konfigurasi fungsi memakai verify_jwt=false. sync-pull sudah di-deploy dan skenario status, respons tanpa user_id, serta tipe angka lulus uji curl. Uji di HP dan kecocokan brewed_at_utc dengan data asli sync-push belum dibuktikan.
+
+## 2026-10-21 - Fitur 05 langkah 3b
+- Klien pull untuk beans, brews, dan brew_stages selesai: session token, verifikasi hash sebelum tulis, transaksi per halaman, lanjut dari prefix lokal setelah halaman berikutnya gagal, dan ringkasan pull di settings.
+- Pull otomatis senyap sekali setelah login/register baru bila belum ada seduhan lokal; tombol tarik manual dan hasil terakhir tampil di Profil. Best brew dihitung ulang dari seduhan aktif lokal setelah pull selesai.
+- Tes SQLite dalam memori mencakup halaman jamak, prefix, hash salah, rollback, kegagalan halaman kedua lalu lanjut, konflik, isolasi pengguna, 401, dan kunci push/pull. Uji di HP masih menunggu.

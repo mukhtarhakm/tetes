@@ -50,6 +50,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   SyncStatus? _syncStatus;
   String? _syncError;
   bool _syncLoading = true;
+  bool _initialPullAttempted = false;
+  int _pullRevision = 0;
 
   @override
   void initState() {
@@ -96,10 +98,30 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Future<void> _automaticSync() async {
-    final userId = ref.read(sessionControllerProvider).asData?.value.userId;
+    final session = ref.read(sessionControllerProvider).asData?.value;
+    final userId = session?.userId;
     if (userId == null) return;
     try {
       final service = await _service();
+      if (!_initialPullAttempted && session!.isFreshAuthentication) {
+        _initialPullAttempted = true;
+        final database = await ref.read(databaseProvider.future);
+        final local = await database.query(
+          'brews',
+          columns: ['id'],
+          where: 'user_id = ?',
+          whereArgs: [userId],
+          limit: 1,
+        );
+        if (local.isEmpty) {
+          try {
+            await service.pull(userId);
+            _refreshPulledViews();
+          } catch (_) {
+            // Pull otomatis senyap; ringkasan kegagalan tetap tersimpan.
+          }
+        }
+      }
       await service.run(userId: userId);
     } catch (_) {
       // Sinkronisasi otomatis tetap senyap; baris gagal tidak berubah.
@@ -119,6 +141,41 @@ class _AppShellState extends ConsumerState<AppShell> {
           });
         }
       }
+    }
+  }
+
+  void _refreshPulledViews() {
+    ref.invalidate(beanListProvider);
+    ref.invalidate(journalBrewsProvider);
+    if (mounted) setState(() => _pullRevision++);
+  }
+
+  Future<void> _manualPull() async {
+    final userId = ref.read(sessionControllerProvider).asData?.value.userId;
+    if (userId == null) return;
+    setState(() {
+      _syncLoading = true;
+      _syncError = null;
+    });
+    try {
+      final service = await _service();
+      var result = await service.pull(userId);
+      if (result.pullSummary?['status'] == 'local_ahead' ||
+          result.pullSummary?['status'] == 'empty_server') {
+        result = await service.run(userId: userId);
+      }
+      _refreshPulledViews();
+      if (mounted) setState(() => _syncStatus = result);
+    } on SyncException catch (error) {
+      if (mounted) setState(() => _syncError = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _syncError = 'Tarik data gagal. Coba lagi.');
+    } finally {
+      try {
+        final result = await (await _service()).status(userId);
+        if (mounted) setState(() => _syncStatus = result);
+      } catch (_) {}
+      if (mounted) setState(() => _syncLoading = false);
     }
   }
 
@@ -185,8 +242,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          const BeanListScreen(),
-          _journalVisited ? const JournalScreen() : const SizedBox.shrink(),
+          BeanListScreen(key: ValueKey(_pullRevision)),
+          _journalVisited
+              ? JournalScreen(key: ValueKey(_pullRevision))
+              : const SizedBox.shrink(),
           const _TabEmptyView(
             title: 'Eksplor',
             message: 'Agenda, toko, kurs, dan game akan hadir di sini.',
@@ -202,6 +261,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             error: _syncError,
             loading: _syncLoading,
             onSync: _manualSync,
+            onPull: _manualPull,
           ),
         ],
       ),
@@ -296,12 +356,14 @@ class _SyncProfile extends StatelessWidget {
     required this.error,
     required this.loading,
     required this.onSync,
+    required this.onPull,
   });
 
   final SyncStatus? status;
   final String? error;
   final bool loading;
   final VoidCallback onSync;
+  final VoidCallback onPull;
 
   @override
   Widget build(BuildContext context) {
@@ -370,6 +432,20 @@ class _SyncProfile extends StatelessWidget {
                 label: 'Sinkronkan sekarang',
                 onPressed: loading ? null : onSync,
               ),
+              const SizedBox(height: AppSpacing.s8),
+              AppButton(
+                label: 'Tarik data dari server',
+                onPressed: loading ? null : onPull,
+              ),
+              if (status?.lastPullAt != null) ...[
+                const SizedBox(height: AppSpacing.s8),
+                Text('Tarik terakhir: ${status!.lastPullAt}'),
+                Text(
+                  status!.pullSummary?['error'] is String
+                      ? 'Hasil tarik: ${status!.pullSummary!['error']}'
+                      : 'Hasil tarik: ${status!.pullSummary?['beans'] ?? 0} biji, ${status!.pullSummary?['brews'] ?? 0} seduhan.',
+                ),
+              ],
             ],
           ),
         ),
