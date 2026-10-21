@@ -159,6 +159,39 @@ abstract final class AiBrew {
     };
   }
 
+  static Map<String, Object?> diagnoseSavedPayload({
+    required Bean bean,
+    required BrewDetailData detail,
+    required List<BrewDetailData> history,
+  }) => {
+    'bean': _bean(bean),
+    'brew': {
+      'dose_g': detail.item.doseG,
+      'ratio': detail.item.ratio,
+      'water_temp_c': detail.item.waterTempC,
+      'grind': detail.item.grind.databaseValue,
+      'total_time_s': detail.item.totalTimeS,
+      'taste_score': detail.item.tasteScore,
+      'taste_tags': detail.item.tasteTags.join(','),
+      'notes': _short(detail.notes),
+      'stages': [
+        for (final stage in detail.stages)
+          {
+            'position': stage.position,
+            'name': stage.name.databaseValue,
+            'target_start_s': stage.targetStartS,
+            'target_duration_s': stage.targetDurationS,
+            'target_water_cum_g': stage.targetWaterCumG,
+            'target_pour_g': stage.targetPourG,
+            'actual_water_g': stage.actualWaterG,
+            if (stage.position == detail.stages.length)
+              'drawdown_s': stage.drawdownS,
+          },
+      ],
+    },
+    'history': history.take(5).map(_historyBrew).toList(),
+  };
+
   static AiRecommendation recommendationFromResponse({
     required BrewPlan fallback,
     required int requestedPouringCount,

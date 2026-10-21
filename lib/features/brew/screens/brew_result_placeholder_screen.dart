@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,22 +8,14 @@ import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/ui/state_views.dart';
-import '../../../core/ui/status_pill.dart';
-import '../../../data/remote/ai_client.dart';
 import '../../../data/repositories/brew_repo.dart';
-import '../../../data/secure/session_storage.dart';
-import '../../auth/session/force_logout.dart';
-import '../../auth/state/auth_providers.dart';
 import '../../auth/state/session_controller.dart';
 import '../../beans/bean_model.dart';
 import '../../beans/state/bean_providers.dart';
 import '../../journal/state/journal_controller.dart';
-import '../ai_brew.dart';
-import '../brew_plan.dart';
+import '../../journal/screens/brew_detail_screen.dart';
 import '../brew_session_result.dart';
-import '../state/ai_client_provider.dart';
 import '../state/brew_setup_controller.dart';
-import 'brew_setup_screen.dart';
 
 class BrewResultPlaceholderScreen extends ConsumerStatefulWidget {
   const BrewResultPlaceholderScreen({required this.result, super.key});
@@ -38,12 +28,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
   Bean? bean;
   String? userId;
   String? error;
-  String? diagnosisNotice;
-  Map<String, dynamic>? diagnosis;
-  BrewPlan? nextPlan;
-  bool diagnosisFromAi = false;
-  bool loading = true, saving = false, diagnosing = false;
-  int formRevision = 0;
+  bool loading = true, saving = false;
   int? score;
   final tags = <RoasteryNoteTag>{};
   final notes = TextEditingController(), drawdown = TextEditingController();
@@ -55,22 +40,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
   @override
   void initState() {
     super.initState();
-    notes.addListener(_formChanged);
-    drawdown.addListener(_formChanged);
-    for (final input in water) {
-      input.addListener(_formChanged);
-    }
     load();
-  }
-
-  void _formChanged() {
-    setState(() {
-      formRevision++;
-      diagnosis = null;
-      nextPlan = null;
-      diagnosisNotice = null;
-      diagnosisFromAi = false;
-    });
   }
 
   @override
@@ -117,7 +87,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
   }
 
   Future<void> save() async {
-    if (saving || diagnosing || score == null || tags.isEmpty) return;
+    if (saving || score == null || tags.isEmpty) return;
     final feedback = _feedbackValues();
     if (feedback == null) return;
     final (actual, drawdownS) = feedback;
@@ -141,7 +111,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
     }
     try {
       final repo = await ref.read(brewRepositoryProvider.future);
-      await repo.save(
+      final brewId = await repo.save(
         userId: userId!,
         result: widget.result,
         tasteScore: score!,
@@ -149,16 +119,20 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
         actualWaterG: actual,
         drawdownS: drawdownS,
         notes: notes.text,
-        aiAdvice: diagnosisFromAi && diagnosis != null
-            ? jsonEncode(diagnosis)
-            : null,
       );
       ref.invalidate(journalBrewsProvider);
       ref.invalidate(beanListProvider);
       if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seduhan berhasil disimpan.')),
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      navigator.popUntil((route) => route.isFirst);
+      navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => BrewDetailScreen(brewId: brewId),
+        ),
+      );
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Seduhan tersimpan')),
       );
     } on BrewSaveException catch (e) {
       if (mounted) setState(() => error = e.message);
@@ -190,115 +164,6 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
       return null;
     }
     return (actual, drawdownS);
-  }
-
-  bool _canShowDiagnosis(int revision) =>
-      mounted &&
-      formRevision == revision &&
-      ModalRoute.of(context)?.isCurrent == true;
-
-  void _showFallback(String notice) {
-    final fallback = AiBrew.fallbackDiagnosis(
-      plan: widget.result.plan,
-      tasteScore: score!,
-      tasteTags: tags.map((tag) => tag.databaseValue).toList(),
-    );
-    setState(() {
-      diagnosis = fallback;
-      nextPlan = AiBrew.planFromDiagnosis(
-        base: widget.result.plan,
-        diagnosis: fallback,
-      );
-      diagnosisNotice = notice;
-      diagnosisFromAi = false;
-    });
-  }
-
-  Future<void> requestDiagnosis() async {
-    if (diagnosing ||
-        saving ||
-        score == null ||
-        tags.isEmpty ||
-        bean == null ||
-        userId == null) {
-      return;
-    }
-    final feedback = _feedbackValues();
-    if (feedback == null) return;
-    final (actual, drawdownS) = feedback;
-    final revision = formRevision;
-    final requestedScore = score!;
-    final requestedTags = List<RoasteryNoteTag>.of(tags);
-    final requestedNotes = notes.text;
-    final requestedBean = bean!;
-    final requestedUserId = userId!;
-    final sessionStorage = ref.read(sessionStorageProvider);
-    final sessionController = ref.read(sessionControllerProvider.notifier);
-    setState(() {
-      diagnosing = true;
-      error = null;
-      diagnosis = null;
-      nextPlan = null;
-      diagnosisNotice = null;
-    });
-    try {
-      final repo = await ref.read(brewRepositoryProvider.future);
-      final history = await repo.findAiHistory(
-        userId: requestedUserId,
-        beanId: requestedBean.id,
-      );
-      if (!_canShowDiagnosis(revision)) return;
-      final payload = AiBrew.diagnosePayload(
-        bean: requestedBean,
-        result: widget.result,
-        tasteScore: requestedScore,
-        tasteTags: requestedTags,
-        actualWaterG: actual,
-        drawdownS: drawdownS,
-        notes: requestedNotes,
-        history: history,
-      );
-      final response = await ref
-          .read(aiClientProvider)
-          .diagnose(userId: requestedUserId, payload: payload);
-      if (!_canShowDiagnosis(revision)) return;
-      final plan = AiBrew.validDiagnosis(response)
-          ? AiBrew.planFromDiagnosis(
-              base: widget.result.plan,
-              diagnosis: response,
-            )
-          : null;
-      if (plan == null) {
-        _showFallback(
-          'Saran AI tidak dapat dipakai sebagai rencana seduh. Menampilkan saran sederhana.',
-        );
-      } else {
-        setState(() {
-          diagnosis = response;
-          nextPlan = plan;
-          diagnosisFromAi = true;
-        });
-      }
-    } on AiException catch (e) {
-      if (e.failure == AiFailure.unauthorized) {
-        try {
-          final storedSession = await sessionStorage.readSession();
-          if (storedSession?.userId == requestedUserId) {
-            await forceLogoutOnUnauthorized(sessionController);
-          }
-        } on SessionStorageException {
-          // Akun aktif tidak dapat dipastikan, jadi jangan hapus sesinya.
-        }
-      } else if (_canShowDiagnosis(revision)) {
-        _showFallback('${e.message} Menampilkan saran sederhana.');
-      }
-    } catch (_) {
-      if (_canShowDiagnosis(revision)) {
-        _showFallback('Diagnosa AI gagal. Menampilkan saran sederhana.');
-      }
-    } finally {
-      if (mounted) setState(() => diagnosing = false);
-    }
   }
 
   @override
@@ -399,7 +264,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                         selected: score == index + 1,
                         onSelected: (_) {
                           score = index + 1;
-                          _formChanged();
+                          setState(() {});
                         },
                       ),
                     ),
@@ -422,7 +287,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                               } else {
                                 tags.remove(tag);
                               }
-                              _formChanged();
+                              setState(() {});
                             },
                           ),
                         )
@@ -459,80 +324,17 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                     'Biaya seduhan: ${brewCost(plan.doseG, bean!.priceIdrPerKg)?.toStringAsFixed(0) ?? '-'} IDR',
                   ),
                   if (error != null) Text(error!),
-                  if (diagnosis != null) ...[
-                    const SizedBox(height: AppSpacing.s16),
-                    AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          StatusPill(
-                            label: diagnosisFromAi
-                                ? 'Diagnosa AI'
-                                : 'Saran sederhana',
-                            variant: diagnosisFromAi
-                                ? StatusPillVariant.synced
-                                : StatusPillVariant.warning,
-                          ),
-                          if (diagnosisNotice != null) ...[
-                            const SizedBox(height: AppSpacing.s8),
-                            Text(diagnosisNotice!),
-                          ],
-                          const SizedBox(height: AppSpacing.s8),
-                          Text(AiBrew.diagnosisSummary(diagnosis!)),
-                          const SizedBox(height: AppSpacing.s8),
-                          Text(
-                            'Saran, bukan kepastian. Coba dan catat hasilnya.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (nextPlan != null) ...[
-                      const SizedBox(height: AppSpacing.s8),
-                      AppButton(
-                        label: 'Terapkan ke seduhan berikutnya',
-                        variant: AppButtonVariant.secondary,
-                        onPressed: saving || diagnosing
-                            ? null
-                            : () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      BrewSetupScreen(initialPlan: nextPlan),
-                                ),
-                              ),
-                      ),
-                    ],
-                  ] else if (score == null || tags.isEmpty) ...[
-                    const SizedBox(height: AppSpacing.s16),
-                    const AppCard(
-                      child: Text(
-                        'Pilih skor dan tag rasa untuk meminta diagnosa.',
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    'Diagnosa AI tersedia setelah menyimpan',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: AppSpacing.s16),
                   AppButton(
                     label: 'Simpan',
                     isLoading: saving,
-                    onPressed:
-                        score != null &&
-                            tags.isNotEmpty &&
-                            !saving &&
-                            !diagnosing
+                    onPressed: score != null && tags.isNotEmpty && !saving
                         ? save
-                        : null,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  AppButton(
-                    label: 'Minta Diagnosa AI',
-                    variant: AppButtonVariant.secondary,
-                    isLoading: diagnosing,
-                    onPressed:
-                        score != null &&
-                            tags.isNotEmpty &&
-                            !saving &&
-                            !diagnosing
-                        ? requestDiagnosis
                         : null,
                   ),
                 ],

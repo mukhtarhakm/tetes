@@ -205,7 +205,6 @@ void main() {
         tasteTags: [RoasteryNoteTag.manis],
         actualWaterG: List.filled(plan.stages.length, null),
         drawdownS: 35,
-        aiAdvice: '{"diagnosis":"Seduhan seimbang."}',
       );
       final secondId = await brewRepository.save(
         userId: 'user-1',
@@ -219,7 +218,7 @@ void main() {
       expect(brews.first['prev_hash'], '0');
       expect(brews.last['prev_hash'], brews.first['hash']);
       expect(brews.first['brewed_at_utc'], result.brewedAtUtc);
-      expect(brews.first['ai_advice'], '{"diagnosis":"Seduhan seimbang."}');
+      expect(brews.first['ai_advice'], isNull);
       expect(brews.first['cost_idr'], brewCost(plan.doseG, 200000));
       expect(brews.last['taste_tags'], 'cokelat,manis');
       expect(await brewRepository.verifyUserChain('user-1'), 'utuh (2 entri)');
@@ -418,6 +417,80 @@ void main() {
     );
     expect(await database.query('brews'), isEmpty);
   });
+
+  test(
+    'updateAiAdvice hanya mengubah saran dan status sync pada seduhan aktif milik user',
+    () async {
+      final beanId = await _createBean(beanRepository);
+      final plan = BrewCalculator.createDefault(beanId: beanId);
+      final brewId = await brewRepository.save(
+        userId: 'user-1',
+        result: BrewSessionResult(
+          plan: plan,
+          totalTimeS: 135,
+          drawdownS: null,
+          brewedAtUtc: '2026-10-20T01:02:03Z',
+        ),
+        tasteScore: 3,
+        tasteTags: [RoasteryNoteTag.asam],
+        actualWaterG: List.filled(plan.stages.length, null),
+      );
+      await database.update(
+        'brews',
+        {'sync_status': 'synced'},
+        where: 'id = ?',
+        whereArgs: [brewId],
+      );
+      final before = (await database.query(
+        'brews',
+        where: 'id = ?',
+        whereArgs: [brewId],
+      )).single;
+      expect(
+        await brewRepository.updateAiAdvice(
+          userId: 'user-1',
+          brewId: brewId,
+          aiAdvice: '{"diagnosis":"uji"}',
+        ),
+        1,
+      );
+      final after = (await database.query(
+        'brews',
+        where: 'id = ?',
+        whereArgs: [brewId],
+      )).single;
+      expect(after['ai_advice'], '{"diagnosis":"uji"}');
+      expect(after['sync_status'], 'pending');
+      for (final key in before.keys.where(
+        (key) => key != 'ai_advice' && key != 'sync_status',
+      )) {
+        expect(after[key], before[key], reason: key);
+      }
+      expect(await brewRepository.verifyUserChain('user-1'), 'utuh (1 entri)');
+      await expectLater(
+        brewRepository.updateAiAdvice(
+          userId: 'user-2',
+          brewId: brewId,
+          aiAdvice: 'lain',
+        ),
+        throwsA(isA<BrewSaveException>()),
+      );
+      await database.update(
+        'brews',
+        {'status': 'dibatalkan'},
+        where: 'id = ?',
+        whereArgs: [brewId],
+      );
+      await expectLater(
+        brewRepository.updateAiAdvice(
+          userId: 'user-1',
+          brewId: brewId,
+          aiAdvice: 'lain',
+        ),
+        throwsA(isA<BrewSaveException>()),
+      );
+    },
+  );
 }
 
 Future<String> _createBean(BeanRepository repository) {

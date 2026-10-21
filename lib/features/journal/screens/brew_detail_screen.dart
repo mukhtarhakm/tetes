@@ -10,10 +10,18 @@ import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../../data/remote/ai_client.dart';
+import '../../../data/repositories/brew_repo.dart';
+import '../../../data/secure/session_storage.dart';
+import '../../auth/session/force_logout.dart';
+import '../../auth/state/auth_providers.dart';
+import '../../auth/state/session_controller.dart';
 import '../../beans/state/bean_providers.dart';
 import '../../brew/ai_brew.dart';
+import '../../brew/brew_plan.dart';
 import '../../brew/screens/brew_setup_screen.dart';
 import '../../brew/state/brew_setup_controller.dart';
+import '../../brew/state/ai_client_provider.dart';
 import '../journal_model.dart';
 import '../state/journal_controller.dart';
 
@@ -30,8 +38,7 @@ class BrewDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Detail Seduhan')),
       body: SafeArea(
         child: detailAsync.when(
-          loading: () =>
-              const LoadingView(message: 'Memuat detail seduhan...'),
+          loading: () => const LoadingView(message: 'Memuat detail seduhan...'),
           error: (_, _) => Padding(
             padding: AppInsets.screen,
             child: ErrorView(
@@ -51,7 +58,7 @@ class BrewDetailScreen extends ConsumerWidget {
                 ),
               );
             }
-            return _BrewDetailContent(data: data);
+            return _BrewDetailContent(key: ValueKey(data.item.id), data: data);
           },
         ),
       ),
@@ -59,13 +66,184 @@ class BrewDetailScreen extends ConsumerWidget {
   }
 }
 
-class _BrewDetailContent extends ConsumerWidget {
-  const _BrewDetailContent({required this.data});
+class _BrewDetailContent extends ConsumerStatefulWidget {
+  const _BrewDetailContent({required this.data, super.key});
 
   final BrewDetailData data;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BrewDetailContent> createState() => _BrewDetailContentState();
+}
+
+class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
+  final _cooldown = AiRequestCooldown();
+  bool _diagnosing = false;
+  int _cooldownSeconds = 0;
+  String? _diagnosisNotice;
+  Map<String, dynamic>? _fallback;
+  BrewPlan? _fallbackPlan;
+
+  @override
+  void dispose() {
+    _cooldown.dispose();
+    super.dispose();
+  }
+
+  bool get _current => mounted && ModalRoute.of(context)?.isCurrent == true;
+
+  Future<void> _requestDiagnosis() async {
+    final data = widget.data;
+    if (_diagnosing || _cooldown.active || data.item.isCancelled) return;
+    setState(() => _diagnosing = true);
+    SessionState session;
+    try {
+      session = await ref.read(sessionControllerProvider.future);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _diagnosing = false;
+          _diagnosisNotice = 'Sesi tidak tersedia.';
+        });
+      }
+      return;
+    }
+    if (!mounted ||
+        !_current ||
+        session.userId != data.item.userId ||
+        session.status != SessionStatus.authenticated) {
+      if (mounted) setState(() => _diagnosing = false);
+      return;
+    }
+    final sessionStorage = ref.read(sessionStorageProvider);
+    final sessionController = ref.read(sessionControllerProvider.notifier);
+    if (data.aiAdvice?.isNotEmpty == true) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AppDialog(
+          title: 'Minta ulang diagnosa?',
+          message: 'Saran AI yang tersimpan akan diganti.',
+          primaryLabel: 'Minta ulang',
+          onPrimaryPressed: () => Navigator.of(dialogContext).pop(true),
+          secondaryLabel: 'Batal',
+          onSecondaryPressed: () => Navigator.of(dialogContext).pop(false),
+        ),
+      );
+      if (confirmed != true || !_current) {
+        if (mounted) setState(() => _diagnosing = false);
+        return;
+      }
+    }
+    setState(() {
+      _diagnosisNotice = null;
+      _fallback = null;
+      _fallbackPlan = null;
+    });
+    try {
+      final repo = await ref.read(brewRepositoryProvider.future);
+      final beanRepo = await ref.read(beanRepositoryProvider.future);
+      final bean = await beanRepo.findById(
+        userId: session.userId!,
+        id: data.item.beanId,
+      );
+      if (!_current) return;
+      if (bean == null) {
+        throw StateError('Biji tidak ditemukan');
+      }
+      final history = await repo.findAiHistory(
+        userId: session.userId!,
+        beanId: bean.id,
+      );
+      if (!_current) return;
+      final response = await ref
+          .read(aiClientProvider)
+          .diagnose(
+            userId: session.userId!,
+            payload: AiBrew.diagnoseSavedPayload(
+              bean: bean,
+              detail: data,
+              history: history
+                  .where((entry) => entry.item.id != data.item.id)
+                  .toList(),
+            ),
+          );
+      if (!_current) return;
+      final plan = data.toBrewPlan();
+      if (!AiBrew.validDiagnosis(response) ||
+          plan == null ||
+          AiBrew.planFromDiagnosis(base: plan, diagnosis: response) == null) {
+        _showFallback(
+          'Saran AI tidak dapat dipakai sebagai rencana seduh. Menampilkan saran sederhana.',
+        );
+        return;
+      }
+      await repo.updateAiAdvice(
+        userId: session.userId!,
+        brewId: data.item.id,
+        aiAdvice: jsonEncode(response),
+      );
+      if (!_current) return;
+      ref.invalidate(brewDetailProvider(data.item.id));
+      ref.invalidate(journalBrewsProvider);
+    } on AiException catch (error) {
+      if (error.failure == AiFailure.unauthorized) {
+        try {
+          final stored = await sessionStorage.readSession();
+          if (stored?.userId == session.userId) {
+            await forceLogoutOnUnauthorized(sessionController);
+          }
+        } on SessionStorageException {
+          // Sesi aktif tidak dapat dipastikan.
+        }
+      } else {
+        if (error.failure == AiFailure.network ||
+            error.failure == AiFailure.rateLimited ||
+            error.failure == AiFailure.invalidOutput ||
+            error.failure == AiFailure.upstream ||
+            error.failure == AiFailure.timeout) {
+          _cooldown.start((seconds) {
+            if (mounted) setState(() => _cooldownSeconds = seconds);
+          });
+        }
+        if (_current) {
+          _showFallback(
+            error.upstreamStatus == 503 || error.upstreamStatus == 429
+                ? 'Layanan AI sedang sibuk, coba lagi sebentar.'
+                : '${error.message} Menampilkan saran sederhana.',
+          );
+        }
+      }
+    } on BrewSaveException catch (error) {
+      if (_current) setState(() => _diagnosisNotice = error.message);
+    } catch (_) {
+      if (_current) {
+        _showFallback('Diagnosa AI gagal. Menampilkan saran sederhana.');
+      }
+    } finally {
+      if (mounted) setState(() => _diagnosing = false);
+    }
+  }
+
+  void _showFallback(String notice) {
+    final plan = widget.data.toBrewPlan();
+    if (plan == null) {
+      setState(() => _diagnosisNotice = notice);
+      return;
+    }
+    final fallback = AiBrew.fallbackDiagnosis(
+      plan: plan,
+      tasteScore: widget.data.item.tasteScore,
+      tasteTags: widget.data.item.tasteTags,
+    );
+    setState(() {
+      _fallback = fallback;
+      _fallbackPlan = AiBrew.planFromDiagnosis(base: plan, diagnosis: fallback);
+      _diagnosisNotice = notice;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = widget.data;
     final textTheme = Theme.of(context).textTheme;
     final item = data.item;
 
@@ -77,8 +255,14 @@ class _BrewDetailContent extends ConsumerWidget {
       'error' => ('Galat sync', StatusPillVariant.error),
       _ => ('Menunggu sync', StatusPillVariant.pending),
     };
-    final shortHash = item.hash.length >= 8 ? item.hash.substring(0, 8) : item.hash;
-    final adviceText = _formatAdvice(data.aiAdvice);
+    final shortHash = item.hash.length >= 8
+        ? item.hash.substring(0, 8)
+        : item.hash;
+    final adviceText = _fallback == null
+        ? _formatAdvice(data.aiAdvice)
+        : AiBrew.diagnosisSummary(_fallback!);
+    final savedPlan = _planFromSavedAdvice(data);
+    final nextPlan = _fallbackPlan ?? savedPlan;
 
     return ListView(
       padding: AppInsets.screen,
@@ -138,12 +322,17 @@ class _BrewDetailContent extends ConsumerWidget {
               const SizedBox(height: AppSpacing.s12),
               Row(
                 children: [
-                  Icon(Icons.calendar_today_outlined,
-                      size: AppSizes.navigationIcon, color: AppColors.inkSoft),
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: AppSizes.navigationIcon,
+                    color: AppColors.inkSoft,
+                  ),
                   const SizedBox(width: AppSpacing.s4),
                   Text(
                     _formatLocalBrewedAt(item.brewedAtUtc),
-                    style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.inkSoft,
+                    ),
                   ),
                 ],
               ),
@@ -286,8 +475,10 @@ class _BrewDetailContent extends ConsumerWidget {
               if (data.roasteryNotesTags.isEmpty &&
                   (data.roasteryNotesText == null ||
                       data.roasteryNotesText!.isEmpty))
-                Text('Tidak ada catatan dari roastery.',
-                    style: textTheme.bodySmall)
+                Text(
+                  'Tidak ada catatan dari roastery.',
+                  style: textTheme.bodySmall,
+                )
               else ...[
                 if (data.roasteryNotesTags.isNotEmpty)
                   Wrap(
@@ -300,10 +491,7 @@ class _BrewDetailContent extends ConsumerWidget {
                 if (data.roasteryNotesText != null &&
                     data.roasteryNotesText!.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.s8),
-                  Text(
-                    data.roasteryNotesText!,
-                    style: textTheme.bodyMedium,
-                  ),
+                  Text(data.roasteryNotesText!, style: textTheme.bodyMedium),
                 ],
               ],
             ],
@@ -328,22 +516,30 @@ class _BrewDetailContent extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.s16),
 
-        // Saran AI
-        Text('Saran AI', style: textTheme.titleMedium),
+        Text('Diagnosa AI', style: textTheme.titleMedium),
         const SizedBox(height: AppSpacing.s8),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_fallback != null)
+                const StatusPill(
+                  label: 'Saran sederhana',
+                  variant: StatusPillVariant.warning,
+                ),
+              if (_diagnosisNotice != null) Text(_diagnosisNotice!),
               Text(
                 adviceText,
                 style: textTheme.bodyMedium?.copyWith(
-                  color: data.aiAdvice != null && data.aiAdvice!.isNotEmpty
+                  color:
+                      _fallback != null ||
+                          data.aiAdvice != null && data.aiAdvice!.isNotEmpty
                       ? AppColors.ink
                       : AppColors.inkSoft,
                 ),
               ),
-              if (data.aiAdvice != null && data.aiAdvice!.isNotEmpty) ...[
+              if (_fallback != null ||
+                  data.aiAdvice != null && data.aiAdvice!.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.s8),
                 Text(
                   'Saran, bukan kepastian. Coba dan catat hasilnya.',
@@ -356,6 +552,33 @@ class _BrewDetailContent extends ConsumerWidget {
             ],
           ),
         ),
+        if (!item.isCancelled) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppButton(
+            label: _cooldownSeconds > 0
+                ? 'Coba lagi dalam $_cooldownSeconds detik'
+                : data.aiAdvice?.isNotEmpty == true
+                ? 'Minta ulang'
+                : 'Minta Diagnosa AI',
+            variant: AppButtonVariant.secondary,
+            isLoading: _diagnosing,
+            onPressed: _diagnosing || _cooldownSeconds > 0
+                ? null
+                : _requestDiagnosis,
+          ),
+        ],
+        if (nextPlan != null) ...[
+          const SizedBox(height: AppSpacing.s8),
+          AppButton(
+            label: 'Terapkan ke seduhan berikutnya',
+            variant: AppButtonVariant.secondary,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => BrewSetupScreen(initialPlan: nextPlan),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: AppSpacing.s16),
 
         // Integritas Rantai Hash
@@ -397,6 +620,7 @@ class _BrewDetailContent extends ConsumerWidget {
   }
 
   void _handleBrewAgain(BuildContext context) {
+    final data = widget.data;
     if (data.isBeanArchived) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -412,18 +636,14 @@ class _BrewDetailContent extends ConsumerWidget {
     if (plan == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Pengaturan seduh ini tidak valid untuk dibuat ulang.',
-          ),
+          content: Text('Pengaturan seduh ini tidak valid untuk dibuat ulang.'),
         ),
       );
       return;
     }
 
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BrewSetupScreen(initialPlan: plan),
-      ),
+      MaterialPageRoute(builder: (_) => BrewSetupScreen(initialPlan: plan)),
     );
   }
 
@@ -442,7 +662,21 @@ class _BrewDetailContent extends ConsumerWidget {
     return advice;
   }
 
+  BrewPlan? _planFromSavedAdvice(BrewDetailData data) {
+    final plan = data.toBrewPlan();
+    if (plan == null || data.aiAdvice == null) return null;
+    try {
+      final advice = jsonDecode(data.aiAdvice!);
+      return advice is Map<String, dynamic>
+          ? AiBrew.planFromDiagnosis(base: plan, diagnosis: advice)
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _handleCancel(BuildContext context, WidgetRef ref) async {
+    final data = widget.data;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AppDialog(
@@ -475,19 +709,25 @@ class _BrewDetailContent extends ConsumerWidget {
         ref.invalidate(beanDetailProvider(data.item.beanId));
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Seduhan berhasil ditandai dibatalkan.')),
+          const SnackBar(
+            content: Text('Seduhan berhasil ditandai dibatalkan.'),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Seduhan tidak dapat dibatalkan atau sudah dibatalkan.'),
+            content: Text(
+              'Seduhan tidak dapat dibatalkan atau sudah dibatalkan.',
+            ),
           ),
         );
       }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Terjadi kesalahan saat membatalkan seduhan.')),
+          const SnackBar(
+            content: Text('Terjadi kesalahan saat membatalkan seduhan.'),
+          ),
         );
       }
     }
@@ -545,7 +785,10 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft)),
+          Text(
+            label,
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+          ),
           Text(
             value,
             style: textTheme.bodyMedium?.copyWith(
@@ -572,9 +815,9 @@ class _TableHeader extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -591,10 +834,7 @@ class _TableCell extends StatelessWidget {
         horizontal: AppSpacing.s8,
         vertical: AppSpacing.s12,
       ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
+      child: Text(text, style: Theme.of(context).textTheme.bodySmall),
     );
   }
 }

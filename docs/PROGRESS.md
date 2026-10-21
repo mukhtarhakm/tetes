@@ -84,3 +84,5 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Diagnosa AI yang valid disimpan sebagai teks JSON di brews.ai_advice saat seduhan disimpan, di luar hash, lalu dibaca sebagai saran di detail Jurnal. Jalur sync-push meneruskan teks JSON ini tanpa mengubahnya.
 - Seluruh 211 tes Flutter lulus dan flutter analyze bersih melalui runtime Flutter yang terpasang, termasuk tes 401 terlambat dan perubahan akun. Uji langsung di HP belum dilakukan. Pembuatan diagnosa dari Jurnal setelah seduhan tersimpan tidak termasuk langkah ini.
 - 2026-10-21: Atur Seduh kini menampilkan kartu ringkas perubahan rekomendasi AI, penanda kolom, dan pemulihan rencana lengkap; galat jaringan atau layanan memicu hitungan mundur 30 detik, status upstream 503/429 mendapat pesan sibuk, dan uji HP masih menunggu.
+
+- Diagnosa AI dipindah ke Detail setelah seduhan tersimpan; Hasil hanya menyimpan seduhan, dan saran AI aktif disimpan tanpa mengubah rantai hash (uji HP masih diperlukan).

@@ -22,6 +22,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(sqfliteFfiInit);
 
+  test('cooldown bersama langsung aktif selama 30 detik', () {
+    final cooldown = AiRequestCooldown();
+    addTearDown(cooldown.dispose);
+    var seconds = 0;
+    cooldown.start((value) => seconds = value);
+    expect(cooldown.active, isTrue);
+    expect(seconds, 30);
+  });
+
   test('respons AI terlambat tidak menimpa perubahan form', () async {
     final response = Completer<http.Response>();
     final started = Completer<void>();

@@ -413,4 +413,36 @@ void main() {
     expect(client.calls.single.beans.single['id'], beanId);
     expect((await db.query('beans')).single['sync_status'], 'synced');
   });
+
+  test(
+    'perubahan ai_advice mengirim hanya seduhan pending dengan hash semula',
+    () async {
+      final db = await _database();
+      final client = _FakeClient();
+      addTearDown(() async {
+        client.close();
+        await db.close();
+      });
+      await _bean(db, beanId, status: 'synced');
+      await _brew(db, brewId, 1, status: 'synced');
+      final laterId = '66666666-6666-4666-8666-666666666666';
+      await _brew(db, laterId, 2, status: 'synced');
+      await db.update(
+        'brews',
+        {'ai_advice': '{"diagnosis":"uji"}', 'sync_status': 'pending'},
+        where: 'id = ?',
+        whereArgs: [laterId],
+      );
+      await SyncService(db, client, () async {}).run(userId: user);
+      expect(client.calls, hasLength(1));
+      expect(client.calls.single.brews, hasLength(1));
+      expect(client.calls.single.brews.single['id'], laterId);
+      expect(
+        client.calls.single.brews.single['ai_advice'],
+        '{"diagnosis":"uji"}',
+      );
+      expect(client.calls.single.brews.single['hash'], 'hash-2');
+      expect(client.calls.single.brews.single['prev_hash'], 'prev-2');
+    },
+  );
 }

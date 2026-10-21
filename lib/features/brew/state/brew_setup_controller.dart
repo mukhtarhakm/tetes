@@ -23,6 +23,32 @@ final brewRepositoryProvider = FutureProvider<BrewRepository>((ref) async {
 
 final initialBrewPlanProvider = Provider<BrewPlan?>((ref) => null);
 
+class AiRequestCooldown {
+  Timer? _timer;
+  DateTime? _until;
+
+  bool get active => _until != null && DateTime.now().isBefore(_until!);
+
+  void start(void Function(int seconds) onTick) {
+    _timer?.cancel();
+    _until = DateTime.now().add(const Duration(seconds: 30));
+    onTick(30);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final remaining = _until!.difference(DateTime.now());
+      final seconds = remaining.isNegative
+          ? 0
+          : (remaining.inMilliseconds / 1000).ceil();
+      onTick(seconds);
+      if (seconds == 0) {
+        _until = null;
+        timer.cancel();
+      }
+    });
+  }
+
+  void dispose() => _timer?.cancel();
+}
+
 final brewSetupControllerProvider = AsyncNotifierProvider.autoDispose
     .family<BrewSetupController, BrewSetupState, String?>(
       BrewSetupController.new,
@@ -93,15 +119,14 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
   final String? initialBeanId;
   int _revision = 0;
   bool _disposed = false;
-  Timer? _aiCooldownTimer;
-  DateTime? _aiCooldownUntil;
+  final _aiCooldown = AiRequestCooldown();
 
   @override
   Future<BrewSetupState> build() async {
     _disposed = false;
     ref.onDispose(() {
       _disposed = true;
-      _aiCooldownTimer?.cancel();
+      _aiCooldown.dispose();
     });
     final userId = await _activeUserId();
     final beanRepository = await ref.watch(beanRepositoryProvider.future);
@@ -198,8 +223,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     if (bean == null ||
         plan == null ||
         current.isAiLoading ||
-        (_aiCooldownUntil != null &&
-            DateTime.now().isBefore(_aiCooldownUntil!))) {
+        _aiCooldown.active) {
       return;
     }
 
@@ -557,24 +581,10 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
 
   void _startAiCooldown() {
     if (_disposed) return;
-    _aiCooldownTimer?.cancel();
-    _aiCooldownUntil = DateTime.now().add(const Duration(seconds: 30));
-    state = AsyncData(_current.copyWith(aiCooldownSeconds: 30));
-    _aiCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_disposed) {
-        timer.cancel();
-        return;
-      }
-      final remaining = _aiCooldownUntil!.difference(DateTime.now());
-      final seconds = remaining.isNegative
-          ? 0
-          : (remaining.inMilliseconds / 1000).ceil();
+    _aiCooldown.start((seconds) {
+      if (_disposed) return;
       if (seconds != _current.aiCooldownSeconds) {
         state = AsyncData(_current.copyWith(aiCooldownSeconds: seconds));
-      }
-      if (seconds == 0) {
-        _aiCooldownUntil = null;
-        timer.cancel();
       }
     });
   }

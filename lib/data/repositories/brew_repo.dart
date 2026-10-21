@@ -33,6 +33,24 @@ class BrewRepository {
 
   final Database _database;
 
+  Future<int> updateAiAdvice({
+    required String userId,
+    required String brewId,
+    required String aiAdvice,
+  }) async {
+    final changed = await _database.update(
+      'brews',
+      {'ai_advice': aiAdvice, 'sync_status': 'pending'},
+      where: "id = ? AND user_id = ? AND status = 'aktif'",
+      whereArgs: [brewId, userId],
+    );
+    if (changed == 0) {
+      throw const BrewSaveException('Seduhan tidak aktif atau bukan milikmu.');
+    }
+    _changes.add(userId);
+    return changed;
+  }
+
   Future<String> save({
     required String userId,
     required BrewSessionResult result,
@@ -41,7 +59,6 @@ class BrewRepository {
     required List<double?> actualWaterG,
     int? drawdownS,
     String? notes,
-    String? aiAdvice,
   }) async {
     final plan = result.plan;
     final tags = tasteTags.map((tag) => tag.databaseValue).toSet().toList()
@@ -103,7 +120,6 @@ class BrewRepository {
             (beans.single['price_idr_per_kg'] as num?)?.toDouble(),
           ),
           'notes': notes?.trim().isEmpty == true ? null : notes?.trim(),
-          'ai_advice': aiAdvice,
           'status': 'aktif',
           'sync_status': 'pending',
           'created_at': now,
