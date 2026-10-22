@@ -160,10 +160,10 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 - **S** Level 2 dan 3, kalibrasi dan sensitivitas.
 
 ### Profil (PROF) dan navigasi (NAV)
-- **M** Bottom navigation: Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, Logout.
-- **M** Profil: foto profil, pengaturan, verifikasi integritas, dan sinkronkan sekarang.
+- **M** Bottom navigation: Beranda, Profil, Saran & Kesan, Logout. Beranda menjadi hub untuk Biji kopi (satu-satunya daftar biji), Atur Seduh, Jurnal, Toko Terdekat, Agenda Event, Kalkulator Kurs, dan Game sebagai layar penuh.
+- **M** Profil: header dengan foto dan statistik, Keamanan, Sinkronisasi (termasuk verifikasi integritas dan sinkronkan sekarang), Pengingat, serta Tentang dengan atribusi OpenStreetMap dan OpenFreeMap. Ikon tab Profil memakai foto atau inisial pengguna; semua label navigasi satu baris.
 - **M** Saran & Kesan menjadi layar tab sendiri untuk mengirim dan melihat riwayat masukan.
-- **M** Logout menjadi aksi di bottom navigation yang meminta konfirmasi, bukan layar tersendiri.
+- **M** Logout menjadi aksi di bottom navigation yang meminta konfirmasi, termasuk peringatan data belum sinkron; bukan layar atau tab terpilih.
 
 ## 8. Pemenuhan Requirement Tugas
 
@@ -175,7 +175,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 | Penyimpanan lokal dan online | SQLite + Supabase Postgres |
 | Web service/API | Edge Function sendiri + API kurs |
 | LBS terkait tema | LBS: toko biji dan alat seduh |
-| Bottom navigation: profil (ada gambar), saran dan kesan, logout | NAV: enam item; Profil dan Saran & Kesan berupa layar, Logout berupa aksi konfirmasi |
+| Bottom navigation: profil (ada gambar), saran dan kesan, logout | NAV: empat item; Beranda, Profil, dan Saran & Kesan berupa tab, Logout berupa aksi konfirmasi |
 | Konversi mata uang (min. 3) | CUR: harga biji impor |
 | Konversi waktu (WIB, WIT, WITA, London) | EVT: agenda event |
 | Min. 2 sensor | Accelerometer (goyang timer) dan gyroscope (game) |
@@ -240,11 +240,11 @@ Aplikasi dianggap berhasil jika:
 | Batas gratis layanan (Supabase, LLM, API kurs) berubah | Cek sebelum Sprint 5, jalankan semuanya sehari sebelum demo |
 | Waktu 8 hari terlalu singkat | Urutan pemotongan di bagian 14 |
 
-**Pertanyaan ke dosen (kirim sekaligus)**
-1. Apakah aplikasi pelatih dan jurnal seduh V60, tanpa katalog resep, berbagi resep, dan pencari kedai, dianggap berbeda dari tema resep dan pencari kedai kopi?
-2. Apakah login boleh dibuat sendiri di server (Edge Function, hash password dan session buatan sendiri), tanpa Firebase dan tanpa layanan auth siap pakai?
-3. Apakah boleh memakai Supabase (database dan Edge Function) untuk bagian online?
-4. **Sudah diputuskan mengikuti bunyi slide:** Saran & Kesan menjadi tab sendiri dan Logout menjadi aksi di bottom navigation; Profil tetap menjadi tab dengan foto pengguna. Keputusan ini tetap boleh dikonfirmasi kepada dosen untuk memastikan interpretasinya tepat.
+**Status empat pertanyaan dosen (sudah aman menurut pembaruan status proyek)**
+1. Tema pelatih dan jurnal seduh V60 dibedakan dari katalog resep dan pencari kedai.
+2. Login dibuat sendiri di server melalui Edge Function, tanpa Firebase atau layanan auth siap pakai.
+3. Supabase digunakan untuk database dan Edge Function bagian online.
+4. Penempatan menu mengikuti empat item: Beranda, Profil, Saran & Kesan, dan aksi Logout.
 
 **Keputusan yang masih menunggu**
 - Nama dan tagline: **Tetes**, "Jurnal seduh V60" (belum dicek kemiripannya di toko aplikasi).

@@ -33,6 +33,7 @@ Nilai di bawah adalah **titik awal**. Hex cyan, abu, putih, dan hitam dibaca dar
 | `chipDark` | `#2E2E2E` | Chip tidak terpilih di layar gelap |
 | `onDark` | `#FFFFFF` | Teks di layar gelap |
 | `warning` | `#F5A524` | Stok menipis (tambahan, tidak ada di referensi) |
+| `rating` | `#F5B83D` | Bintang skor seduhan; bintang kosong memakai `divider` |
 | `error` | `#E5484D` | Galat dan peringatan integritas (tambahan) |
 | `divider` | `#E6E8EA` | Garis pemisah dan batas halus |
 
@@ -82,16 +83,18 @@ Semua layar wajib memakai komponen ini. Tambah komponen baru di sini, jangan mem
 | `AppCard` | Putih, radius 24, bayangan kartu. Varian `featured` (hitam, teks putih), `tinted` (`primaryContainer`) |
 | `AppChip` | Pil. Tidak terpilih: `surface` dengan garis tipis `divider` pada layar terang, atau `chipDark` pada layar gelap. Terpilih: `primary` dengan teks `ink`. Lebar mengikuti teks tanpa memotong label. Dipakai untuk tag rasa, grind, filter, jenis toko |
 | `AppTextField` | Pil untuk pencarian (dengan ikon), radius 16 untuk isian biasa. Label di atas, galat di bawah dalam `error` |
-| `AppBottomNav` | Putih, 6 item: Seduh, Jurnal, Eksplor, Saran & Kesan, Profil, Logout. Item aktif: ikon di atas label maksimal dua baris, di dalam kotak `primaryContainer` radius 16. Item lain: ikon saja berwarna `inkSoft`. Area sentuh tiap item minimal 48 × 48 dan seluruh bar menghormati safe area bawah. Logout adalah aksi dialog dan tidak pernah menjadi item aktif |
+| `AppBottomNav` | Putih, 4 item: Beranda, Profil, Saran & Kesan, Logout. Label selalu tampak dalam satu baris. Item aktif memakai pil `primaryContainer` dengan teks dan ikon hitam; Profil memakai foto kecil atau inisial pengguna dengan cincin saat aktif. Area sentuh tiap item minimal 48 × 48 dan bar menghormati safe area bawah. Logout dipisah tipis, berwarna netral, berupa aksi dialog konfirmasi dengan peringatan data belum sinkron dan tidak pernah aktif |
 | `AppListRow` | Baris dalam kartu putih: ikon, judul, chevron. Pemisah `divider` dengan inset |
 | `SegmentProgress` | Batang bersegmen di atas layar (satu segmen per tahap seduh atau langkah) |
 | `ScoreChart` | Garis `primary` tebal 2.5, isian gradien `primary` 25% ke transparan, garis bantu putus-putus `divider`, gelembung keterangan pada titik terpilih |
 | `StatusPill` | Pil kecil untuk status sinkronisasi dan stok: tersinkron (mint), menunggu (abu), galat (`error`), menipis (`warning`) |
+| `RatingStars` | Ikon bintang bulat untuk skor 1–5, warna `rating`, nilai `n/5` tetap tertulis dan diumumkan pembaca layar; mode ringkas memakai satu ikon |
 | `StateViews` | `LoadingView`, `EmptyView`, `ErrorView` |
 | `AppDialog`, `AppBottomSheet` | Radius 24, tombol memakai `AppButton` |
 | `Avatar` | Bulat, foto atau inisial |
 
 **Ikon:** satu keluarga bawaan Flutter (Material Icons varian rounded atau outlined). Jangan menambah paket ikon baru tanpa bertanya.
+Pintasan Biji kopi memakai `BeanIcon` bergaris hitam berukuran sama dengan ikon pintasan lain di dalam lingkaran cyan; kartu biji pada Beranda memakai ikon yang sama.
 
 ## 7. Keadaan Layar (wajib semua)
 
@@ -110,22 +113,22 @@ Deskripsi bentuk. Isi dan alur ada di spec fitur.
 |---|---|
 | **Splash** | Latar `background`, nama "Tetes" besar di tengah |
 | **Login / Register** | Judul besar, isian bertumpuk, satu `AppButton` primary penuh lebar, tautan teks di bawah |
-| **Seduh (beranda tab)** | Sapaan `headline` + tombol lonceng, kolom pencarian pil, dua `AppCard` sejajar (kartu hitam: biji aktif atau terakhir; kartu putih: aksi cepat), lalu bagian "Pengaturan terbaik" dengan `tinted` card dan `RoundAction` |
+| **Beranda (tab)** | Tanggal kecil di atas sapaan dua baris dan status sinkron di sisi kanan; kartu putih berisi tombol Mulai seduh dan baris Seduh lagi hanya bila ada pengaturan; ringkasan Seduhan terakhir selebar layar di atas pasangan Stok menipis dan Event berikutnya; satu bagian Pintasan dengan enam kartu dua kolom. Layar fitur dibuka penuh tanpa bottom navigation |
 | **Daftar biji** | `AppCard` per biji, chip kecil untuk spesies dan sangrai, `StatusPill` untuk stok |
 | **Form biji** | Isian bertumpuk; setiap kelompok `AppChip` memakai `Wrap` dengan jarak horizontal dan vertikal dari token `AppSpacing`, sehingga chip berpindah baris tanpa memotong teks; slider untuk persen arabika |
 | **Atur Seduh** | Isian angka besar, chip grind, daftar tahap sebagai kartu, `ScoreChart` atau grafik air di atas atau bawah kartu tahap, tombol "Mulai Sesi" di dasar layar |
 | **Sesi (layar gelap)** | `SegmentProgress` di atas, nama tahap dan target air, **timer `display`**, tombol putih besar "Tahap berikutnya" di bawah, tombol batal berupa teks |
 | **Hasil** | Kartu ringkasan, tabel plan vs realisasi di dalam kartu, bintang 1-5 atau wajah sederhana untuk skor rasa, chip tag rasa (boleh dalam bottom sheet gelap), kartu notes roastery vs rasa, tombol simpan |
-| **Jurnal** | Sub-tab sebagai chip bertumpuk di atas, kolom cari, baris chip filter, kartu seduhan |
+| **Jurnal** | Kolom cari, baris chip filter, kartu seduhan; daftar biji hanya ada di layar Biji kopi dari Beranda |
 | **Detail seduhan** | Seperti Hasil, ditambah `StatusPill` integritas |
 | **Bandingkan** | Dua kolom dalam satu kartu, baris yang berbeda memakai latar `primaryContainer` lembut |
-| **Eksplor** | Kartu-kartu menu (Agenda, Toko, Kurs, Game), tiap kartu satu ikon dan satu kalimat |
+| **Pintasan fitur** | Agenda, Toko, Kurs, dan Game dibuka dari Beranda sebagai layar penuh, masing-masing mempertahankan isi fiturnya |
 | **Agenda event** | Kartu event dengan empat jam (WIB, WITA, WIT, London) sebagai baris kecil |
 | **Peta toko** | Peta penuh lebar, daftar di bottom sheet yang bisa ditarik, chip filter jenis toko |
 | **Game (layar gelap)** | Zona hijau `accent`, titik aliran putih, bar air `primary`, angka waktu `display` |
 | **Saran & Kesan** | Layar tab sendiri: dua kolom teks untuk saran dan kesan, tombol Kirim, lalu riwayat kiriman |
-| **Profil** | Avatar besar di tengah, nama, `ScoreChart` ringkas bila ada data, dan kartu daftar pengaturan (`AppListRow`). Tidak memuat Saran & Kesan atau Logout |
-| **Logout (aksi navigasi)** | Tidak memiliki layar. Ketuk item membuka `AppDialog` konfirmasi; menutup dialog mengembalikan pengguna ke tab aktif sebelumnya |
+| **Profil** | Header dengan foto, nama, dan statistik; bagian Keamanan, Sinkronisasi, Pengingat, serta Tentang dengan atribusi OpenStreetMap dan OpenFreeMap. Tidak memuat Saran & Kesan atau Logout |
+| **Logout (aksi navigasi)** | Tidak memiliki layar dan tidak pernah terpilih. Ketuk item membuka `AppDialog` konfirmasi dengan peringatan data belum sinkron; menutup dialog mengembalikan pengguna ke tab aktif sebelumnya |
 
 ## 9. Gerak dan Umpan Balik
 

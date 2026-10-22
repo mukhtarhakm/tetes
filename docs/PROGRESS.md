@@ -18,6 +18,12 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
+2026-10-23: Dokumen navigasi dan Profil diselaraskan untuk empat item: Beranda sebagai hub fitur dengan satu daftar biji, ikon Profil berupa foto atau inisial, label satu baris, Logout sebagai dialog dengan peringatan data belum sinkron, dan Profil berisi header statistik, Keamanan, Sinkronisasi, Pengingat, serta Tentang dengan atribusi OpenStreetMap dan OpenFreeMap. Uji di HP tetap menunggu.
+
+2026-10-23: Visual Beranda mengikuti mockup: header dua baris dengan chip sinkron sejajar, kartu putih Mulai seduh/Seduh lagi, ringkasan tetap tanpa gulir horizontal, serta satu grid enam Pintasan. Bar bawah memakai area ikon seragam dan label satu baris. Bintang rating memakai komponen ikon bersama di Beranda dan kartu Jurnal; rasio 1:15 dan 1:15.5 memakai pemformat yang sama. Sapaan 00.00–04.59 diperbaiki menjadi Selamat malam. Ikon biji kopi bergaris dipakai konsisten pada pintasan, kartu tambah biji, dan Seduh lagi. UI_SPEC diselaraskan dan token warna rating ditambah. Seluruh 292 tes Flutter lulus, termasuk batas jam sapaan, lebar 320 dengan teks 1,3×, dan username panjang; `flutter analyze --no-pub` bersih. Uji visual di HP masih menunggu.
+
+2026-10-23: Navigasi diringkas menjadi Beranda, Profil, Saran & Kesan, dan aksi Logout. Beranda menampilkan sapaan, status sinkron, Mulai seduh/Seduh lagi, tiga ringkasan data lokal, dan enam pintasan. Jurnal, Biji kopi, Agenda Event, Toko Terdekat, Kalkulator Kurs, serta Game dibuka penuh dari Beranda; payload stok, event, dan pengingat seduh diarahkan ke tujuan yang sama saat aplikasi dibuka atau aktif. Dokumen PRD, UI_SPEC, dan Fitur 00 diselaraskan. Seluruh 289 tes Flutter lulus, termasuk SQLite offline, layar 320 dengan teks 1,3×, tombol kembali, dan payload notifikasi; `flutter analyze` bersih. Uji HP masih menunggu.
+
 2026-10-22: Perapian UI: tooltip ScoreChart memakai tipografi tema dan bintang `★` terverifikasi; nama layar Hasil dan semua rujukan kode/tes tidak lagi memakai `placeholder`; form biji memiliki judul Info biji, Pengolahan, Pembelian, dan Rasa; jarak dan pembungkusan teks di Hasil, Atur Seduh, serta tombol bersama dirapikan. Audit `lib/` tidak menemukan karakter encoding rusak, TODO aktif, atau nilai warna/font/jarak/radius langsung di layar yang perlu dipindahkan. Widget test pada lebar 320 dan teks 1,3× lulus; seluruh 277 tes Flutter dan `flutter analyze` bersih. `graphify update .` berhasil. Uji tampilan dan alur di HP masih menunggu.
 
 2026-10-20: Penyempurnaan Fitur 04: sub-tab Biji dicabut dari tab Jurnal sehingga menjadi satu daftar seduhan tunggal; tombol pemicu mode perbandingan diubah menjadi "Bandingkan" dengan ikon perbandingan; bar aksi perbandingan dipindahkan ke bawah di atas bottom nav dengan padding dinamis dari tinggi bar dan reset otomatis saat berpindah tab; kartu seduhan ditata ulang dengan judul di baris sendiri, pil status terpisah dengan Wrap, dan parameter fleksibel tahan pembesaran font. Seluruh 164 tes unit/widget lulus dan flutter analyze bersih.
@@ -42,11 +48,11 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 - Bersih-bersih akhir proyek: hapus akun uji (misalnya rais_uji) beserta sesi dan baris login_attempts di Supabase, hapus fungsi hello, pastikan tidak ada berkas JSON uji atau rahasia di repo.
 - uji live diagnosa dan penyimpanan ai_advice menunggu Gemini stabil; server dan klien sudah menangani 503 (percobaan ulang, pesan sibuk, cooldown, fallback).” Fitur AI tetap bisa dipakai lewat fallback aturan sederhana, jadi aplikasi tidak rusak.
 
-## Menunggu jawaban dosen
-- [ ] Tema (V60 pelatih/jurnal vs Brewmaster)
-- [ ] Apakah login boleh dibuat sendiri di server (Edge Function, hash password dan session buatan sendiri), tanpa Firebase dan tanpa layanan auth siap pakai?
-- [ ] Supabase diperbolehkan untuk bagian online
-- [x] Penempatan Saran & Kesan dan Logout di bottom navigation: diputuskan mengikuti bunyi slide, tetap boleh dikonfirmasi kepada dosen
+## Status pertanyaan dosen
+- [x] Tema (V60 pelatih/jurnal vs Brewmaster): sudah aman menurut pembaruan status proyek.
+- [x] Login buatan sendiri di server tanpa Firebase atau layanan auth siap pakai: sudah aman menurut pembaruan status proyek.
+- [x] Supabase untuk bagian online: sudah aman menurut pembaruan status proyek.
+- [x] Penempatan menu di bottom navigation: sudah aman menurut pembaruan status proyek; Beranda, Profil, Saran & Kesan, dan aksi Logout.
 
 ## Daftar tangkapan layar untuk laporan
 (centang setelah diambil: login, biji, atur seduh, sesi, hasil, jurnal, bandingkan, verifikasi, event, peta, game, profil)
