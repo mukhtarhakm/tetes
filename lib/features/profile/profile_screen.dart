@@ -8,9 +8,10 @@ import 'package:path/path.dart' as path;
 import '../../app/theme/tokens.dart';
 import '../../core/notifications/notification_profile_card.dart';
 import '../../core/ui/app_avatar.dart';
-import '../../core/ui/app_button.dart';
 import '../../core/ui/app_card.dart';
 import '../../core/ui/app_dialog.dart';
+import '../../core/ui/app_switch.dart';
+import '../../core/ui/settings_row.dart';
 import '../../core/ui/state_views.dart';
 import '../../data/sync/sync_service.dart';
 import '../../data/repositories/user_repo.dart';
@@ -18,7 +19,9 @@ import '../auth/biometric/biometric_authenticator.dart';
 import '../auth/state/auth_providers.dart';
 import '../auth/state/session_controller.dart';
 import '../brew/state/brew_setup_controller.dart';
+import 'profile_format.dart';
 import 'profile_photo_service.dart';
+import 'profile_stats.dart';
 import 'sync_profile_card.dart';
 
 Future<BiometricAuthenticationOutcome?> updateBiometricSetting({
@@ -45,6 +48,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
     required this.syncLoading,
     required this.onSync,
     required this.onPull,
+    this.onPhotoChanged,
     this.photoService,
     super.key,
   });
@@ -54,6 +58,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
   final bool syncLoading;
   final VoidCallback onSync;
   final VoidCallback onPull;
+  final VoidCallback? onPhotoChanged;
   final ProfilePhotoService? photoService;
 
   @override
@@ -155,7 +160,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         source: source,
         repository: await ref.read(userRepositoryProvider.future),
       );
-      if (name != null && mounted) await _load();
+      if (name != null && mounted) {
+        await _load();
+        widget.onPhotoChanged?.call();
+      }
     } catch (_) {
       _message(
         'Foto belum dapat dipilih atau disimpan. Periksa izin Kamera/Foto Tetes di Pengaturan perangkat, lalu coba lagi.',
@@ -235,6 +243,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _showAbout() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: AppInsets.dialog,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tentang & atribusi',
+                style: Theme.of(sheet).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              const Text(
+                'Tetes: jurnal dan pendamping seduh kopi V60.',
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              const Text(
+                'Data peta © OpenStreetMap contributors. Gaya dan tile vektor © OpenFreeMap bila tersedia; tile OSM standar dipakai sebagai cadangan.',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView(message: 'Memuat profil...');
@@ -246,79 +283,64 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final created = DateTime.tryParse(
       _profile!['created_at'] as String? ?? '',
     )?.toLocal();
+    final stats = ref.watch(profileStatsProvider).asData?.value;
     return SafeArea(
       bottom: false,
       child: ListView(
         padding: AppInsets.screen,
         children: [
-          AppCard(
-            child: Row(
-              children: [
-                AppAvatar(username: username, photo: _photo),
-                const SizedBox(width: AppSpacing.s16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        username,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      AppButton(
-                        label: 'Ganti foto',
-                        variant: AppButtonVariant.text,
-                        expand: false,
-                        onPressed: _busy ? null : _choosePhoto,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          _ProfileHeader(
+            username: username,
+            joined: created,
+            photo: _photo,
+            stats: stats,
+            busy: _busy,
+            onChangePhoto: _choosePhoto,
           ),
-          const SizedBox(height: AppSpacing.s12),
+          const SizedBox(height: AppSpacing.s24),
+          const SettingsSectionTitle('Keamanan'),
           AppCard(
+            padding: AppInsets.settingsCard,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Akun', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: AppSpacing.s8),
-                Text('Username: $username'),
-                Text(
-                  created == null
-                      ? 'Tanggal bergabung belum tersedia.'
-                      : 'Bergabung: ${MaterialLocalizations.of(context).formatMediumDate(created)}',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Keamanan', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: AppSpacing.s8),
-                if (_biometricAvailable)
-                  SwitchListTile(
-                    title: const Text('Biometrik'),
+                SettingsRow(
+                  icon: Icons.fingerprint_rounded,
+                  title: 'Biometrik',
+                  subtitle: _biometricAvailable
+                      ? 'Buka aplikasi dengan sidik jari'
+                      : 'Tidak tersedia atau belum terdaftar di perangkat',
+                  trailing: AppSwitch(
                     value: _biometricEnabled,
-                    onChanged: _busy ? null : _setBiometric,
-                  )
-                else
-                  const Text(
-                    'Biometrik tidak tersedia atau belum terdaftar di perangkat.',
+                    semanticLabel: 'Biometrik',
+                    onChanged: _busy || !_biometricAvailable
+                        ? null
+                        : _setBiometric,
                   ),
-                const SizedBox(height: AppSpacing.s8),
-                AppButton(
-                  label: 'Verifikasi Integritas Jurnal',
-                  isLoading: _busy,
-                  onPressed: _busy ? null : _verify,
+                ),
+                const SettingsDivider(),
+                SettingsRow(
+                  icon: Icons.verified_user_rounded,
+                  tint: SettingsIconTint.accent,
+                  title: 'Verifikasi integritas jurnal',
+                  subtitle: 'Periksa rantai hash seduhan',
+                  trailing: _busy
+                      ? const SizedBox.square(
+                          dimension: AppSizes.navigationIcon,
+                          child: CircularProgressIndicator(
+                            strokeWidth: AppSizes.progressStroke,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.inkSoft,
+                        ),
+                  onTap: _busy ? null : _verify,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.s12),
+          const SizedBox(height: AppSpacing.s24),
+          const SettingsSectionTitle('Sinkronisasi'),
           SyncProfileCard(
             status: widget.syncStatus,
             error: widget.syncError,
@@ -326,23 +348,219 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             onSync: widget.onSync,
             onPull: widget.onPull,
           ),
-          const SizedBox(height: AppSpacing.s12),
+          const SizedBox(height: AppSpacing.s24),
+          const SettingsSectionTitle('Pengingat'),
           const NotificationProfileCard(),
-          const SizedBox(height: AppSpacing.s12),
+          const SizedBox(height: AppSpacing.s24),
           AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Tentang', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: AppSpacing.s8),
-                const Text(
-                  'Data peta © OpenStreetMap contributors. Gaya dan tile vektor © OpenFreeMap bila tersedia; tile OSM standar dipakai sebagai cadangan.',
-                ),
-              ],
+            padding: AppInsets.settingsCard,
+            child: SettingsRow(
+              icon: Icons.info_outline_rounded,
+              tint: SettingsIconTint.neutral,
+              title: 'Tentang & atribusi',
+              subtitle: 'Tetes 1.0 · OpenStreetMap, OpenFreeMap',
+              trailing: const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.inkSoft,
+              ),
+              onTap: _showAbout,
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.username,
+    required this.joined,
+    required this.photo,
+    required this.stats,
+    required this.busy,
+    required this.onChangePhoto,
+  });
+
+  final String username;
+  final DateTime? joined;
+  final File? photo;
+  final ProfileStats? stats;
+  final bool busy;
+  final VoidCallback onChangePhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Stack(
+                children: [
+                  AppAvatar(
+                    username: username,
+                    photo: photo,
+                    size: AppSizes.profileAvatar,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Semantics(
+                      button: true,
+                      label: 'Ganti foto profil',
+                      child: Material(
+                        color: AppColors.ink,
+                        shape: const CircleBorder(
+                          side: BorderSide(
+                            color: AppColors.surface,
+                            width: AppSizes.profileBadgeBorder,
+                          ),
+                        ),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: busy ? null : onChangePhoto,
+                          child: const SizedBox.square(
+                            dimension: AppSizes.profileBadge,
+                            child: Icon(
+                              Icons.photo_camera_rounded,
+                              size: AppSizes.profileBadgeIcon,
+                              color: AppColors.onDark,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: AppSpacing.s16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      username.replaceAll('_', '_​'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s4),
+                    Text(
+                      joined == null
+                          ? 'Tanggal bergabung belum tersedia.'
+                          : 'Bergabung sejak ${formatJoinedDate(joined!)}',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.inkSoft,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(AppRadius.innerCard),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _Stat(
+                      label: 'Seduhan',
+                      value: Text(
+                        stats?.brewCount.toString() ?? '-',
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const _StatDivider(),
+                  Expanded(
+                    child: _Stat(
+                      label: 'Biji',
+                      value: Text(
+                        stats?.beanCount.toString() ?? '-',
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const _StatDivider(),
+                  Expanded(
+                    child: _Stat(
+                      label: 'Rata-rata skor',
+                      value: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            formatAverageScore(stats?.averageScore),
+                            style: textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (stats?.averageScore != null) ...[
+                            const SizedBox(width: AppSpacing.s4),
+                            const Icon(
+                              Icons.star_rounded,
+                              color: AppColors.rating,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final Widget value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        value,
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+    width: AppSizes.dividerThickness,
+    child: ColoredBox(color: AppColors.divider),
+  );
 }

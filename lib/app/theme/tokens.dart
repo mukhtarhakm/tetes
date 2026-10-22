@@ -4,6 +4,7 @@ abstract final class AppColors {
   static const primary = Color(0xFF49CBEB);
   static const primaryContainer = Color(0xFF9EE3F6);
   static const accent = Color(0xFF7FF0CB);
+  static const accentSoft = Color(0xFFC9F7E8);
   static const ink = Color(0xFF000000);
   static const inkSoft = Color(0xFF5B6168);
   static const background = Color(0xFFF4F5F6);
@@ -12,6 +13,7 @@ abstract final class AppColors {
   static const chipDark = Color(0xFF2E2E2E);
   static const onDark = Color(0xFFFFFFFF);
   static const warning = Color(0xFFF5A524);
+  static const rating = Color(0xFFF5B83D);
   static const error = Color(0xFFE5484D);
   static const divider = Color(0xFFE6E8EA);
   static const shadow = Color(0x0F000000);
@@ -54,6 +56,8 @@ abstract final class AppSizes {
   static const stateIcon = 28.0;
   static const stateIconContainer = 64.0;
   static const statePreviewHeight = 260.0;
+  static const homeSummaryCardWidth = 180.0;
+  static const navigationAvatar = 32.0;
   static const mapMarker = 40.0;
   static const mapMarkerSelected = 52.0;
   static const mapMarkerBorder = 3.0;
@@ -69,6 +73,16 @@ abstract final class AppSizes {
   static const dialogMaxWidth = 420.0;
   static const progressStroke = 2.0;
   static const chipHeight = 36.0;
+  static const profileAvatar = 84.0;
+  static const profileBadge = 32.0;
+  static const profileBadgeBorder = 3.0;
+  static const profileBadgeIcon = 16.0;
+  static const settingsIconCircle = 42.0;
+  static const settingsRowHeight = 68.0;
+  static const dayChipHeight = 44.0;
+  static const stepperButton = 40.0;
+  static const stepperValueWidth = 52.0;
+  static const dividerThickness = 1.0;
 }
 
 abstract final class AppInsets {
@@ -89,6 +103,11 @@ abstract final class AppInsets {
     vertical: AppSpacing.s8,
   );
   static const bottomNavigationItem = EdgeInsets.all(AppSpacing.s4);
+  static const settingsCard = EdgeInsets.symmetric(
+    horizontal: AppSpacing.s16,
+    vertical: AppSpacing.s4,
+  );
+  static const settingsBlock = EdgeInsets.all(AppSpacing.s16);
   static const chip = EdgeInsets.symmetric(
     horizontal: AppSpacing.s12,
     vertical: AppSpacing.s8,
