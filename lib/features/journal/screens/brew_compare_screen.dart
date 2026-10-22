@@ -5,6 +5,7 @@ import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../../core/utils/format_ratio.dart';
 import '../brew_comparison_service.dart';
 import '../journal_model.dart';
 import '../state/journal_controller.dart';
@@ -68,11 +69,14 @@ class BrewCompareScreen extends ConsumerWidget {
                 }
 
                 // Seduhan lebih lama di kiri, lebih baru di kanan berdasarkan brewed_at_utc
-                final dt1 = DateTime.tryParse(data1.item.brewedAtUtc) ??
+                final dt1 =
+                    DateTime.tryParse(data1.item.brewedAtUtc) ??
                     DateTime.fromMillisecondsSinceEpoch(0);
-                final dt2 = DateTime.tryParse(data2.item.brewedAtUtc) ??
+                final dt2 =
+                    DateTime.tryParse(data2.item.brewedAtUtc) ??
                     DateTime.fromMillisecondsSinceEpoch(0);
-                final isFirstOlder = dt1.isBefore(dt2) ||
+                final isFirstOlder =
+                    dt1.isBefore(dt2) ||
                     (dt1.isAtSameMomentAs(dt2) &&
                         data1.item.seq <= data2.item.seq);
 
@@ -118,8 +122,11 @@ class _CompareContent extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded,
-                    color: AppColors.ink, size: 24),
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: AppColors.ink,
+                  size: 24,
+                ),
                 const SizedBox(width: AppSpacing.s12),
                 Expanded(
                   child: Column(
@@ -243,8 +250,8 @@ class _CompareContent extends StatelessWidget {
               ),
               _CompareRow(
                 label: 'Rasio',
-                val1: _formatRatio(older.item.ratio),
-                val2: _formatRatio(newer.item.ratio),
+                val1: formatRatio(older.item.ratio),
+                val2: formatRatio(newer.item.ratio),
                 isDifferent:
                     (older.item.ratio - newer.item.ratio).abs() > 0.0001,
               ),
@@ -327,10 +334,6 @@ class _CompareContent extends StatelessWidget {
     return set1.length != set2.length || !set1.containsAll(set2);
   }
 
-  static String _formatRatio(double ratio) {
-    return ratio % 1 == 0 ? '1:${ratio.toInt()}' : '1:${ratio.toStringAsFixed(1)}';
-  }
-
   static String _formatSeconds(int s) {
     final m = s ~/ 60;
     final sec = s % 60;
@@ -371,7 +374,9 @@ class _CompareRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: isLast
-            ? const BorderRadius.vertical(bottom: Radius.circular(AppRadius.card))
+            ? const BorderRadius.vertical(
+                bottom: Radius.circular(AppRadius.card),
+              )
             : null,
       ),
       padding: const EdgeInsets.symmetric(

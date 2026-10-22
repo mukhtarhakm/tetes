@@ -9,7 +9,6 @@ import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
 import '../bean_model.dart';
 import '../state/bean_providers.dart';
-import '../../brew/screens/brew_setup_screen.dart';
 import 'bean_detail_screen.dart';
 import 'bean_form_screen.dart';
 
@@ -27,8 +26,6 @@ class BeanListScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Biji kopi', style: Theme.of(context).textTheme.headlineLarge),
-            const SizedBox(height: AppSpacing.s8),
             Text(
               'Kelola profil dan stok biji untuk seduhanmu.',
               style: Theme.of(
@@ -36,12 +33,6 @@ class BeanListScreen extends ConsumerWidget {
               ).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
             ),
             const SizedBox(height: AppSpacing.s20),
-            AppButton(
-              label: 'Mulai seduh',
-              icon: Icons.play_arrow_rounded,
-              onPressed: () => _openBrewSetup(context),
-            ),
-            const SizedBox(height: AppSpacing.s8),
             AppButton(
               label: 'Tambah biji',
               icon: Icons.add_rounded,
@@ -100,12 +91,6 @@ class BeanListScreen extends ConsumerWidget {
           const SnackBar(content: Text('Biji berhasil disimpan.')),
         );
     }
-  }
-
-  Future<void> _openBrewSetup(BuildContext context) async {
-    await Navigator.of(
-      context,
-    ).push<void>(MaterialPageRoute(builder: (_) => const BrewSetupScreen()));
   }
 
   Future<void> _openDetail(BuildContext context, String beanId) async {

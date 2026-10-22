@@ -343,6 +343,7 @@ class BrewRepository {
   /// 7. Semua urutan diakhiri seq DESC sebagai pemutus seri, dan cost_idr kosong selalu di akhir pada pengurutan biaya.
   Future<List<BrewJournalItem>> findJournalBrews({
     required String userId,
+    int? limit,
     String? searchQuery,
     Set<String>? beanIds,
     int? minTasteScore,
@@ -352,6 +353,7 @@ class BrewRepository {
     BrewSortOption sortOption = BrewSortOption.newest,
     bool includeCancelled = false,
   }) async {
+    if (limit != null && limit < 1) throw ArgumentError.value(limit, 'limit');
     final whereClauses = <String>['br.user_id = ?'];
     final whereArgs = <Object?>[userId];
 
@@ -429,6 +431,7 @@ class BrewRepository {
       JOIN beans b ON br.bean_id = b.id
       WHERE $whereString
       ORDER BY $orderBy
+      ${limit == null ? '' : 'LIMIT $limit'}
     ''';
 
     final rows = await _database.rawQuery(query, whereArgs);

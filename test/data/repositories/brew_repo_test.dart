@@ -35,6 +35,45 @@ void main() {
   });
 
   test(
+    'ringkasan mengambil satu seduhan aktif terbaru milik pengguna',
+    () async {
+      final beanId = await _createBean(beanRepository);
+      final plan = BrewCalculator.createDefault(beanId: beanId);
+      for (final timestamp in [
+        '2026-10-20T01:00:00Z',
+        '2026-10-21T01:00:00Z',
+      ]) {
+        await brewRepository.save(
+          userId: 'user-1',
+          result: BrewSessionResult(
+            plan: plan,
+            totalTimeS: 135,
+            drawdownS: null,
+            brewedAtUtc: timestamp,
+          ),
+          tasteScore: 4,
+          tasteTags: [RoasteryNoteTag.manis],
+          actualWaterG: List.filled(plan.stages.length, null),
+        );
+      }
+      final latest = await brewRepository.findJournalBrews(
+        userId: 'user-1',
+        limit: 1,
+      );
+      expect(latest, hasLength(1));
+      expect(latest.single.brewedAtUtc, '2026-10-21T01:00:00Z');
+      expect(
+        await brewRepository.findJournalBrews(userId: 'user-2', limit: 1),
+        isEmpty,
+      );
+      expect(
+        () => brewRepository.findJournalBrews(userId: 'user-1', limit: 0),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test(
     'verifikasi kosong, tamper, dan celah seq untuk pengguna aktif',
     () async {
       expect(await brewRepository.verifyUserChain('user-1'), 'utuh (0 entri)');
@@ -67,15 +106,15 @@ void main() {
         await brewRepository.verifyUserChain('user-1'),
         'rantai putus di seq 2',
       );
-    await database.update(
-      'brews',
-      {'seq': 3},
-      where: 'user_id = ? AND seq = ?',
-      whereArgs: ['user-1', 2],
-    );
+      await database.update(
+        'brews',
+        {'seq': 3},
+        where: 'user_id = ? AND seq = ?',
+        whereArgs: ['user-1', 2],
+      );
       expect(
         await brewRepository.verifyUserChain('user-1'),
-      'rantai putus di seq 2',
+        'rantai putus di seq 2',
       );
     },
   );

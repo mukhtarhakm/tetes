@@ -4,6 +4,8 @@ import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../../core/ui/rating_stars.dart';
+import '../../../core/utils/format_ratio.dart';
 import '../journal_model.dart';
 
 class JournalBrewCard extends StatelessWidget {
@@ -29,9 +31,7 @@ class JournalBrewCard extends StatelessWidget {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
 
-    final ratioText = item.ratio % 1 == 0
-        ? '1:${item.ratio.toInt()}'
-        : '1:${item.ratio.toStringAsFixed(1)}';
+    final ratioText = formatRatio(item.ratio);
     final durationText = _formatSeconds(item.totalTimeS);
     final (syncLabel, syncVariant) = switch (item.syncStatus) {
       'synced' => ('Tersinkron', StatusPillVariant.synced),
@@ -45,18 +45,14 @@ class JournalBrewCard extends StatelessWidget {
         Text(
           item.beanName,
           softWrap: true,
-          style: textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         if (item.beanRoastery != null && item.beanRoastery!.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.s4),
           Text(
             item.beanRoastery!,
             softWrap: true,
-            style: textTheme.bodySmall?.copyWith(
-              color: AppColors.inkSoft,
-            ),
+            style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
           ),
         ],
         const SizedBox(height: AppSpacing.s8),
@@ -80,8 +76,11 @@ class JournalBrewCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.s8),
         Row(
           children: [
-            Icon(Icons.calendar_today_outlined,
-                size: AppSizes.navigationIcon, color: AppColors.inkSoft),
+            Icon(
+              Icons.calendar_today_outlined,
+              size: AppSizes.navigationIcon,
+              color: AppColors.inkSoft,
+            ),
             const SizedBox(width: AppSpacing.s4),
             Expanded(
               child: Text(
@@ -113,8 +112,7 @@ class JournalBrewCard extends StatelessWidget {
               ),
               _ParamColumn(
                 label: 'Skor',
-                value: '★ ${item.tasteScore}/5',
-                highlight: true,
+                valueWidget: RatingStars(score: item.tasteScore, compact: true),
               ),
             ],
           ),
@@ -200,15 +198,11 @@ class JournalBrewCard extends StatelessWidget {
 }
 
 class _ParamColumn extends StatelessWidget {
-  const _ParamColumn({
-    required this.label,
-    required this.value,
-    this.highlight = false,
-  });
+  const _ParamColumn({required this.label, this.value, this.valueWidget});
 
   final String label;
-  final String value;
-  final bool highlight;
+  final String? value;
+  final Widget? valueWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -219,18 +213,16 @@ class _ParamColumn extends StatelessWidget {
       children: [
         Text(
           label,
-          style: textTheme.bodySmall?.copyWith(
-            color: AppColors.inkSoft,
-          ),
+          style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
         ),
         const SizedBox(height: AppSpacing.s4),
-        Text(
-          value,
-          style: textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: highlight ? AppColors.ink : null,
+        if (valueWidget != null)
+          valueWidget!
+        else
+          Text(
+            value!,
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
-        ),
       ],
     );
   }

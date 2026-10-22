@@ -3,10 +3,17 @@ import 'package:flutter/material.dart';
 import '../../app/theme/tokens.dart';
 
 class AppBottomNavItem {
-  const AppBottomNavItem({required this.label, required this.icon});
+  const AppBottomNavItem({
+    required this.label,
+    required this.icon,
+    this.iconWidget,
+    this.isAction = false,
+  });
 
   final String label;
   final IconData icon;
+  final Widget? iconWidget;
+  final bool isAction;
 }
 
 class AppBottomNav extends StatelessWidget {
@@ -34,24 +41,21 @@ class AppBottomNav extends StatelessWidget {
             height: AppSizes.bottomNavigationHeight,
             child: Row(
               children: [
-                for (var index = 0; index < items.length; index++)
-                  if (index == currentIndex)
-                    Expanded(
-                      child: _NavigationItem(
-                        item: items[index],
-                        isSelected: true,
-                        onTap: () => onTap(index),
-                      ),
-                    )
-                  else
-                    SizedBox(
-                      width: AppSizes.minimumTouchTarget,
-                      child: _NavigationItem(
-                        item: items[index],
-                        isSelected: false,
-                        onTap: () => onTap(index),
-                      ),
+                for (var index = 0; index < items.length; index++) ...[
+                  if (items[index].isAction)
+                    const VerticalDivider(
+                      width: AppSpacing.s8,
+                      color: AppColors.divider,
                     ),
+                  Expanded(
+                    child: _NavigationItem(
+                      item: items[index],
+                      isSelected:
+                          index == currentIndex && !items[index].isAction,
+                      onTap: () => onTap(index),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -102,25 +106,46 @@ class _NavigationItem extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  item.icon,
-                  size: AppSizes.navigationIcon,
-                  color: foregroundColor,
+                SizedBox(
+                  height: AppSizes.navigationAvatar,
+                  child: Center(
+                    child: item.iconWidget != null
+                        ? Container(
+                            decoration: isSelected
+                                ? BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AppColors.ink,
+                                      width: AppSizes.progressStroke,
+                                    ),
+                                  )
+                                : null,
+                            child: item.iconWidget,
+                          )
+                        : Icon(
+                            item.icon,
+                            size: AppSizes.navigationIcon,
+                            color: foregroundColor,
+                          ),
+                  ),
                 ),
-                if (isSelected) ...[
-                  const SizedBox(height: AppSpacing.s4),
-                  Flexible(
+                const SizedBox(height: AppSpacing.s4),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
                     child: Text(
                       item.label,
-                      maxLines: 2,
+                      maxLines: 1,
+                      softWrap: false,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: Theme.of(
                         context,
-                      ).textTheme.labelLarge?.copyWith(color: foregroundColor),
+                      ).textTheme.bodySmall?.copyWith(color: foregroundColor),
                     ),
                   ),
-                ],
+                ),
               ],
             ),
           ),

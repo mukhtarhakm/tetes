@@ -9,6 +9,9 @@ import 'package:tetes/features/auth/state/auth_providers.dart';
 import 'package:tetes/main.dart';
 import 'package:tetes/core/notifications/notification_service.dart';
 import 'package:tetes/core/notifications/notification_coordinator.dart';
+import 'package:tetes/app/navigation/app_shell.dart';
+import 'package:tetes/data/sync/sync_service.dart';
+import 'package:tetes/features/home/home_screen.dart';
 import 'core/notifications/fake_notification_service.dart';
 
 void main() {
@@ -52,6 +55,11 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appSyncServiceFactoryProvider.overrideWith((ref) => () async => _WidgetSyncService()),
+          homeDataProvider.overrideWith((ref) async => const HomeData(
+            beans: [], latestBrew: null, nextEvent: null, againPlan: null,
+          )),
+          homeIdentityProvider.overrideWith((ref) async => const HomeIdentity('Barista', null)),
           notificationServiceProvider.overrideWithValue(
             FakeNotificationService(),
           ),
@@ -77,7 +85,7 @@ void main() {
     );
     await _pumpAsyncUi(tester);
 
-    expect(find.text('Biji kopi'), findsOneWidget);
+    expect(find.text('Beranda'), findsOneWidget);
     expect(find.text('Masuk ke Tetes'), findsNothing);
   });
 
@@ -202,6 +210,17 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+class _WidgetSyncService extends Fake implements SyncService {
+  @override
+  Future<SyncStatus> run({required String userId, bool retryErrors = false}) async =>
+      const SyncStatus(pendingCount: 0, errorCount: 0);
+  @override
+  Future<SyncStatus> status(String userId) async =>
+      const SyncStatus(pendingCount: 0, errorCount: 0);
+  @override
+  void close() {}
 }
 
 Future<void> _pumpAsyncUi(WidgetTester tester) async {

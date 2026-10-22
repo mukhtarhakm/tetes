@@ -158,7 +158,8 @@ void main() {
       expect(find.text('Roastery Kita'), findsOneWidget);
       expect(find.text('1:15.5'), findsOneWidget);
       expect(find.text('93°C'), findsOneWidget);
-      expect(find.text('★ 4/5'), findsOneWidget);
+      expect(find.text('4/5'), findsOneWidget);
+      expect(find.byIcon(Icons.star_rounded), findsOneWidget);
       expect(find.text('Terbaik'), findsOneWidget);
       expect(find.text('Tersinkron'), findsOneWidget);
       expect(find.text('asam'), findsOneWidget);

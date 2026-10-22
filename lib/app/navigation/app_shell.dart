@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../theme/tokens.dart';
 import '../../core/ui/app_bottom_nav.dart';
+import '../../core/ui/app_avatar.dart';
 import '../../core/ui/app_dialog.dart';
 import '../../core/notifications/notification_coordinator.dart';
 import '../../core/notifications/notification_service.dart';
@@ -14,15 +16,32 @@ import '../../data/sync/sync_service.dart';
 import '../../features/auth/session/force_logout.dart';
 import '../../features/auth/state/auth_providers.dart';
 import '../../features/auth/state/session_controller.dart';
-import '../../features/beans/screens/bean_list_screen.dart';
 import '../../features/beans/state/bean_providers.dart';
-import '../../features/journal/screens/journal_screen.dart';
 import '../../features/journal/state/journal_controller.dart';
 import '../../features/explore/explore_screen.dart';
 import '../../features/explore/store_screen.dart';
 import '../../features/feedback/feedback_screen.dart';
+import '../../features/home/home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../router/app_routes.dart';
+
+final appSyncServiceFactoryProvider = Provider<Future<SyncService> Function()>((
+  ref,
+) {
+  return () async {
+    final database = await ref.read(databaseProvider.future);
+    return SyncService(
+      database,
+      SyncClient(sessionStorage: ref.read(sessionStorageProvider)),
+      () => forceLogoutOnUnauthorized(
+        ref.read(sessionControllerProvider.notifier),
+      ),
+      (userId, oldBaseId) async => (await ref.read(
+        notificationCoordinatorProvider.future,
+      )).rescheduleEvent(userId, oldBaseId),
+    );
+  };
+});
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -32,20 +51,10 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  static const _navigationItems = [
-    AppBottomNavItem(label: 'Seduh', icon: Icons.coffee_rounded),
-    AppBottomNavItem(label: 'Jurnal', icon: Icons.menu_book_outlined),
-    AppBottomNavItem(label: 'Eksplor', icon: Icons.explore_outlined),
-    AppBottomNavItem(label: 'Saran & Kesan', icon: Icons.rate_review_outlined),
-    AppBottomNavItem(label: 'Profil', icon: Icons.person_outline_rounded),
-    AppBottomNavItem(label: 'Logout', icon: Icons.logout_rounded),
-  ];
-
-  static const _logoutIndex = 5;
+  static const _logoutIndex = 3;
 
   int _currentIndex = 0;
   bool _logoutFlowActive = false;
-  bool _journalVisited = false;
   bool _feedbackVisited = false;
   bool _profileVisited = false;
   StreamSubscription<String>? _brewChanges;
@@ -64,6 +73,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     _notificationService.onTap = _openNotificationTab;
     _brewChanges = BrewRepository.changes.listen((userId) {
       if (userId == ref.read(sessionControllerProvider).asData?.value.userId) {
+        ref.invalidate(homeDataProvider);
         unawaited(_automaticSync());
       }
     });
@@ -86,20 +96,21 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.read(sessionControllerProvider).asData?.value.userId == null) {
       return;
     }
-    setState(
-      () => _currentIndex = payload.startsWith('event:') || payload == 'stock'
-          ? 2
-          : 0,
-    );
-    if (payload == 'stock') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute<void>(builder: (_) => const StoreScreen()));
-        }
-      });
-    }
+    setState(() => _currentIndex = 0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      navigator.popUntil((route) => route.isFirst);
+      if (payload == 'stock' || payload.startsWith('event:')) {
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => payload == 'stock'
+                ? const StoreScreen()
+                : const EventAgendaScreen(),
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _setupNotifications() async {
@@ -163,7 +174,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Future<SyncService> _service() {
-    return _syncService ??= _createService();
+    return _syncService ??= ref.read(appSyncServiceFactoryProvider)();
   }
 
   Future<void> _syncAfterInitialLoad() async {
@@ -173,20 +184,6 @@ class _AppShellState extends ConsumerState<AppShell> {
       // Sinkronisasi tetap dapat berjalan bila daftar biji gagal dimuat.
     }
     if (mounted) await _automaticSync();
-  }
-
-  Future<SyncService> _createService() async {
-    final database = await ref.read(databaseProvider.future);
-    return SyncService(
-      database,
-      SyncClient(sessionStorage: ref.read(sessionStorageProvider)),
-      () => forceLogoutOnUnauthorized(
-        ref.read(sessionControllerProvider.notifier),
-      ),
-      (userId, oldBaseId) async => (await ref.read(
-        notificationCoordinatorProvider.future,
-      )).rescheduleEvent(userId, oldBaseId),
-    );
   }
 
   Future<void> _automaticSync() async {
@@ -239,6 +236,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   void _refreshPulledViews() {
     ref.invalidate(beanListProvider);
     ref.invalidate(journalBrewsProvider);
+    ref.invalidate(homeDataProvider);
     if (mounted) setState(() => _pullRevision++);
   }
 
@@ -330,47 +328,77 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          BeanListScreen(key: ValueKey(_pullRevision)),
-          _journalVisited
-              ? JournalScreen(key: ValueKey(_pullRevision))
-              : const SizedBox.shrink(),
-          const ExploreScreen(),
-          _feedbackVisited ? const FeedbackScreen() : const SizedBox.shrink(),
-          _profileVisited
-              ? ProfileScreen(
-                  syncStatus: _syncStatus,
-                  syncError: _syncError,
-                  syncLoading: _syncLoading,
-                  onSync: _manualSync,
-                  onPull: _manualPull,
-                )
-              : const SizedBox.shrink(),
-        ],
+    final identity = ref.watch(homeIdentityProvider).asData?.value;
+    final navigationItems = [
+      const AppBottomNavItem(label: 'Beranda', icon: Icons.home_rounded),
+      AppBottomNavItem(
+        label: 'Profil',
+        icon: Icons.person_outline_rounded,
+        iconWidget: AppAvatar(
+          username: identity?.username ?? 'Barista',
+          photo: identity?.photo,
+          size: AppSizes.navigationAvatar,
+        ),
       ),
-      bottomNavigationBar: AppBottomNav(
-        items: _navigationItems,
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          if (index == _logoutIndex) {
-            unawaited(_handleLogoutTap());
-            return;
-          }
-
-          setState(() {
-            _currentIndex = index;
-            if (index == 3) _feedbackVisited = true;
-            if (index == 4) _profileVisited = true;
-            if (index == 1) {
-              _journalVisited = true;
-            } else {
-              ref.read(journalSelectionProvider.notifier).reset();
+      const AppBottomNavItem(
+        label: 'Saran & Kesan',
+        icon: Icons.rate_review_outlined,
+      ),
+      const AppBottomNavItem(
+        label: 'Logout',
+        icon: Icons.logout_rounded,
+        isAction: true,
+      ),
+    ];
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _currentIndex != 0) setState(() => _currentIndex = 0);
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            HomeScreen(
+              key: ValueKey(_pullRevision),
+              syncStatus: _syncStatus,
+              syncError: _syncError,
+              syncLoading: _syncLoading,
+            onOpenSync: () => setState(() {
+              _currentIndex = 1;
+              _profileVisited = true;
+            }),
+            ),
+            _profileVisited
+                ? ProfileScreen(
+                    syncStatus: _syncStatus,
+                    syncError: _syncError,
+                    syncLoading: _syncLoading,
+                    onSync: _manualSync,
+                    onPull: _manualPull,
+                    onPhotoChanged: () => ref.invalidate(homeIdentityProvider),
+                  )
+                : const SizedBox.shrink(),
+            _feedbackVisited ? const FeedbackScreen() : const SizedBox.shrink(),
+          ],
+        ),
+        bottomNavigationBar: AppBottomNav(
+          items: navigationItems,
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            if (index == _logoutIndex) {
+              unawaited(_handleLogoutTap());
+              return;
             }
-          });
-        },
+
+            setState(() {
+              _currentIndex = index;
+              if (index == 1) _profileVisited = true;
+              if (index == 2) _feedbackVisited = true;
+              if (index == 0) ref.invalidate(homeIdentityProvider);
+            });
+          },
+        ),
       ),
     );
   }
