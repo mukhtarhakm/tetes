@@ -328,6 +328,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: AppSpacing.s12),
           const NotificationProfileCard(),
+          const SizedBox(height: AppSpacing.s12),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Tentang', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: AppSpacing.s8),
+                const Text(
+                  'Data peta © OpenStreetMap contributors. Gaya dan tile vektor © OpenFreeMap bila tersedia; tile OSM standar dipakai sebagai cadangan.',
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

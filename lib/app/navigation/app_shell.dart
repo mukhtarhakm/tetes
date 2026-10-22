@@ -19,6 +19,7 @@ import '../../features/beans/state/bean_providers.dart';
 import '../../features/journal/screens/journal_screen.dart';
 import '../../features/journal/state/journal_controller.dart';
 import '../../features/explore/explore_screen.dart';
+import '../../features/explore/store_screen.dart';
 import '../../features/feedback/feedback_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../router/app_routes.dart';
@@ -85,7 +86,16 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.read(sessionControllerProvider).asData?.value.userId == null) {
       return;
     }
-    setState(() => _currentIndex = payload.startsWith('event:') ? 2 : 0);
+    setState(() => _currentIndex = payload.startsWith('event:') || payload == 'stock' ? 2 : 0);
+    if (payload == 'stock') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const StoreScreen()),
+          );
+        }
+      });
+    }
   }
 
   Future<void> _setupNotifications() async {

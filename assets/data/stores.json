@@ -1,1 +1,137 @@
-[]
+[
+  {
+    "id": "2aa03a31-c294-43d7-a4da-8d2c5a6c8fd2",
+    "name": "Hayati Coffee Roaster",
+    "store_type": "roastery",
+    "latitude": -7.778781,
+    "longitude": 110.393523,
+    "address": "Demangan Baru No. 7, Caturtunggal, Depok, Sleman",
+    "notes": "Roastery dengan penjualan biji kopi."
+  },
+  {
+    "id": "24443d57-575d-4c29-adc0-710273a52992",
+    "name": "Space Coffee Roastery",
+    "store_type": "roastery",
+    "latitude": -7.765735,
+    "longitude": 110.36064,
+    "address": "Jl. Kabupaten KM 4,5 No. 115, Trihanggo, Gamping, Sleman",
+    "notes": "Alamat kontak disebut kantor; cek dahulu sebelum berkunjung."
+  },
+  {
+    "id": "758d5084-cbe8-4495-97dc-11601c07e17a",
+    "name": "Bekasbaru Outlet Jogja",
+    "store_type": "toko_alat",
+    "latitude": -7.813858,
+    "longitude": 110.357778,
+    "address": "Jl. Pugeran No. 11-15, Suryodiningratan, Mantrijeron, Yogyakarta",
+    "notes": "Perlengkapan manual brew dan grinder."
+  },
+  {
+    "id": "a2886724-02f4-4033-b0ad-1ab8b5f101e8",
+    "name": "Coday Coffee Lab & Roastery",
+    "store_type": "roastery",
+    "latitude": -7.815422,
+    "longitude": 110.416581,
+    "address": "Jl. Ahmad Wahid, Baturetno, Banguntapan, Bantul",
+    "notes": "Roastery; menjual green bean dan roasted bean."
+  },
+  {
+    "id": "cfa92cca-5779-403b-aadc-3804ce768f99",
+    "name": "Darat Coffee Lab",
+    "store_type": "roastery",
+    "latitude": -7.769539,
+    "longitude": 110.425952,
+    "address": "Jl. Nangka V No. 7A, Maguwoharjo, Depok, Sleman",
+    "notes": "Menjual roasted bean."
+  },
+  {
+    "id": "4d35eb35-116c-4558-9a31-3cc583ac6cca",
+    "name": "Kopi Komplit Nusantara",
+    "store_type": "toko_biji",
+    "latitude": -7.871068,
+    "longitude": 110.387186,
+    "address": "Jl. Jejeran II, Wonokromo, Pleret, Bantul",
+    "notes": "Toko biji kopi pilihan."
+  },
+  {
+    "id": "a7e1d194-b173-435b-955f-afc5a7c3cd43",
+    "name": "ETECE Roastery",
+    "store_type": "roastery",
+    "latitude": -7.781586,
+    "longitude": 110.34272,
+    "address": "Gading Sari II No. 2, Banyuraden, Gamping, Sleman",
+    "notes": "Fasilitas roastery; penjualan langsung perlu dikonfirmasi."
+  },
+  {
+    "id": "8dfb8ec5-a1b8-478f-a585-9201ff66afa9",
+    "name": "TokoKopi Seduh Wangi",
+    "store_type": "toko_alat",
+    "latitude": -7.755322,
+    "longitude": 110.428744,
+    "address": "Jl. Beringin Raya No. 03, Maguwoharjo, Depok, Sleman",
+    "notes": "Biji, bubuk, dan alat seduh manual."
+  },
+  {
+    "id": "c2b84326-9c36-499b-888e-7374f4a56ce9",
+    "name": "Kopi Simbah",
+    "store_type": "toko_alat",
+    "latitude": -7.841313,
+    "longitude": 110.376806,
+    "address": "Pandeyan, Bangunharjo, Sewon, Bantul",
+    "notes": "Alat kopi; ketersediaan perlu dikonfirmasi."
+  },
+  {
+    "id": "43cde3d8-b30d-434c-aeda-e97c52b8837f",
+    "name": "de Ngokow Coffee Roastery & Tea Club",
+    "store_type": "roastery",
+    "latitude": -7.818157,
+    "longitude": 110.3556,
+    "address": "Jl. Bantul No. 64, Gedongkiwo, Mantrijeron, Yogyakarta",
+    "notes": "Roastery; penjualan biji langsung perlu dikonfirmasi."
+  },
+  {
+    "id": "00ecf7bc-12dc-4fea-9f8a-3bd75d051134",
+    "name": "Fordo Coffee Lab - Roastery 02",
+    "store_type": "roastery",
+    "latitude": -7.776425,
+    "longitude": 110.361902,
+    "address": "Jl. Magelang Kidul No. 442, Karangwaru, Tegalrejo, Yogyakarta",
+    "notes": "Roastery; produksi biji."
+  },
+  {
+    "id": "a435557c-622d-45d6-a8d5-8cc64111d2e2",
+    "name": "Ailen Coffee - Small Roastery & Mini Bar",
+    "store_type": "roastery",
+    "latitude": -7.830459,
+    "longitude": 110.396141,
+    "address": "Gg. Soka, Bodon, Jagalan, Banguntapan, Bantul",
+    "notes": "Small roastery."
+  },
+  {
+    "id": "f73da7ef-dab2-4f12-bf35-31e0857261dc",
+    "name": "Petik Merah Cafe & Roastery",
+    "store_type": "roastery",
+    "latitude": -7.778674,
+    "longitude": 110.393658,
+    "address": "Jl. Cucak Rowo No. 1, Demangan Baru, Depok, Sleman",
+    "notes": "Roastery; penjualan biji dibawa pulang perlu dikonfirmasi."
+  },
+  {
+    "id": "4e1b3608-a39f-4dd0-874c-f4dc2ce196a8",
+    "name": "Toska Kahve Roastery (Bantul)",
+    "store_type": "roastery",
+    "latitude": -7.892039,
+    "longitude": 110.325536,
+    "address": "Jl. KH Wahid Hasyim No. 24, Bejen, Bantul",
+    "notes": "Roastery."
+  },
+  {
+    "id": "9763deab-db85-4c89-8771-b5846cca41d8",
+    "name": "Dasawarsa Coffee Roasters",
+    "store_type": "roastery",
+    "latitude": -7.781957,
+    "longitude": 110.36129,
+    "address": "Jl. Poncowinatan No. 79, Cokrodiningratan, Jetis, Yogyakarta",
+    "notes": "Roastery."
+  }
+]

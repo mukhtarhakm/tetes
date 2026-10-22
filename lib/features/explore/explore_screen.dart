@@ -17,6 +17,8 @@ import '../../data/repositories/event_repo.dart';
 import '../auth/state/session_controller.dart';
 import '../game/game_prototype_screen.dart';
 import 'event_model.dart';
+import 'store_screen.dart';
+import 'currency_calculator_screen.dart';
 
 final eventRepositoryProvider = FutureProvider<EventRepository>(
   (ref) async => EventRepository(await ref.watch(databaseProvider.future)),
@@ -42,16 +44,24 @@ class ExploreScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.s12),
-        const _MenuCard(
+        _MenuCard(
           title: 'Toko Terdekat',
-          description: 'Temukan toko biji dan alat seduh. Segera',
+          description: 'Temukan roastery, toko biji, dan alat seduh.',
           icon: Icons.store_outlined,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const StoreScreen()),
+          ),
         ),
         const SizedBox(height: AppSpacing.s12),
-        const _MenuCard(
+        _MenuCard(
           title: 'Kalkulator Kurs',
-          description: 'Hitung harga dalam mata uang lain. Segera',
+          description: 'Hitung nilai mata uang dengan kurs terbaru.',
           icon: Icons.currency_exchange_outlined,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const CurrencyCalculatorScreen(),
+            ),
+          ),
         ),
         const SizedBox(height: AppSpacing.s12),
         _MenuCard(

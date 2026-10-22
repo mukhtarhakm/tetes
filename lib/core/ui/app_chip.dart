@@ -5,6 +5,7 @@ import '../../app/theme/tokens.dart';
 class AppChip extends StatelessWidget {
   const AppChip({
     required this.label,
+    this.icon,
     this.selected = false,
     this.onSelected,
     this.onDeleted,
@@ -12,6 +13,7 @@ class AppChip extends StatelessWidget {
   });
 
   final String label;
+  final IconData? icon;
   final bool selected;
   final ValueChanged<bool>? onSelected;
   final VoidCallback? onDeleted;
@@ -46,6 +48,10 @@ class AppChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (icon != null) ...[
+            Icon(icon, size: AppSizes.navigationIcon, color: foregroundColor),
+            const SizedBox(width: AppSpacing.s8),
+          ],
           Text(
             label,
             softWrap: false,

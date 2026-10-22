@@ -114,3 +114,8 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## 2026-10-22 - Fitur 07 sesi B
 - Profil kini menampilkan foto lokal dan akun, sakelar biometrik per pengguna, verifikasi integritas jurnal, serta kartu Sinkronisasi dan Notifikasi yang dipakai ulang; Saran & Kesan menyimpan dan menampilkan riwayat lokal per pengguna tanpa sinkronisasi server. Foto lama baru dihapus setelah foto baru dan path tersimpan. Seluruh 255 tes Flutter dan flutter analyze lulus; uji kamera, galeri, dan biometrik di HP asli masih menunggu.
+
+## 2026-10-22 - Fitur 06 langkah 5 dan 6
+- Seed 15 toko lokal tanpa menimpa data lama, peta dan daftar toko dengan filter, jarak, izin lokasi, navigasi, serta kalkulator kurs melalui cache Fitur 02 selesai. Tile mengikuti area peta terlihat dan peta hanya berpusat pada lokasi pengguna dalam batas DIY. Uji di HP asli masih menunggu.
+- Tampilan toko memakai tile CARTO Voyager, filter Biji/Alat, ikon toko konsisten, kontrol zoom/posisi/kompas, kerucut arah bila sensor tersedia, dan rute OSRM dengan persetujuan, moda serta langkah bahasa Indonesia. Uji langsung di HP masih menunggu.
+- Perbaikan peta: OpenFreeMap liberty menggantikan CARTO, tile OSM standar selalu tersedia di bawahnya dan mengambil alih saat gaya/tile vektor gagal; gaya membalas HTTP 200 tanpa key dari mesin kerja. Atribusi popup dan Profil Tentang ditambah. Peta kini memenuhi layar dengan satu sheet tarik untuk daftar, detail, serta rute; kontrol mengikuti tepi sheet dan kamera rute memperhitungkan area tertutup. Seluruh 270 tes Flutter dan flutter analyze lulus; uji visual tile vektor di HP masih menunggu.

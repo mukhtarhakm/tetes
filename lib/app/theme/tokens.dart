@@ -54,6 +54,18 @@ abstract final class AppSizes {
   static const stateIcon = 28.0;
   static const stateIconContainer = 64.0;
   static const statePreviewHeight = 260.0;
+  static const mapMarker = 40.0;
+  static const mapMarkerSelected = 52.0;
+  static const mapMarkerBorder = 3.0;
+  static const mapSheetHandleWidth = 48.0;
+  static const mapSheetHandleHeight = 4.0;
+  static const mapRouteWidth = 7.0;
+  static const mapRouteBorderWidth = 11.0;
+  static const routePanelHeight = 180.0;
+  static const mapSheetInitial = 0.42;
+  static const mapSheetMinimum = 0.16;
+  static const mapSheetDetail = 0.65;
+  static const mapSheetMaximum = 0.85;
   static const dialogMaxWidth = 420.0;
   static const progressStroke = 2.0;
   static const chipHeight = 36.0;
@@ -65,6 +77,7 @@ abstract final class AppInsets {
     vertical: AppSpacing.s24,
   );
   static const card = EdgeInsets.all(AppSpacing.s20);
+  static const mapListCard = EdgeInsets.all(AppSpacing.s12);
   static const input = EdgeInsets.symmetric(
     horizontal: AppSpacing.s16,
     vertical: AppSpacing.s16,
