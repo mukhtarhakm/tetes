@@ -221,15 +221,15 @@ class _BrewForm extends StatelessWidget {
         const SizedBox(height: AppSpacing.s16),
         AppCard(
           variant: AppCardVariant.tinted,
-          child: Row(
+          child: Wrap(
+            spacing: AppSpacing.s12,
+            runSpacing: AppSpacing.s8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Icon(Icons.water_drop_outlined),
-              const SizedBox(width: AppSpacing.s12),
-              Expanded(
-                child: Text(
-                  'Total air',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+              Text(
+                'Total air',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               Text(
                 '${_formatNumber(plan.totalWaterG)} g',
@@ -285,7 +285,7 @@ class _BrewForm extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.s24),
-        Text('Tahap seduh', style: Theme.of(context).textTheme.headlineSmall),
+        Text('Tahap seduh', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: AppSpacing.s12),
         ...List.generate(
           plan.stages.length,
@@ -438,13 +438,14 @@ class _StageCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.s12,
+            runSpacing: AppSpacing.s8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  stage.name.label,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+              Text(
+                stage.name.label,
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               Text(
                 'Mulai ${_formatTime(stage.startSeconds)}',

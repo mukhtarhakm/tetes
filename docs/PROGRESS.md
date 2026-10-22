@@ -7,17 +7,19 @@ Perbarui di akhir setiap sesi.
 | Sprint | Fokus | Spec | Status | Catatan |
 |---|---|---|---|---|
 | 1 | Fondasi, login online buatan sendiri, biometrik, navigasi | 00, 01 | Selesai | Fitur 00 selesai. Fitur 01: server (register, login, logout, pembatasan percobaan) dan Flutter (register, login, session, guard, logout, biometrik) sudah diimplementasikan. Fitur 01 lolos uji di HP  |
-| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Fitur 02 dan implementasi Fitur 03 bagian A selesai; tahap tanpa jeda memakai warna konsisten pada kartu, timeline, dan grafik; Atur Seduh menunggu uji manual di HP |
-| 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Selesai | Sesi B dan C selesai: tahap otomatis/drawdown/timer aktif, layar Hasil, penyimpanan atomik dengan hash chain, pengaturan terbaik, biaya, dan stok |
-| 4 | Jurnal | 04 | Sedang jalan | Fitur 04 Sesi A & B selesai: tab Jurnal (sub-tab Seduhan & Biji, perbandingan 2 seduhan dengan ringkasan murni & sorotan beda, grafik skor fl_chart tanpa seduhan dibatalkan, pembacaan stok & ambang batas tanpa N+1). Sesi berikutnya: jadikan pengaturan terbaik manual & bandingkan dua biji |
-| 5 | Sinkronisasi dan AI | 05 | Sedang jalan | Push/pull dan integrasi AI Flutter untuk Atur Seduh serta Hasil selesai; uji HP menunggu |
-| 6 | Event, notifikasi, LBS | 06 | Belum mulai | |
-| 7 | Game, profil, perapian | 07 | Belum mulai | |
-| 8 | Pengujian, laporan, presentasi | - | Belum mulai | |
+| 2 | Profil biji, kurs, Atur Seduh | 02, 03 (bagian A) | Sedang jalan | Implementasi fitur 02 dan Atur Seduh ada; uji manual di HP masih menunggu. |
+| 3 | Sesi, hasil, hash chain | 03 (bagian B, C) | Sedang jalan | Implementasi dan tes otomatis ada; sensor, getar, suara, serta alur Sesi dan Hasil masih perlu uji HP. |
+| 4 | Jurnal | 04 | Sedang jalan | Daftar, detail, bandingkan seduhan, grafik skor, dan verifikasi ada. Pengaturan terbaik manual dan perbandingan dua biji belum selesai. |
+| 5 | Sinkronisasi dan AI | 05 | Sedang jalan | Push/pull dan AI diimplementasikan; migrasi/deploy sinkronisasi lanjutan dan uji live/HP masih menunggu. |
+| 6 | Event, notifikasi, LBS | 06 | Sedang jalan | Agenda, notifikasi, peta toko, rute, dan kurs ada; uji notifikasi, lokasi, dan peta di HP masih menunggu. |
+| 7 | Game, profil, perapian | 07 | Sedang jalan | Game, profil, dan perapian UI diimplementasikan; kalibrasi sensor, kamera, biometrik, dan tampilan di HP masih menunggu. |
+| 8 | Pengujian, laporan, presentasi | - | Sedang jalan | Tes otomatis dan analisis dilakukan; uji HP, tangkapan layar, laporan, serta presentasi belum selesai. |
 
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
+2026-10-22: Perapian UI: tooltip ScoreChart memakai tipografi tema dan bintang `★` terverifikasi; nama layar Hasil dan semua rujukan kode/tes tidak lagi memakai `placeholder`; form biji memiliki judul Info biji, Pengolahan, Pembelian, dan Rasa; jarak dan pembungkusan teks di Hasil, Atur Seduh, serta tombol bersama dirapikan. Audit `lib/` tidak menemukan karakter encoding rusak, TODO aktif, atau nilai warna/font/jarak/radius langsung di layar yang perlu dipindahkan. Widget test pada lebar 320 dan teks 1,3× lulus; seluruh 277 tes Flutter dan `flutter analyze` bersih. `graphify update .` berhasil. Uji tampilan dan alur di HP masih menunggu.
+
 2026-10-20: Penyempurnaan Fitur 04: sub-tab Biji dicabut dari tab Jurnal sehingga menjadi satu daftar seduhan tunggal; tombol pemicu mode perbandingan diubah menjadi "Bandingkan" dengan ikon perbandingan; bar aksi perbandingan dipindahkan ke bawah di atas bottom nav dengan padding dinamis dari tinggi bar dan reset otomatis saat berpindah tab; kartu seduhan ditata ulang dengan judul di baris sendiri, pil status terpisah dengan Wrap, dan parameter fleksibel tahan pembesaran font. Seluruh 164 tes unit/widget lulus dan flutter analyze bersih.
 2026-10-20: Fitur 04 Sesi B selesai: tab Jurnal memiliki sub-tab Seduhan dan Biji; mode pilih pada sub-tab Seduhan membatasi tepat dua entri dan menolak entri ke-3 dengan pesan singkat; layar Bandingkan menyajikan dua kolom berdampingan (seduhan lama di kiri, baru di kanan), menyoroti baris berbeda dengan token tema (primaryContainer & pill Beda), dan kalimat ringkasan dibuat dengan fungsi murni tanpa AI; sub-tab Biji menampilkan daftar biji aktif milik pengguna dengan sisa stok dan pengaturan terbaik aktif tanpa N+1 query (JOIN/subquery), serta StatusPill stok menipis berdasarkan setting user; layar detail biji diperkaya dengan ScoreChart tren skor rasa dari seduhan aktif (minimal dua titik data) menggunakan fl_chart dan riwayat seduhan biji terkait. Seluruh 163 tes unit/widget lulus dan flutter analyze bersih.
 2026-10-20: Fitur 04 Sesi A selesai: tab Jurnal seduhan menggantikan tampilan sementara di AppShell; query SQLite aman di BrewRepository dengan parameter terikat dan batas user_id aktif; pencarian ber-escape ('\' untuk '%' dan '_'); filter kombinasi (biji, skor minimal, tag rasa utuh, rentang tanggal lokal-ke-UTC inklusif sampai akhir hari, dan urutan dengan cost_idr null di akhir); kartu seduhan menampilkan waktu lokal, rasio, suhu, skor rasa, tag rasa, StatusPill, badge "Terbaik", dan tampilan pudar bila dibatalkan; detail seduhan memuat ringkasan, tabel tahap, tag rasa vs roastery berdampingan, catatan, saran AI, integritas (seq & 8 karakter pertama hash); aksi "Seduh lagi" memuat parameter tahap tanpa mengubah logika sesi (menolak jika biji terarsip); aksi "Tandai dibatalkan" dalam satu transaksi tanpa menyentuh rantai hash dan menghitung ulang pengaturan terbaik serta stok. Seluruh 150 tes lulus dan `flutter analyze` bersih.
@@ -36,13 +38,9 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 (bug yang belum beres, hal yang menunggu jawaban dosen)
 
 - Guard belum memeriksa ulang masa berlaku session ketika aplikasi kembali dari latar belakang; pengecekan saat resume ditunda ke langkah berikutnya.
-- Belum ada tombol untuk mematikan biometrik. Dibuat di layar Profil (Fitur 07).
-- Build Android memakai kotlin.incremental=false di android/gradle.properties karena proyek (drive D) dan cache paket (drive C) berbeda drive. Developer Mode Windows aktif. Perbaikan permanen: satukan drive (PUB_CACHE atau lokasi proyek).
+- Build Android masih memakai kotlin.incremental=false di android/gradle.properties; setelah proyek dipindah ke C:\src\tetes, opsi ini belum diuji ulang untuk dihapus.
 - Bersih-bersih akhir proyek: hapus akun uji (misalnya rais_uji) beserta sesi dan baris login_attempts di Supabase, hapus fungsi hello, pastikan tidak ada berkas JSON uji atau rahasia di repo.
-- Perapian layout (nanti, tahap perapian): layar Hasil dan Atur Seduh; ganti nama berkas brew_result_placeholder_screen.dart karena sudah bukan placeholder.
-- Judul bagian di form biji ("Info biji", "Pengolahan", "Kemasan dan harga").
 - uji live diagnosa dan penyimpanan ai_advice menunggu Gemini stabil; server dan klien sudah menangani 503 (percobaan ulang, pesan sibuk, cooldown, fallback).” Fitur AI tetap bisa dipakai lewat fallback aturan sederhana, jadi aplikasi tidak rusak.
-- score_chart.dart: ganti fontSize: 12 pada tooltip dengan gaya teks dari tema; cek bintang di tooltip tampil benar (★), bukan karakter rusak.
 
 ## Menunggu jawaban dosen
 - [ ] Tema (V60 pelatih/jurnal vs Brewmaster)

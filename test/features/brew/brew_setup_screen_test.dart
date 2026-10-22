@@ -68,6 +68,32 @@ void main() {
     );
   });
 
+  testWidgets('Atur Seduh tidak overflow pada lebar 320 dan teks 1,3x', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final bean = _bean();
+    final plan = BrewCalculator.createDefault(beanId: bean.id);
+    await tester.pumpWidget(
+      _app(
+        () async =>
+            BrewSetupState(beans: [bean], selectedBeanId: bean.id, plan: plan),
+        initialBeanId: bean.id,
+        textScale: 1.3,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    for (var i = 0; i < 8; i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   test('pemetaan warna tahap memakai lima token tema', () {
     expect(BrewStageColors.forPosition(1), AppColors.stage1);
     expect(BrewStageColors.forPosition(2), AppColors.stage2);
@@ -77,14 +103,26 @@ void main() {
   });
 }
 
-Widget _app(Future<BrewSetupState> Function() load, {String? initialBeanId}) {
+Widget _app(
+  Future<BrewSetupState> Function() load, {
+  String? initialBeanId,
+  double textScale = 1,
+}) {
   return ProviderScope(
     overrides: [
       brewSetupControllerProvider.overrideWith2(
         (argument) => _FakeBrewSetupController(argument, load),
       ),
     ],
-    child: MaterialApp(home: BrewSetupScreen(initialBeanId: initialBeanId)),
+    child: MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale),
+        ),
+        child: child!,
+      ),
+      home: BrewSetupScreen(initialBeanId: initialBeanId),
+    ),
   );
 }
 

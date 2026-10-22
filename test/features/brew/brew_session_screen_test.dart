@@ -8,7 +8,7 @@ import 'package:tetes/core/ui/app_button.dart';
 import 'package:tetes/core/ui/app_card.dart';
 import 'package:tetes/features/brew/brew_calculator.dart';
 import 'package:tetes/features/brew/brew_plan.dart';
-import 'package:tetes/features/brew/screens/brew_result_placeholder_screen.dart';
+import 'package:tetes/features/brew/screens/brew_result_screen.dart';
 import 'package:tetes/features/brew/screens/brew_session_screen.dart';
 import 'package:tetes/features/brew/services/brew_session_hardware.dart';
 import 'package:tetes/features/brew/services/brew_stage_feedback.dart';
@@ -165,7 +165,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hasil seduh'), findsWidgets);
-    expect(find.byType(BrewResultPlaceholderScreen), findsOneWidget);
+    expect(find.byType(BrewResultScreen), findsOneWidget);
   });
 
   testWidgets('Air habis membawa drawdown dan total ke hasil', (tester) async {
@@ -189,7 +189,7 @@ void main() {
     await tester.tap(find.text('Air habis'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(BrewResultPlaceholderScreen), findsOneWidget);
+    expect(find.byType(BrewResultScreen), findsOneWidget);
   });
 
   testWidgets('Lewati membawa drawdown null ke hasil', (tester) async {
@@ -215,7 +215,7 @@ void main() {
     await tester.tap(find.text('Lewati'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(BrewResultPlaceholderScreen), findsOneWidget);
+    expect(find.byType(BrewResultScreen), findsOneWidget);
   });
 
   testWidgets('jeda menghentikan timer dan umpan balik', (tester) async {

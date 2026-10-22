@@ -145,6 +145,8 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text('Info biji', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.s12),
               AppTextField(
                 controller: _nameController,
                 label: 'Nama biji',
@@ -224,7 +226,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                         },
                 ),
               ],
-              const SizedBox(height: AppSpacing.s20),
+              const SizedBox(height: AppSpacing.s24),
+              Text('Pengolahan', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.s12),
               const _SectionLabel(label: 'Proses'),
               const SizedBox(height: AppSpacing.s8),
               _optionalChips<BeanProcess>(
@@ -273,7 +277,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                       ? null
                       : () => setState(() => _roastDate = null),
                 ),
-              const SizedBox(height: AppSpacing.s20),
+              const SizedBox(height: AppSpacing.s24),
+              Text('Pembelian', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.s12),
               _SectionLabel(
                 label: 'Ukuran kemasan',
                 errorText: _errors['packSize'],
@@ -366,7 +372,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                   _clearError('stock');
                 },
               ),
-              const SizedBox(height: AppSpacing.s20),
+              const SizedBox(height: AppSpacing.s24),
+              Text('Rasa', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.s12),
               _SectionLabel(
                 label: 'Tasting notes roastery',
                 errorText: _errors['tags'],

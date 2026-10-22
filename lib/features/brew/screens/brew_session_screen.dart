@@ -13,7 +13,7 @@ import '../services/brew_session_hardware.dart';
 import '../services/brew_stage_feedback.dart';
 import '../state/brew_session_controller.dart';
 import '../widgets/brew_stage_colors.dart';
-import 'brew_result_placeholder_screen.dart';
+import 'brew_result_screen.dart';
 
 const sessionUiRefreshInterval = Duration(milliseconds: 200);
 
@@ -433,7 +433,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
     await Navigator.of(context).pushReplacement<void, void>(
       MaterialPageRoute(
         builder: (_) =>
-            BrewResultPlaceholderScreen(result: _controller!.result!),
+            BrewResultScreen(result: _controller!.result!),
       ),
     );
   }

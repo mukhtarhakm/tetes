@@ -123,10 +123,9 @@ class ScoreChart extends StatelessWidget {
                 return touchedSpots.map((spot) {
                   return LineTooltipItem(
                     'Seduhan #${spot.x.toInt()}\nSkor: ★ ${spot.y.toInt()}/5',
-                    const TextStyle(
+                    Theme.of(context).textTheme.bodySmall!.copyWith(
                       color: AppColors.onDark,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
                     ),
                   );
                 }).toList();

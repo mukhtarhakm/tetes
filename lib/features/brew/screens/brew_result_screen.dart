@@ -18,14 +18,14 @@ import '../../journal/screens/brew_detail_screen.dart';
 import '../brew_session_result.dart';
 import '../state/brew_setup_controller.dart';
 
-class BrewResultPlaceholderScreen extends ConsumerStatefulWidget {
-  const BrewResultPlaceholderScreen({required this.result, super.key});
+class BrewResultScreen extends ConsumerStatefulWidget {
+  const BrewResultScreen({required this.result, super.key});
   final BrewSessionResult result;
   @override
-  ConsumerState<BrewResultPlaceholderScreen> createState() => _ResultState();
+  ConsumerState<BrewResultScreen> createState() => _ResultState();
 }
 
-class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
+class _ResultState extends ConsumerState<BrewResultScreen> {
   Bean? bean;
   String? userId;
   String? error;
@@ -231,6 +231,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                           'Ringkasan',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
+                        const SizedBox(height: AppSpacing.s8),
                         Text(
                           '${bean!.name} • ${plan.doseG} g • 1:${plan.ratio}',
                         ),
@@ -246,6 +247,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                     'Tahap seduh',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
+                  const SizedBox(height: AppSpacing.s12),
                   ...List.generate(plan.stages.length, (index) {
                     final stage = plan.stages[index];
                     return Padding(
@@ -258,9 +260,11 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                               stage.name.label,
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
+                            const SizedBox(height: AppSpacing.s8),
                             Text(
                               'Target ${stage.startSeconds} detik • ${plan.cumulativeWaterAt(index)} g kumulatif • ${stage.targetPourG} g tuang',
                             ),
+                            const SizedBox(height: AppSpacing.s12),
                             AppTextField(
                               controller: water[index],
                               label: 'Air aktual (g) • opsional',
@@ -286,8 +290,10 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                     'Skor rasa',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
+                  const SizedBox(height: AppSpacing.s8),
                   Wrap(
                     spacing: AppSpacing.s8,
+                    runSpacing: AppSpacing.s8,
                     children: List.generate(
                       5,
                       (index) => AppChip(
@@ -305,8 +311,10 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                     'Tag rasa',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
+                  const SizedBox(height: AppSpacing.s8),
                   Wrap(
                     spacing: AppSpacing.s8,
+                    runSpacing: AppSpacing.s8,
                     children: RoasteryNoteTag.values
                         .map(
                           (tag) => AppChip(
@@ -333,6 +341,7 @@ class _ResultState extends ConsumerState<BrewResultPlaceholderScreen> {
                           'Perbandingan rasa',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
+                        const SizedBox(height: AppSpacing.s8),
                         Text(
                           'Roastery: ${bean!.roasteryNotesTags.isEmpty ? '-' : bean!.roasteryNotesTags.join(', ')}',
                         ),

@@ -9,7 +9,7 @@ import 'package:tetes/features/beans/state/bean_providers.dart';
 import 'package:tetes/features/brew/brew_calculator.dart';
 import 'package:tetes/features/brew/brew_session_result.dart';
 import 'package:tetes/core/ui/app_chip.dart';
-import 'package:tetes/features/brew/screens/brew_result_placeholder_screen.dart';
+import 'package:tetes/features/brew/screens/brew_result_screen.dart';
 import 'package:tetes/features/brew/state/brew_setup_controller.dart';
 import 'package:tetes/features/journal/screens/brew_detail_screen.dart';
 import 'package:tetes/features/journal/state/journal_controller.dart';
@@ -32,7 +32,7 @@ void main() {
           brewDetailProvider('brew-new').overrideWith((ref) async => null),
         ],
         child: MaterialApp(
-          home: BrewResultPlaceholderScreen(
+          home: BrewResultScreen(
             result: BrewSessionResult(
               plan: plan,
               totalTimeS: 135,
@@ -47,6 +47,48 @@ void main() {
     expect(find.text('Diagnosa AI tersedia setelah menyimpan'), findsOneWidget);
     expect(find.text('Minta Diagnosa AI'), findsNothing);
     expect(find.byType(BrewDetailScreen), findsNothing);
+  });
+
+  testWidgets('Hasil tidak overflow pada lebar 320 dan teks 1,3x', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final plan = BrewCalculator.createDefault(beanId: 'bean-1');
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sessionControllerProvider.overrideWith(_SessionController.new),
+          beanRepositoryProvider.overrideWith((ref) async => _BeanRepository()),
+          brewRepositoryProvider.overrideWith((ref) async => _BrewRepository()),
+        ],
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.3),
+            ),
+            child: child!,
+          ),
+          home: BrewResultScreen(
+            result: BrewSessionResult(
+              plan: plan,
+              totalTimeS: 135,
+              drawdownS: null,
+              brewedAtUtc: '2026-10-21T00:00:00Z',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    for (var i = 0; i < 6; i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('Simpan membuka Detail dan Back kembali ke layar akar', (
@@ -71,7 +113,7 @@ void main() {
               builder: (context) => TextButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => BrewResultPlaceholderScreen(
+                    builder: (_) => BrewResultScreen(
                       result: BrewSessionResult(
                         plan: plan,
                         totalTimeS: 135,
