@@ -86,13 +86,17 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.read(sessionControllerProvider).asData?.value.userId == null) {
       return;
     }
-    setState(() => _currentIndex = payload.startsWith('event:') || payload == 'stock' ? 2 : 0);
+    setState(
+      () => _currentIndex = payload.startsWith('event:') || payload == 'stock'
+          ? 2
+          : 0,
+    );
     if (payload == 'stock') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const StoreScreen()),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const StoreScreen()));
         }
       });
     }
@@ -179,6 +183,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       () => forceLogoutOnUnauthorized(
         ref.read(sessionControllerProvider.notifier),
       ),
+      (userId, oldBaseId) async => (await ref.read(
+        notificationCoordinatorProvider.future,
+      )).rescheduleEvent(userId, oldBaseId),
     );
   }
 

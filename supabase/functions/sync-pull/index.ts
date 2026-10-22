@@ -15,8 +15,8 @@ Deno.serve(async (request) => {
   try {
     const result = await handle(request);
     status = result.status;
-    beanCount = result.beans.length;
-    brewCount = result.brews.length;
+    beanCount = "beans" in result ? result.beans.length : 0;
+    brewCount = "brews" in result ? result.brews.length : 0;
     return new Response(JSON.stringify(result), { status: 200, headers: jsonHeaders });
   } catch (error) {
     if (error instanceof SessionUnauthorizedError) {
@@ -51,6 +51,7 @@ async function handle(request: Request) {
   try { body = await request.json(); } catch { throw new InputError(400, "invalid_json", "Body JSON tidak valid."); }
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new InputError(400, "invalid_input", "Data sinkronisasi tidak valid.");
   const input = body as Row;
+  if (input.group !== undefined) return await pullGroup(input, userId);
   if (!Number.isInteger(input.last_seq) || (input.last_seq as number) < 0 || (input.last_seq as number) > 2147483647 ||
     (input.last_seq === 0 ? input.last_hash !== null : typeof input.last_hash !== "string" || !hash.test(input.last_hash)) ||
     (input.page_size !== undefined && (!Number.isInteger(input.page_size) || (input.page_size as number) < 1 || (input.page_size as number) > 50))) {
@@ -109,6 +110,55 @@ async function handle(request: Request) {
       })) }));
   }
   return { status, server_last_seq: serverLastSeq, has_more: status === "pull" && brews.length > 0 && (brews.at(-1)!.seq as number) < serverLastSeq, beans, brews };
+}
+
+async function pullGroup(input: Row, userId: string) {
+  const group = input.group;
+  if (group !== "events" && group !== "game_scores" && group !== "feedback") {
+    throw new InputError(400, "invalid_input", "Kelompok sinkronisasi tidak valid.");
+  }
+  const cursorAt = input.cursor_at;
+  const cursorId = input.cursor_id;
+  if ((cursorAt == null) !== (cursorId == null) ||
+    cursorAt != null && (typeof cursorAt !== "string" || Number.isNaN(Date.parse(cursorAt)) ||
+      typeof cursorId !== "string" || !/^[0-9a-f-]{36}$/.test(cursorId))) {
+    throw new InputError(400, "invalid_input", "Kursor sinkronisasi tidak valid.");
+  }
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) throw new Error("database unavailable");
+  const query = new URL(`${url}/rest/v1/${group}`);
+  query.searchParams.set("user_id", `eq.${userId}`);
+  query.searchParams.set("select", group === "events"
+    ? "id,name,event_type,location,notes,start_utc,source_zone,reminder_minutes,deleted,created_at,updated_at,server_updated_at"
+    : group === "game_scores"
+    ? "id,level,accuracy,stars,duration_s,played_at,server_updated_at"
+    : "id,suggestion,impression,created_at,server_updated_at");
+  if (cursorAt != null) {
+    query.searchParams.set("or", `(server_updated_at.gt.${cursorAt},and(server_updated_at.eq.${cursorAt},id.gt.${cursorId}))`);
+  }
+  query.searchParams.set("order", "server_updated_at.asc,id.asc");
+  query.searchParams.set("limit", "51");
+  const response = await fetch(query, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  if (!response.ok) throw new Error("database read failed");
+  const rows = await response.json() as Row[];
+  const page = rows.slice(0, 50).map((row) => {
+    const result = { ...row };
+    if (group === "events") {
+      result.deleted = row.deleted === true;
+      for (const field of ["start_utc", "created_at", "updated_at"]) result[field] = utc(row[field]);
+    } else if (group === "game_scores") {
+      result.accuracy = numeric(row.accuracy);
+      result.level = numeric(row.level);
+      result.stars = numeric(row.stars);
+      result.duration_s = numeric(row.duration_s);
+      result.played_at = utc(row.played_at);
+    } else result.created_at = utc(row.created_at);
+    return result;
+  });
+  const last = page.at(-1);
+  return { status: "pull", group, rows: page, has_more: rows.length > 50,
+    cursor_at: last?.server_updated_at ?? null, cursor_id: last?.id ?? null };
 }
 
 function utc(value: unknown): string { return new Date(value as string).toISOString().replace(/\.\d{3}Z$/, "Z"); }

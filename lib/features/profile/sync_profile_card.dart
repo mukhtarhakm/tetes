@@ -26,8 +26,16 @@ class SyncProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final accepted = status?.summary?['accepted'];
     final acceptedCount = accepted is Map
-        ? ((accepted['beans'] as num?) ?? 0).toInt() +
-              ((accepted['brews'] as num?) ?? 0).toInt()
+        ? const [
+            'beans',
+            'brews',
+            'events',
+            'game_scores',
+            'feedback',
+          ].fold<int>(
+            0,
+            (total, table) => total + ((accepted[table] as num?) ?? 0).toInt(),
+          )
         : 0;
     final empty =
         status != null &&

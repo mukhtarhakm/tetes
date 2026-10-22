@@ -188,7 +188,7 @@ Sebelum meminta pull, Flutter memverifikasi ulang urutan `seq`, `prev_hash`, dan
 - **Server prefix dari lokal:** tidak ada `brews` yang ditarik; lanjutkan push data lokal yang belum ada di server.
 - **Bercabang:** bila hash berbeda pada `seq` yang sama, atau kedua sisi memiliki entri yang tidak dimiliki sisi lain, jangan gabungkan otomatis.
 
-Untuk `beans`, `events`, `game_scores`, dan `feedback`, pull hanya menyisipkan baris yang belum ada di SQLite dan tidak menimpa baris yang sudah ada. Perubahan `notes` atau `status` dari perangkat lain belum ditarik pada v1.
+Untuk `beans`, `game_scores`, dan `feedback`, pull hanya menyisipkan ID yang belum ada. Khusus `events`, pull membawa juga baris `deleted` dan memperbarui baris lokal hanya jika `updated_at` server lebih baru serta status lokal bukan `pending`. Tiga tabel ini dipaginasi dengan kursor `(server_updated_at, id)` yang dibuat server, sehingga baris dengan cap waktu klien lama tetap tertarik. Jika `updated_at` event sama, versi yang sudah tersimpan menang. Perubahan `notes` atau `status` seduhan dari perangkat lain belum ditarik pada v1.
 
 Saat rantai bercabang, tampilkan pilihan:
 1. **Pulihkan ulang dari server:** konfirmasi eksplisit menyebut jumlah seluruh data lokal yang akan dikosongkan, termasuk jumlah entri `pending`. Setelah pengguna setuju, kosongkan data pengguna yang disinkronkan (`beans`, `brews`, `brew_stages`, `events`, `game_scores`, `feedback`), lalu lakukan pull penuh dan verifikasi sebelum commit.
@@ -281,6 +281,8 @@ Respons:
 ### 7.5 `sync-pull`
 Header: `x-session-token`.
 
+Untuk tabel `events`, `game_scores`, dan `feedback`, endpoint yang sama menerima `{ "group": "events | game_scores | feedback", "cursor_at": null | "timestamptz", "cursor_id": null | "uuid" }`. Respons memuat `rows` (maksimal 50), `has_more`, dan kursor `(cursor_at, cursor_id)` dari baris terakhir. `server_updated_at` dibuat server dan tidak berasal dari cap waktu klien. Klien meminta halaman berikutnya sampai `has_more = false`.
+
 Permintaan mengirim seluruh ringkasan rantai lokal agar server dapat membuktikan hubungan prefix:
 ```json
 {
@@ -301,7 +303,7 @@ Perilaku:
 1. Bandingkan tiap `seq` dan `hash` dengan rantai server.
 2. Kembalikan semua data bila lokal kosong, hanya suffix bila lokal prefix server, respons kosong bila sama, atau penanda `server_is_prefix` bila server merupakan prefix lokal.
 3. Bila bercabang, kembalikan `409` dengan `code: "sync_conflict"` dan jumlah data server yang relevan. Klien menawarkan pemulihan ulang atau batal.
-4. Payload sukses mengurutkan `beans` sebelum `brews`; `beans`, `events`, `game_scores`, dan `feedback` hanya memuat baris server yang ID-nya belum ada pada `local_ids`.
+4. Payload sukses mengurutkan `beans` sebelum `brews`; `beans` memakai ID yang belum ada, sedangkan `events`, `game_scores`, dan `feedback` ditarik dalam halaman terpisah memakai kursor `(server_updated_at, id)`. Pull `events` dapat memperbarui ID lokal yang lebih lama sesuai aturan 6.4.
 
 Respons ringkas:
 ```json

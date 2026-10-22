@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/utils/hash.dart';
+import '../repositories/event_repo.dart';
 import '../remote/sync_client.dart';
 
 typedef SyncUnauthorized = Future<void> Function();
+typedef SyncEventChanged = Future<void> Function(String userId, int? oldBaseId);
 
 class SyncStatus {
   const SyncStatus({
@@ -26,34 +28,54 @@ class SyncStatus {
 }
 
 class SyncService {
-  SyncService(this._database, this._client, this._onUnauthorized);
+  SyncService(
+    this._database,
+    this._client,
+    this._onUnauthorized, [
+    this._onEventChanged,
+  ]);
 
   final Database _database;
   final SyncClient _client;
   final SyncUnauthorized _onUnauthorized;
+  final SyncEventChanged? _onEventChanged;
   bool _running = false;
 
   void close() => _client.close();
 
   static const reasonMessages = <String, String>{
     'invalid': 'Data tidak valid.',
+    'invalid_event':
+        'Event tidak valid. Periksa nama, jenis, zona, pengingat, dan waktu.',
+    'invalid_score':
+        'Skor game tidak valid. Periksa level, akurasi, bintang, dan durasi.',
+    'invalid_feedback':
+        'Saran atau kesan tidak valid. Isi salah satu, maksimal 500 karakter.',
+    'future_timestamp':
+        'Waktu pencatatan lebih dari 5 menit di masa depan. Periksa jam HP.',
     'hash_mismatch': 'Hash seduhan tidak cocok.',
     'chain_broken': 'Urutan rantai seduhan terputus.',
     'tamper': 'Data seduhan berbeda dari yang tersimpan di server.',
     'not_owner': 'Data ini bukan milik akun yang sedang masuk.',
     'chain_blocked': 'Seduhan menunggu perbaikan entri sebelumnya.',
+    'immutable': 'Data yang sudah tersimpan tidak boleh diubah.',
+    'stale':
+        'Event di server lebih baru. Tarik data dari server atau ubah lagi event ini.',
   };
 
   Future<SyncStatus> status(String userId) async {
-    final counts = await _database.rawQuery(
-      '''
+    final counts = await _database.rawQuery('''
       SELECT (SELECT COUNT(*) FROM beans WHERE user_id = ? AND sync_status = 'pending') +
-             (SELECT COUNT(*) FROM brews WHERE user_id = ? AND sync_status = 'pending') AS pending_count,
+             (SELECT COUNT(*) FROM brews WHERE user_id = ? AND sync_status = 'pending') +
+             (SELECT COUNT(*) FROM events WHERE user_id = ? AND sync_status = 'pending') +
+             (SELECT COUNT(*) FROM game_scores WHERE user_id = ? AND sync_status = 'pending') +
+             (SELECT COUNT(*) FROM feedback WHERE user_id = ? AND sync_status = 'pending') AS pending_count,
              (SELECT COUNT(*) FROM beans WHERE user_id = ? AND sync_status = 'error') +
-             (SELECT COUNT(*) FROM brews WHERE user_id = ? AND sync_status = 'error') AS error_count
-    ''',
-      [userId, userId, userId, userId],
-    );
+             (SELECT COUNT(*) FROM brews WHERE user_id = ? AND sync_status = 'error') +
+             (SELECT COUNT(*) FROM events WHERE user_id = ? AND sync_status = 'error') +
+             (SELECT COUNT(*) FROM game_scores WHERE user_id = ? AND sync_status = 'error') +
+             (SELECT COUNT(*) FROM feedback WHERE user_id = ? AND sync_status = 'error') AS error_count
+    ''', List.filled(10, userId));
     final settings = await _database.query(
       'settings',
       columns: ['key', 'value'],
@@ -197,6 +219,24 @@ class SyncService {
         if (!page.hasMore) break;
       }
       await _updateBestBrews(userId, changedBeans);
+      SyncException? groupError;
+      for (final group in const ['events', 'game_scores', 'feedback']) {
+        try {
+          await _pullGroup(userId, group);
+        } on SyncException catch (error) {
+          if (error.failure == SyncFailure.unauthorized) {
+            await _onUnauthorized();
+            rethrow;
+          }
+          groupError ??= error;
+        } catch (_) {
+          groupError ??= const SyncException(
+            SyncFailure.server,
+            'Data dari server tidak valid. Coba lagi.',
+          );
+        }
+      }
+      if (groupError != null) throw groupError;
       await _savePullSummary(userId, beanCount, brewCount, null, lastStatus);
       return status(userId);
     } on SyncException catch (error) {
@@ -212,6 +252,103 @@ class SyncService {
     } finally {
       _running = false;
     }
+  }
+
+  Future<void> _pullGroup(String userId, String group) async {
+    String? cursorAt;
+    String? cursorId;
+    do {
+      final page = await _client.pullGroup(
+        userId: userId,
+        group: group,
+        cursorAt: cursorAt,
+        cursorId: cursorId,
+      );
+      if (page.hasMore &&
+          (page.cursorAt == cursorAt && page.cursorId == cursorId)) {
+        throw const SyncException(
+          SyncFailure.server,
+          'Halaman sinkronisasi tidak bergerak. Coba lagi.',
+        );
+      }
+      final changedBases = <int?>[];
+      await _database.transaction((txn) async {
+        for (final value in page.rows) {
+          final id = value['id'];
+          if (id is! String) throw const FormatException('id');
+          final existing = await txn.query(
+            group,
+            where: 'id = ?',
+            whereArgs: [id],
+            limit: 1,
+          );
+          if (existing.isNotEmpty && existing.single['user_id'] != userId) {
+            throw const FormatException('owner');
+          }
+          if (group == 'events') {
+            final updated = value['updated_at'];
+            if (updated is! String ||
+                value['deleted'] is! bool ||
+                value['name'] is! String ||
+                value['start_utc'] is! String ||
+                value['source_zone'] is! String ||
+                value['reminder_minutes'] is! String ||
+                value['created_at'] is! String) {
+              throw const FormatException('event');
+            }
+            if (existing.isNotEmpty &&
+                (existing.single['sync_status'] == 'pending' ||
+                    (existing.single['updated_at'] as String).compareTo(
+                          updated,
+                        ) >=
+                        0)) {
+              continue;
+            }
+            final row = Map<String, Object?>.from(value)
+              ..remove('server_updated_at')
+              ..['user_id'] = userId
+              ..['deleted'] = value['deleted'] == true ? 1 : 0
+              ..['sync_status'] = 'synced'
+              ..['notif_base_id'] = existing.isEmpty
+                  ? null
+                  : existing.single['notif_base_id'];
+            if (existing.isEmpty) {
+              await txn.insert(group, row);
+            } else {
+              await txn.update(
+                group,
+                row,
+                where: 'id = ? AND user_id = ?',
+                whereArgs: [id, userId],
+              );
+            }
+            changedBases.add(
+              existing.isEmpty
+                  ? null
+                  : existing.single['notif_base_id'] as int?,
+            );
+          } else {
+            if (existing.isNotEmpty) continue;
+            final row = Map<String, Object?>.from(value)
+              ..remove('server_updated_at')
+              ..['user_id'] = userId
+              ..['sync_status'] = 'synced';
+            await txn.insert(group, row);
+          }
+        }
+      });
+      if (group == 'events' && changedBases.isNotEmpty) {
+        await EventRepository(
+          _database,
+        ).assignPulledNotificationBaseIds(userId);
+        for (final base in changedBases) {
+          await _onEventChanged?.call(userId, base);
+        }
+      }
+      cursorAt = page.cursorAt;
+      cursorId = page.cursorId;
+      if (!page.hasMore) break;
+    } while (true);
   }
 
   Future<SyncPullResponse> _pull(String userId, int seq, String? hash) async {
@@ -403,7 +540,13 @@ class SyncService {
       );
     }
     _running = true;
-    final acceptedCounts = {'beans': 0, 'brews': 0};
+    final acceptedCounts = {
+      'beans': 0,
+      'brews': 0,
+      'events': 0,
+      'game_scores': 0,
+      'feedback': 0,
+    };
     final rejectedCounts = <String, int>{};
     try {
       final states = retryErrors ? ['pending', 'error'] : ['pending'];
@@ -455,6 +598,68 @@ class SyncService {
         );
         await _saveSummary(userId, acceptedCounts, rejectedCounts);
         if (blocked) break;
+      }
+      SyncException? groupError;
+      for (final group in const ['events', 'game_scores', 'feedback']) {
+        try {
+          final rows = await _pendingRows(
+            group,
+            userId,
+            states,
+            group == 'events'
+                ? 'updated_at ASC, id ASC'
+                : group == 'game_scores'
+                ? 'played_at ASC, id ASC'
+                : 'created_at ASC, id ASC',
+          );
+          for (var start = 0; start < rows.length; start += 100) {
+            final batch = rows.skip(start).take(100).toList();
+            final payload = batch.map((row) {
+              final json = Map<String, Object?>.of(row)
+                ..remove('user_id')
+                ..remove('sync_status')
+                ..remove('notif_base_id');
+              if (group == 'events') json['deleted'] = row['deleted'] == 1;
+              return json;
+            }).toList();
+            final response = await _client.pushGroup(
+              userId: userId,
+              group: group,
+              rows: payload,
+            );
+            await _apply(
+              group,
+              userId,
+              batch,
+              response,
+              acceptedCounts,
+              rejectedCounts,
+            );
+            await _saveSummary(userId, acceptedCounts, rejectedCounts);
+          }
+        } on SyncException catch (error) {
+          if (error.failure == SyncFailure.unauthorized) {
+            await _onUnauthorized();
+            rethrow;
+          }
+          rejectedCounts['${group}_request'] =
+              (rejectedCounts['${group}_request'] ?? 0) + 1;
+          groupError ??= error;
+        } catch (_) {
+          rejectedCounts['${group}_request'] =
+              (rejectedCounts['${group}_request'] ?? 0) + 1;
+          groupError ??= const SyncException(
+            SyncFailure.server,
+            'Sinkronisasi kelompok data gagal. Coba lagi.',
+          );
+        }
+      }
+      if (groupError != null) {
+        await _saveSummary(userId, acceptedCounts, rejectedCounts);
+        throw groupError;
+      }
+      if ((rejectedCounts['stale'] ?? 0) > 0) {
+        await _pullGroup(userId, 'events');
       }
       if (retryErrors && beans.isEmpty && brews.isEmpty) {
         await _saveSummary(userId, acceptedCounts, rejectedCounts);

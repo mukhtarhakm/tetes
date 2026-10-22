@@ -19,6 +19,21 @@ class FakeClient extends SyncClient {
     : super(sessionStorage: const SecureSessionStorage(FlutterSecureStorage()));
 
   Future<SyncPullResponse> Function(int, String?) answer;
+  Future<SyncGroupPage> Function(
+    String group,
+    String? cursorAt,
+    String? cursorId,
+  )?
+  groupAnswer;
+  @override
+  Future<SyncGroupPage> pullGroup({
+    required String userId,
+    required String group,
+    String? cursorAt,
+    String? cursorId,
+  }) async => groupAnswer == null
+      ? const SyncGroupPage([], false, null, null)
+      : groupAnswer!(group, cursorAt, cursorId);
   @override
   Future<SyncPullResponse> pullData({
     required String userId,
@@ -151,6 +166,15 @@ Future<Database> database() async {
     target_start_s INTEGER NOT NULL, target_duration_s INTEGER NOT NULL,
     target_water_cum_g REAL NOT NULL, target_pour_g REAL NOT NULL,
     actual_start_s INTEGER, actual_duration_s INTEGER, actual_water_g REAL, drawdown_s INTEGER)''',
+  );
+  await db.execute(
+    'CREATE TABLE events (id TEXT PRIMARY KEY, user_id TEXT, name TEXT, event_type TEXT, location TEXT, notes TEXT, start_utc TEXT, source_zone TEXT, reminder_minutes TEXT, notif_base_id INTEGER, deleted INTEGER, created_at TEXT, updated_at TEXT, sync_status TEXT)',
+  );
+  await db.execute(
+    'CREATE TABLE game_scores (id TEXT PRIMARY KEY, user_id TEXT, level INTEGER, accuracy REAL, stars INTEGER, duration_s INTEGER, played_at TEXT, sync_status TEXT)',
+  );
+  await db.execute(
+    'CREATE TABLE feedback (id TEXT PRIMARY KEY, user_id TEXT, suggestion TEXT, impression TEXT, created_at TEXT, sync_status TEXT)',
   );
   return db;
 }
@@ -396,6 +420,198 @@ void main() {
       );
       await expectLater(collision.pull(user), throwsA(isA<SyncException>()));
       expect((await db.query('beans')).single['user_id'], other);
+    },
+  );
+
+  test(
+    'pull event memakai kursor server, mempertahankan pending, dan membatalkan notifikasi tombstone',
+    () async {
+      const eventId = '66666666-6666-4666-8666-666666666666';
+      const pendingId = '77777777-7777-4777-8777-777777777777';
+      const newId = '88888888-8888-4888-8888-888888888888';
+      Map<String, dynamic> event(String id, String updated, bool deleted) => {
+        'id': id,
+        'name': 'Workshop',
+        'event_type': 'workshop',
+        'location': null,
+        'notes': null,
+        'start_utc': time,
+        'source_zone': 'Asia/Jakarta',
+        'reminder_minutes': '30',
+        'deleted': deleted,
+        'created_at': time,
+        'updated_at': updated,
+        'server_updated_at': '2026-10-22T01:00:00Z',
+      };
+      for (final id in [eventId, pendingId]) {
+        await db.insert(
+          'events',
+          {
+            ...event(id, time, false),
+            'server_updated_at': null,
+            'user_id': user,
+            'deleted': 0,
+            'notif_base_id': id == eventId ? 12 : 13,
+            'sync_status': id == eventId ? 'synced' : 'pending',
+          }..remove('server_updated_at'),
+        );
+      }
+      final client = FakeClient(
+        (_, _) async => page('empty_server', serverSeq: 0),
+      );
+      final cursors = <String?>[];
+      client.groupAnswer = (group, at, id) async {
+        if (group != 'events') {
+          return const SyncGroupPage([], false, null, null);
+        }
+        cursors.add(at);
+        if (at == null) {
+          return SyncGroupPage(
+            [
+              event(eventId, '2026-10-21T09:00:00Z', true),
+              event(pendingId, '2026-10-21T09:00:00Z', true),
+            ],
+            true,
+            '2026-10-22T01:00:00Z',
+            pendingId,
+          );
+        }
+        return SyncGroupPage(
+          [event(newId, time, false)],
+          false,
+          '2026-10-22T01:00:01Z',
+          newId,
+        );
+      };
+      final canceled = <int?>[];
+      await SyncService(
+        db,
+        client,
+        () async {},
+        (_, base) async => canceled.add(base),
+      ).pull(user);
+      expect(cursors, [null, '2026-10-22T01:00:00Z']);
+      expect(
+        (await db.query(
+          'events',
+          where: 'id = ?',
+          whereArgs: [eventId],
+        )).single['deleted'],
+        1,
+      );
+      expect(
+        (await db.query(
+          'events',
+          where: 'id = ?',
+          whereArgs: [pendingId],
+        )).single['deleted'],
+        0,
+      );
+      expect(
+        (await db.query(
+          'events',
+          where: 'id = ?',
+          whereArgs: [newId],
+        )).single['notif_base_id'],
+        isNotNull,
+      );
+      expect(canceled, contains(12));
+    },
+  );
+
+  test(
+    'skor dan feedback pull append-only; event dengan updated_at sama tidak ditimpa',
+    () async {
+      const eventId = '66666666-6666-4666-8666-666666666666';
+      const scoreId = '77777777-7777-4777-8777-777777777777';
+      const feedbackId = '88888888-8888-4888-8888-888888888888';
+      await db.insert('events', {
+        'id': eventId,
+        'user_id': user,
+        'name': 'Lokal',
+        'event_type': 'workshop',
+        'start_utc': time,
+        'source_zone': 'Asia/Jakarta',
+        'reminder_minutes': '30',
+        'deleted': 0,
+        'created_at': time,
+        'updated_at': time,
+        'sync_status': 'synced',
+      });
+      await db.insert('game_scores', {
+        'id': scoreId,
+        'user_id': user,
+        'level': 1,
+        'accuracy': 0.9,
+        'stars': 3,
+        'duration_s': 20,
+        'played_at': time,
+        'sync_status': 'synced',
+      });
+      final client = FakeClient(
+        (_, _) async => page('empty_server', serverSeq: 0),
+      );
+      client.groupAnswer = (group, _, _) async {
+        if (group == 'events') {
+          return SyncGroupPage(
+            [
+              {
+                'id': eventId,
+                'name': 'Server',
+                'event_type': 'workshop',
+                'location': null,
+                'notes': null,
+                'start_utc': time,
+                'source_zone': 'Asia/Jakarta',
+                'reminder_minutes': '30',
+                'deleted': true,
+                'created_at': time,
+                'updated_at': time,
+                'server_updated_at': time,
+              },
+            ],
+            false,
+            time,
+            eventId,
+          );
+        }
+        if (group == 'game_scores') {
+          return SyncGroupPage(
+            [
+              {
+                'id': scoreId,
+                'level': 1,
+                'accuracy': 0.1,
+                'stars': 1,
+                'duration_s': 29,
+                'played_at': time,
+                'server_updated_at': time,
+              },
+            ],
+            false,
+            time,
+            scoreId,
+          );
+        }
+        return SyncGroupPage(
+          [
+            {
+              'id': feedbackId,
+              'suggestion': 'Baru',
+              'impression': null,
+              'created_at': time,
+              'server_updated_at': time,
+            },
+          ],
+          false,
+          time,
+          feedbackId,
+        );
+      };
+      await SyncService(db, client, () async {}).pull(user);
+      expect((await db.query('events')).single['name'], 'Lokal');
+      expect((await db.query('game_scores')).single['accuracy'], 0.9);
+      expect((await db.query('feedback')).single['suggestion'], 'Baru');
     },
   );
 }

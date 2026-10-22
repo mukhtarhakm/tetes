@@ -41,6 +41,14 @@ class SyncRejection {
   final String reason;
 }
 
+class SyncGroupPage {
+  const SyncGroupPage(this.rows, this.hasMore, this.cursorAt, this.cursorId);
+  final List<Map<String, dynamic>> rows;
+  final bool hasMore;
+  final String? cursorAt;
+  final String? cursorId;
+}
+
 class SyncPullResponse {
   const SyncPullResponse({
     required this.status,
@@ -71,6 +79,137 @@ class SyncClient {
   final bool _ownsClient;
   final String baseUrl;
   final Duration timeout;
+
+  Future<SyncPushResponse> pushGroup({
+    required String userId,
+    required String group,
+    required List<Map<String, Object?>> rows,
+  }) async {
+    final data = await _post(userId, 'sync-push', {
+      'beans': [],
+      'brews': [],
+      group: rows,
+    });
+    final accepted = data['accepted'];
+    final rejected = data['rejected'];
+    if (accepted is! Map<String, dynamic> ||
+        accepted[group] is! List ||
+        rejected is! List) {
+      throw const SyncException(
+        SyncFailure.server,
+        'Respons sinkronisasi tidak valid. Coba lagi.',
+      );
+    }
+    try {
+      return SyncPushResponse(
+        accepted: {group: (accepted[group] as List).cast<String>()},
+        rejected: rejected
+            .map(
+              (item) => SyncRejection(
+                item['table'] as String,
+                item['id'] as String,
+                item['reason'] as String,
+              ),
+            )
+            .toList(),
+      );
+    } catch (_) {
+      throw const SyncException(
+        SyncFailure.server,
+        'Respons sinkronisasi tidak valid. Coba lagi.',
+      );
+    }
+  }
+
+  Future<SyncGroupPage> pullGroup({
+    required String userId,
+    required String group,
+    String? cursorAt,
+    String? cursorId,
+  }) async {
+    final data = await _post(userId, 'sync-pull', {
+      'group': group,
+      'cursor_at': cursorAt,
+      'cursor_id': cursorId,
+    });
+    try {
+      final rows = (data['rows'] as List).cast<Map<String, dynamic>>();
+      final more = data['has_more'] as bool;
+      final at = data['cursor_at'] as String?;
+      final id = data['cursor_id'] as String?;
+      if (data['group'] != group || more && (at == null || id == null)) {
+        throw const FormatException();
+      }
+      return SyncGroupPage(rows, more, at, id);
+    } catch (_) {
+      throw const SyncException(
+        SyncFailure.server,
+        'Respons tarik data tidak valid. Coba lagi.',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _post(
+    String userId,
+    String function,
+    Map<String, Object?> body,
+  ) async {
+    final session = await sessionStorage.readSession();
+    if (session == null || session.userId != userId) {
+      throw const SyncException(
+        SyncFailure.unauthorized,
+        'Sesi tidak sah. Masuk kembali.',
+      );
+    }
+    late http.Response response;
+    try {
+      response = await _client
+          .post(
+            Uri.parse('$baseUrl/$function'),
+            headers: {
+              'Content-Type': 'application/json',
+              'x-session-token': session.token,
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(timeout);
+    } on TimeoutException {
+      throw const SyncException(
+        SyncFailure.timeout,
+        'Sinkronisasi terlalu lama. Coba lagi.',
+      );
+    } on SocketException {
+      throw const SyncException(
+        SyncFailure.network,
+        'Tidak dapat terhubung ke internet.',
+      );
+    } on http.ClientException {
+      throw const SyncException(
+        SyncFailure.network,
+        'Tidak dapat terhubung ke internet.',
+      );
+    }
+    if (response.statusCode == 401) {
+      throw const SyncException(
+        SyncFailure.unauthorized,
+        'Sesi tidak sah. Masuk kembali.',
+      );
+    }
+    if (response.statusCode != 200) {
+      throw const SyncException(
+        SyncFailure.server,
+        'Server sinkronisasi sedang bermasalah. Coba lagi.',
+      );
+    }
+    try {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw const SyncException(
+        SyncFailure.server,
+        'Respons sinkronisasi tidak valid. Coba lagi.',
+      );
+    }
+  }
 
   Future<SyncPullResponse> pullData({
     required String userId,

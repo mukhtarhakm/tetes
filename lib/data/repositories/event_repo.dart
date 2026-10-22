@@ -74,6 +74,26 @@ class EventRepository {
     });
   }
 
+  Future<void> assignPulledNotificationBaseIds(String userId) async {
+    await _database.transaction((txn) async {
+      final rows = await txn.query(
+        'events',
+        columns: ['id'],
+        where: 'user_id = ? AND deleted = 0 AND notif_base_id IS NULL',
+        whereArgs: [userId],
+        orderBy: 'created_at ASC, id ASC',
+      );
+      for (final row in rows) {
+        await txn.update(
+          'events',
+          {'notif_base_id': await _nextNotificationBaseId(txn, userId)},
+          where: 'id = ? AND user_id = ?',
+          whereArgs: [row['id'], userId],
+        );
+      }
+    });
+  }
+
   Future<int> _nextNotificationBaseId(Transaction txn, String userId) async {
     final rows = await txn.query(
       'settings',

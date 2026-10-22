@@ -46,6 +46,9 @@ class _Call {
 class _FakeClient extends SyncClient {
   _FakeClient() : super(sessionStorage: _Storage());
   final calls = <_Call>[];
+  final groupCalls = <String, List<Map<String, Object?>>>{};
+  String? rejectedGroup;
+  String? failedGroup;
   Future<SyncPushResponse> Function(_Call call)? answer;
 
   @override
@@ -63,6 +66,30 @@ class _FakeClient extends SyncClient {
         'brews': brews.map((row) => row['id'] as String).toList(),
       },
       rejected: const [],
+    );
+  }
+
+  @override
+  Future<SyncPushResponse> pushGroup({
+    required String userId,
+    required String group,
+    required List<Map<String, Object?>> rows,
+  }) async {
+    groupCalls[group] = rows;
+    if (failedGroup == group) {
+      throw const SyncException(
+        SyncFailure.network,
+        'Tidak dapat terhubung ke internet.',
+      );
+    }
+    final accepted = rejectedGroup == group
+        ? rows.skip(1).map((row) => row['id'] as String).toList()
+        : rows.map((row) => row['id'] as String).toList();
+    return SyncPushResponse(
+      accepted: {group: accepted},
+      rejected: rejectedGroup == group
+          ? [SyncRejection(group, rows.first['id'] as String, 'invalid')]
+          : [],
     );
   }
 }
@@ -181,6 +208,48 @@ void main() {
       );
     }
   });
+
+  test(
+    'SyncClient group cursor dan payload memakai session tanpa user_id',
+    () async {
+      final requests = <Map<String, dynamic>>[];
+      final client = SyncClient(
+        sessionStorage: _Storage(),
+        baseUrl: 'https://example.test/functions/v1',
+        client: MockClient((request) async {
+          expect(request.headers['x-session-token'], 'test-token');
+          expect(request.headers.containsKey('apikey'), false);
+          requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+          if (request.url.path.endsWith('sync-pull')) {
+            return http.Response(
+              '{"status":"pull","group":"events","rows":[],"has_more":false,"cursor_at":null,"cursor_id":null}',
+              200,
+            );
+          }
+          return http.Response(
+            '{"accepted":{"beans":[],"brews":[],"events":["66666666-6666-4666-8666-666666666666"],"game_scores":[],"feedback":[]},"rejected":[]}',
+            200,
+          );
+        }),
+      );
+      await client.pullGroup(
+        userId: user,
+        group: 'events',
+        cursorAt: timestamp,
+        cursorId: '66666666-6666-4666-8666-666666666666',
+      );
+      await client.pushGroup(
+        userId: user,
+        group: 'events',
+        rows: [
+          {'id': '66666666-6666-4666-8666-666666666666'},
+        ],
+      );
+      expect(requests.first['cursor_at'], timestamp);
+      expect(requests.last.containsKey('user_id'), false);
+      expect(requests.last['events'], hasLength(1));
+    },
+  );
 
   test(
     'beans go first, booleans and nulls map, stages follow, user is isolated',
@@ -445,4 +514,97 @@ void main() {
       expect(client.calls.single.brews.single['prev_hash'], 'prev-2');
     },
   );
+
+  test(
+    'events, game_scores, feedback dikirim per kelompok; invalid tidak memblokir',
+    () async {
+      final db = await _database();
+      final client = _FakeClient()..rejectedGroup = 'events';
+      addTearDown(() async {
+        client.close();
+        await db.close();
+      });
+      for (final id in [
+        '66666666-6666-4666-8666-666666666666',
+        '77777777-7777-4777-8777-777777777777',
+      ]) {
+        await db.insert('events', {
+          'id': id,
+          'user_id': user,
+          'name': 'Event',
+          'start_utc': timestamp,
+          'source_zone': 'Asia/Jakarta',
+          'reminder_minutes': '30',
+          'deleted': 0,
+          'created_at': timestamp,
+          'updated_at': timestamp,
+          'sync_status': 'pending',
+        });
+      }
+      await db.insert('game_scores', {
+        'id': '88888888-8888-4888-8888-888888888888',
+        'user_id': user,
+        'level': 1,
+        'accuracy': 0.8,
+        'stars': 2,
+        'duration_s': 20,
+        'played_at': timestamp,
+        'sync_status': 'pending',
+      });
+      await db.insert('feedback', {
+        'id': '99999999-9999-4999-8999-999999999999',
+        'user_id': user,
+        'suggestion': 'Bagus',
+        'created_at': timestamp,
+        'sync_status': 'pending',
+      });
+      final status = await SyncService(
+        db,
+        client,
+        () async {},
+      ).run(userId: user);
+      expect(client.groupCalls.keys, ['events', 'game_scores', 'feedback']);
+      expect(client.groupCalls['events']!.first.containsKey('user_id'), false);
+      expect(client.groupCalls['events']!.first['deleted'], false);
+      expect(status.errorCount, 1);
+      expect(status.pendingCount, 0);
+      expect((await db.query('game_scores')).single['sync_status'], 'synced');
+      expect((await db.query('feedback')).single['sync_status'], 'synced');
+    },
+  );
+
+  test('gagal request events tidak menghentikan feedback', () async {
+    final db = await _database();
+    final client = _FakeClient()..failedGroup = 'events';
+    addTearDown(() async {
+      client.close();
+      await db.close();
+    });
+    await db.insert('events', {
+      'id': '66666666-6666-4666-8666-666666666666',
+      'user_id': user,
+      'name': 'Event',
+      'start_utc': timestamp,
+      'source_zone': 'Asia/Jakarta',
+      'reminder_minutes': '30',
+      'deleted': 0,
+      'created_at': timestamp,
+      'updated_at': timestamp,
+      'sync_status': 'pending',
+    });
+    await db.insert('feedback', {
+      'id': '77777777-7777-4777-8777-777777777777',
+      'user_id': user,
+      'suggestion': 'Bagus',
+      'created_at': timestamp,
+      'sync_status': 'pending',
+    });
+    await expectLater(
+      SyncService(db, client, () async {}).run(userId: user),
+      throwsA(isA<SyncException>()),
+    );
+    expect(client.groupCalls.keys, contains('feedback'));
+    expect((await db.query('events')).single['sync_status'], 'pending');
+    expect((await db.query('feedback')).single['sync_status'], 'synced');
+  });
 }

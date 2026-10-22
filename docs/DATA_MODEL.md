@@ -397,6 +397,7 @@ Tabel data (`beans`, `brews`, `brew_stages`, `events`, `game_scores`, `feedback`
 - `brews` memiliki `UNIQUE (user_id, seq)` dan `UNIQUE (id)`.
 - Boolean memakai tipe `boolean`.
 - `brew_stages` memiliki `user_id` juga, supaya pemeriksaan kepemilikan sederhana.
+- `events`, `game_scores`, dan `feedback` memiliki `server_updated_at timestamptz NOT NULL DEFAULT now()` untuk kursor pull `(server_updated_at, id)`. Kolom ini hanya di server. `game_scores` dan `feedback` memiliki `created_at`/`updated_at` server yang berasal dari `played_at`/`created_at` lokal dan tetap pada baris append-only.
 
 Tabel `stores` tidak ada di server.
 

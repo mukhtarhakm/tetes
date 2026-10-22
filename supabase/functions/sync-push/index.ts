@@ -1,5 +1,6 @@
 import { buildHashInput, sha256Hex, type BrewHashFields } from "../_shared/hash.ts";
 import { requireValidSession, SessionUnauthorizedError } from "../_shared/session.ts";
+import { validateEvent, validateScore, validateFeedback } from "./validation.ts";
 
 const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -17,7 +18,7 @@ const enums = {
   stage: ["bloom", "pouring_2", "pouring_3", "pouring_4", "pouring_5"],
 } as const;
 type Row = Record<string, unknown>;
-type Rejection = { table: "beans" | "brews"; id: string; reason: "invalid" | "hash_mismatch" | "chain_broken" | "tamper" | "not_owner" | "chain_blocked" };
+type Rejection = { table: "beans" | "brews" | "events" | "game_scores" | "feedback"; id: string; reason: "invalid" | "invalid_event" | "invalid_score" | "invalid_feedback" | "future_timestamp" | "hash_mismatch" | "chain_broken" | "tamper" | "not_owner" | "chain_blocked" | "immutable" | "stale" };
 
 Deno.serve(async (request) => {
   const started = performance.now();
@@ -39,7 +40,8 @@ async function handle(request: Request, count: (beans: number, brews: number) =>
   const userId = await requireValidSession(request.headers.get("x-session-token") ?? "");
   let body: unknown;
   try { body = await request.json(); } catch { return errorResponse(400, "invalid_json", "Body JSON tidak valid."); }
-  if (!record(body) || !Array.isArray(body.beans) || !Array.isArray(body.brews) || body.beans.length > 100 || body.brews.length > 50) {
+  if (!record(body) || !Array.isArray(body.beans) || !Array.isArray(body.brews) || body.beans.length > 100 || body.brews.length > 50 ||
+    !["events", "game_scores", "feedback"].every((name) => body[name] === undefined || Array.isArray(body[name]) && (body[name] as unknown[]).length <= 100)) {
     return errorResponse(400, "invalid_input", "Jumlah atau bentuk data sinkronisasi tidak valid.");
   }
   count(body.beans.length, body.brews.length);
@@ -47,7 +49,7 @@ async function handle(request: Request, count: (beans: number, brews: number) =>
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) throw new Error("database unavailable");
   const headers = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
-  const accepted = { beans: [] as string[], brews: [] as string[] };
+  const accepted = { beans: [] as string[], brews: [] as string[], events: [] as string[], game_scores: [] as string[], feedback: [] as string[] };
   const rejected: Rejection[] = [];
 
   for (const value of body.beans) {
@@ -103,6 +105,39 @@ async function handle(request: Request, count: (beans: number, brews: number) =>
     }
     rejected.push({ table: "brews", id, reason: reason ?? "invalid" });
     blocked = true;
+  }
+  const groups = [
+    ["events", "upsert_sync_event", validateEvent],
+    ["game_scores", "insert_sync_score", validateScore],
+    ["feedback", "insert_sync_feedback", validateFeedback],
+  ] as const;
+  for (const [table, rpc, validate] of groups) {
+    for (const value of (body[table] ?? []) as unknown[]) {
+      const id = record(value) && typeof value.id === "string" ? value.id : "";
+      if (!validate(value)) {
+        const fields = table === "events" ? ["created_at", "updated_at"]
+          : table === "game_scores" ? ["played_at"] : ["created_at"];
+        const future = record(value) && fields.some((field) => typeof value[field] === "string" &&
+          !Number.isNaN(Date.parse(value[field] as string)) && Date.parse(value[field] as string) > Date.now() + 300000);
+        rejected.push({ table, id, reason: future ? "future_timestamp" :
+          table === "events" ? "invalid_event" : table === "game_scores" ? "invalid_score" : "invalid_feedback" });
+        continue;
+      }
+      const payload = { ...value };
+      delete payload.user_id;
+      delete payload.sync_status;
+      delete payload.notif_base_id;
+      if (table === "events") payload.deleted = value.deleted === true;
+      const response = await fetch(`${url}/rest/v1/rpc/${rpc}`, {
+        method: "POST", headers,
+        body: JSON.stringify({ p_user_id: userId, [`p_${table === "game_scores" ? "score" : table === "events" ? "event" : "feedback"}`]: payload }),
+      });
+      if (!response.ok) throw new Error("sync rpc failed");
+      const result = await response.json();
+      if (result === "accepted") accepted[table].push(id);
+      else if (result === "not_owner" || result === "immutable" || result === "stale") rejected.push({ table, id, reason: result });
+      else throw new Error("unexpected sync rpc result");
+    }
   }
   return new Response(JSON.stringify({ accepted, rejected }), { status: 200, headers: jsonHeaders });
 }
