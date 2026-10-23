@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/tokens.dart';
 import '../../../core/utils/currency_format.dart';
+import '../../../core/utils/format_ratio.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
@@ -10,6 +11,7 @@ import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/score_chart.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../journal/journal_model.dart';
 import '../../journal/screens/brew_detail_screen.dart';
 import '../bean_model.dart';
 import '../state/bean_providers.dart';
@@ -63,74 +65,12 @@ class _BeanDetailContent extends ConsumerWidget {
     final mutation = ref.watch(beanMutationProvider);
     return ListView(
       children: [
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(bean.name, style: Theme.of(context).textTheme.headlineLarge),
-              const SizedBox(height: AppSpacing.s12),
-              Wrap(
-                spacing: AppSpacing.s8,
-                runSpacing: AppSpacing.s8,
-                children: [
-                  AppChip(label: bean.species.label),
-                  if (bean.roastLevel != null)
-                    AppChip(label: bean.roastLevel!.label),
-                  StatusPill(
-                    label: bean.isLowStock ? 'Stok menipis' : 'Stok aman',
-                    variant: bean.isLowStock
-                        ? StatusPillVariant.warning
-                        : StatusPillVariant.synced,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s20),
-              _DetailRow(label: 'Roastery', value: bean.roastery),
-              _DetailRow(
-                label: 'Roasting sendiri',
-                value: bean.isSelfRoasted ? 'Ya' : 'Tidak',
-              ),
-              _DetailRow(label: 'Tipe', value: bean.beanType?.label),
-              if (bean.species == BeanSpecies.campuran)
-                _DetailRow(label: 'Arabika', value: '${bean.arabicaPercent}%'),
-              _DetailRow(label: 'Asal', value: bean.origin),
-              _DetailRow(label: 'Proses', value: _processLabel(bean)),
-              _DetailRow(label: 'Tanggal roasting', value: bean.roastDate),
-              _DetailRow(
-                label: 'Ukuran kemasan',
-                value: bean.packSizeG == null
-                    ? 'Ukuran kemasan belum diisi'
-                    : '${_formatNumber(bean.packSizeG!)} g',
-              ),
-              _DetailRow(
-                label: 'Harga kemasan',
-                value: bean.priceOriginal == null
-                    ? null
-                    : '${_formatNumber(bean.priceOriginal!)} ${bean.currency ?? ''}',
-              ),
-              _DetailRow(label: 'Kurs saat input', value: _fxLabel(bean)),
-              _DetailRow(
-                label: 'Harga rupiah per kemasan',
-                value: _packagePriceIdr(bean),
-              ),
-              _DetailRow(
-                label: 'Harga rupiah per kg',
-                value: bean.priceIdrPerKg == null
-                    ? null
-                    : formatIdr(bean.priceIdrPerKg!),
-              ),
-              _DetailRow(
-                label: 'Stok awal',
-                value: '${_formatNumber(bean.initialStockG)} g',
-              ),
-              _DetailRow(
-                label: 'Stok tersisa',
-                value: '${_formatNumber(bean.remainingStockG)} g',
-              ),
-            ],
-          ),
-        ),
+        _BeanSummaryCard(bean: bean),
         const SizedBox(height: AppSpacing.s16),
+        if (_hasPrice(bean)) ...[
+          _PriceCard(bean: bean),
+          const SizedBox(height: AppSpacing.s16),
+        ],
         AppCard(
           variant: AppCardVariant.tinted,
           child: Column(
@@ -168,34 +108,7 @@ class _BeanDetailContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.s16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Pengaturan terbaik',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.s8),
-              Text(
-                bean.bestBrewId == null
-                    ? 'Belum ada seduhan untuk biji ini.'
-                    : 'Pengaturan terbaik tersedia dari jurnal seduhan.',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: AppSpacing.s16),
-              AppButton(
-                label: 'Seduh dengan ini',
-                onPressed: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(
-                    builder: (_) => BrewSetupScreen(initialBeanId: bean.id),
-                  ),
-                ),
-                icon: Icons.coffee_rounded,
-              ),
-            ],
-          ),
-        ),
+        _BestSettingCard(bean: bean),
         const SizedBox(height: AppSpacing.s16),
         AppCard(
           child: Column(
@@ -231,89 +144,7 @@ class _BeanDetailContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.s16),
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Riwayat Seduhan',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.s12),
-              ref.watch(beanHistoryBrewsProvider(bean.id)).when(
-                    data: (brews) {
-                      if (brews.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: AppSpacing.s12,
-                          ),
-                          child: Text(
-                            'Belum ada seduhan untuk biji ini.',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: AppColors.inkSoft),
-                          ),
-                        );
-                      }
-                      return ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: brews.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(color: AppColors.divider),
-                        itemBuilder: (context, index) {
-                          final item = brews[index];
-                          final ratioText = item.ratio % 1 == 0
-                              ? '1:${item.ratio.toInt()}'
-                              : '1:${item.ratio.toStringAsFixed(1)}';
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              '${_formatDate(item.brewedAtUtc)} • ★ ${item.tasteScore}/5',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              '${item.doseG.toStringAsFixed(1)}g • $ratioText • ${item.waterTempC}°C',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: AppColors.inkSoft),
-                            ),
-                            trailing: Wrap(
-                              spacing: AppSpacing.s4,
-                              children: [
-                                if (item.isCancelled)
-                                  const StatusPill(
-                                    label: 'Dibatalkan',
-                                    variant: StatusPillVariant.warning,
-                                  ),
-                                const Icon(Icons.chevron_right_rounded),
-                              ],
-                            ),
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    BrewDetailScreen(brewId: item.id),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(AppSpacing.s16),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                    error: (_, _) =>
-                        const Text('Gagal memuat riwayat seduhan.'),
-                  ),
-            ],
-          ),
-        ),
+        _HistoryCard(bean: bean),
         if (mutation.hasError) ...[
           const SizedBox(height: AppSpacing.s16),
           Text(
@@ -383,36 +214,607 @@ class _BeanDetailContent extends ConsumerWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
 
-  final String label;
-  final String? value;
+bool _hasPrice(Bean bean) =>
+    bean.priceOriginal != null || bean.priceIdrPerKg != null;
+
+({String label, StatusPillVariant variant}) _stockStatus(Bean bean) {
+  if (bean.remainingStockG <= 0) {
+    return (label: 'Habis', variant: StatusPillVariant.error);
+  }
+  if (bean.isLowStock) {
+    return (label: 'Menipis', variant: StatusPillVariant.warning);
+  }
+  return (label: 'Stok aman', variant: StatusPillVariant.synced);
+}
+
+class _BeanSummaryCard extends StatelessWidget {
+  const _BeanSummaryCard({required this.bean});
+
+  final Bean bean;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-      child: Row(
+    final textTheme = Theme.of(context).textTheme;
+    final status = _stockStatus(bean);
+    final remaining = bean.remainingStockG < 0 ? 0.0 : bean.remainingStockG;
+    final fraction = bean.initialStockG <= 0
+        ? 0.0
+        : (remaining / bean.initialStockG).clamp(0.0, 1.0);
+    final barColor = switch (status.variant) {
+      StatusPillVariant.error => AppColors.error,
+      StatusPillVariant.warning => AppColors.warning,
+      _ => AppColors.primary,
+    };
+    final subtitle = [
+      bean.roastery,
+      bean.beanType?.label,
+    ].whereType<String>().where((item) => item.isNotEmpty).join(' · ');
+    final info = <(String, String)>[
+      if (bean.origin != null && bean.origin!.isNotEmpty)
+        ('Asal', bean.origin!),
+      if (_processLabel(bean) != null) ('Proses', _processLabel(bean)!),
+      ('Sumber', bean.isSelfRoasted ? 'Roasting sendiri' : 'Dibeli'),
+      if (bean.species == BeanSpecies.campuran && bean.arabicaPercent != null)
+        ('Arabika', '${bean.arabicaPercent}%'),
+      if (bean.roastDate != null && bean.roastDate!.isNotEmpty)
+        ('Tanggal roasting', _formatDate(bean.roastDate!)),
+      if (bean.packSizeG != null)
+        ('Ukuran kemasan', '${_formatNumber(bean.packSizeG!)} g'),
+    ];
+
+    return AppCard(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(bean.name, style: textTheme.headlineLarge),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        subtitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.inkSoft,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s8),
+              StatusPill(label: status.label, variant: status.variant),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          Wrap(
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s8,
+            children: [
+              AppChip(label: bean.species.label),
+              if (bean.roastLevel != null)
+                AppChip(label: bean.roastLevel!.label),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(AppRadius.innerCard),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      '${_formatNumber(remaining)} g',
+                      style: textTheme.headlineMedium,
+                    ),
+                    const SizedBox(width: AppSpacing.s8),
+                    Expanded(
+                      child: Text(
+                        'tersisa',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.inkSoft,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'dari ${_formatNumber(bean.initialStockG)} g',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppColors.inkSoft,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: LinearProgressIndicator(
+                    value: fraction,
+                    minHeight: AppSizes.stockBarHeight,
+                    color: barColor,
+                    backgroundColor: AppColors.divider,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: AppSpacing.s16),
-          Expanded(
-            child: Text(
-              value == null || value!.isEmpty ? '—' : value!,
-              style: Theme.of(context).textTheme.bodyLarge,
-              textAlign: TextAlign.end,
+          if (info.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - AppSpacing.s16) / 2;
+                return Wrap(
+                  spacing: AppSpacing.s16,
+                  runSpacing: AppSpacing.s16,
+                  children: [
+                    for (final item in info)
+                      SizedBox(
+                        width: width,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.$1,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: AppColors.inkSoft,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.s4),
+                            Text(
+                              item.$2,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceCard extends StatefulWidget {
+  const _PriceCard({required this.bean});
+
+  final Bean bean;
+
+  @override
+  State<_PriceCard> createState() => _PriceCardState();
+}
+
+class _PriceCardState extends State<_PriceCard> {
+  var _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bean = widget.bean;
+    final textTheme = Theme.of(context).textTheme;
+    final muted = textTheme.bodySmall?.copyWith(color: AppColors.inkSoft);
+    final packageIdr = _packagePriceIdr(bean);
+    final original = bean.priceOriginal == null
+        ? null
+        : '${_formatNumber(bean.priceOriginal!)} ${bean.currency ?? ''}'.trim();
+    final headline = packageIdr ?? original ?? formatIdr(bean.priceIdrPerKg!);
+    final subtitleParts = [
+      if (bean.packSizeG != null && (packageIdr ?? original) != null)
+        'per kemasan ${_formatNumber(bean.packSizeG!)} g',
+      if (bean.priceIdrPerKg != null)
+        '${formatIdr(bean.priceIdrPerKg!)} per kg',
+    ];
+    final details = <(String, String)>[
+      if (original != null) ('Harga kemasan', original),
+      if (_fxLabel(bean) != null) ('Kurs saat input', _fxLabel(bean)!),
+      if (packageIdr != null) ('Harga rupiah per kemasan', packageIdr),
+      if (bean.priceIdrPerKg != null)
+        ('Harga rupiah per kg', formatIdr(bean.priceIdrPerKg!)),
+    ];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: AppSizes.settingsIconCircle,
+                height: AppSizes.settingsIconCircle,
+                decoration: const BoxDecoration(
+                  color: AppColors.accentSoft,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.payments_outlined),
+              ),
+              const SizedBox(width: AppSpacing.s16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(headline, style: textTheme.titleLarge),
+                    if (subtitleParts.isNotEmpty)
+                      Text(subtitleParts.join(' · '), style: muted),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (details.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s8),
+            Semantics(
+              button: true,
+              expanded: _expanded,
+              label: 'Rincian harga dan kurs',
+              child: InkWell(
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: AppSizes.minimumTouchTarget,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Rincian harga dan kurs',
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        _expanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: AppColors.inkSoft,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_expanded)
+              for (final item in details)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: Text(item.$1, style: muted)),
+                      const SizedBox(width: AppSpacing.s16),
+                      Expanded(
+                        child: Text(
+                          item.$2,
+                          style: textTheme.bodyMedium,
+                          textAlign: TextAlign.end,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BestSettingCard extends StatelessWidget {
+  const _BestSettingCard({required this.bean});
+
+  final Bean bean;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final hasBest =
+        bean.bestBrewRatio != null &&
+        bean.bestBrewWaterTempC != null &&
+        bean.bestBrewTasteScore != null;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Pengaturan terbaik', style: textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.s12),
+          if (hasBest)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(AppRadius.innerCard),
+              ),
+              child: Row(
+                children: [
+                  _BestStat(
+                    label: 'Rasio',
+                    child: Text(
+                      formatRatio(bean.bestBrewRatio!),
+                      style: textTheme.titleLarge,
+                    ),
+                  ),
+                  const _BestDivider(),
+                  _BestStat(
+                    label: 'Suhu air',
+                    child: Text(
+                      '${bean.bestBrewWaterTempC}°C',
+                      style: textTheme.titleLarge,
+                    ),
+                  ),
+                  const _BestDivider(),
+                  _BestStat(
+                    label: 'Skor rasa',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${bean.bestBrewTasteScore}',
+                          style: textTheme.titleLarge,
+                        ),
+                        const SizedBox(width: AppSpacing.s4),
+                        const Icon(
+                          Icons.star_rounded,
+                          color: AppColors.rating,
+                          size: AppSpacing.s20,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(
+              bean.brewCount == 0
+                  ? 'Belum ada seduhan untuk biji ini.'
+                  : 'Belum ada pengaturan seduh terbaik.',
+              style: textTheme.bodyLarge?.copyWith(color: AppColors.inkSoft),
+            ),
+          const SizedBox(height: AppSpacing.s16),
+          AppButton(
+            label: 'Seduh dengan ini',
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => BrewSetupScreen(initialBeanId: bean.id),
+              ),
+            ),
+            icon: Icons.coffee_rounded,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BestStat extends StatelessWidget {
+  const _BestStat({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          child,
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BestDivider extends StatelessWidget {
+  const _BestDivider();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+    height: AppSizes.settingsIconCircle,
+    child: VerticalDivider(
+      width: AppSizes.dividerThickness,
+      thickness: AppSizes.dividerThickness,
+      color: AppColors.divider,
+    ),
+  );
+}
+
+class _HistoryCard extends ConsumerWidget {
+  const _HistoryCard({required this.bean});
+
+  final Bean bean;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final history = ref.watch(beanHistoryBrewsProvider(bean.id));
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s16,
+        AppSpacing.s20,
+        AppSpacing.s16,
+        AppSpacing.s8,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Riwayat seduhan', style: textTheme.titleLarge),
+                history.maybeWhen(
+                  data: (brews) {
+                    final active = brews.where((b) => !b.isCancelled).length;
+                    return brews.isEmpty
+                        ? const SizedBox.shrink()
+                        : Text(
+                            '$active seduhan aktif',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: AppColors.inkSoft,
+                            ),
+                          );
+                  },
+                  orElse: () => const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          history.when(
+            data: (brews) {
+              if (brews.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(AppSpacing.s12),
+                  child: Text(
+                    'Belum ada seduhan untuk biji ini.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppColors.inkSoft,
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: [
+                  for (var index = 0; index < brews.length; index++) ...[
+                    if (index > 0)
+                      const Divider(
+                        height: AppSizes.dividerThickness,
+                        color: AppColors.divider,
+                        indent: AppSizes.historyBadge + AppSpacing.s16,
+                      ),
+                    _HistoryRow(
+                      item: brews[index],
+                      isBest: brews[index].isBestBrew,
+                    ),
+                  ],
+                ],
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.all(AppSpacing.s16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, _) => const Padding(
+              padding: EdgeInsets.all(AppSpacing.s12),
+              child: Text('Gagal memuat riwayat seduhan.'),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.item, required this.isBest});
+
+  final BrewJournalItem item;
+  final bool isBest;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final badgeColor = item.isCancelled
+        ? AppColors.background
+        : switch (item.tasteScore) {
+            <= 2 => AppColors.stage4Soft,
+            3 => AppColors.stage3Soft,
+            _ => AppColors.stage2Soft,
+          };
+    return Semantics(
+      button: true,
+      label:
+          'Seduhan ${_formatDate(item.brewedAtUtc)}, skor ${item.tasteScore} dari 5',
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => BrewDetailScreen(brewId: item.id)),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: AppSizes.historyRowHeight,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+            child: Row(
+              children: [
+                Container(
+                  width: AppSizes.historyBadge,
+                  height: AppSizes.historyBadge,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text('${item.tasteScore}', style: textTheme.titleMedium),
+                ),
+                const SizedBox(width: AppSpacing.s16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: AppSpacing.s8,
+                        runSpacing: AppSpacing.s4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            _formatDate(item.brewedAtUtc),
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (isBest && !item.isCancelled)
+                            const StatusPill(
+                              label: 'Terbaik',
+                              variant: StatusPillVariant.warning,
+                            ),
+                          if (item.isCancelled)
+                            const StatusPill(
+                              label: 'Dibatalkan',
+                              variant: StatusPillVariant.pending,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.s4),
+                      Text(
+                        '${_formatNumber(item.doseG)} g · '
+                        '${formatRatio(item.ratio)} · ${item.waterTempC}°C',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.inkSoft,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

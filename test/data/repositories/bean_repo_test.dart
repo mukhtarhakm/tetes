@@ -103,6 +103,59 @@ void main() {
     expect(beans.map((bean) => bean.id), [activeId]);
   });
 
+  test(
+    'arsip lalu pulihkan menjaga stok dan seduhan serta menandai sync pending',
+    () async {
+      final beanId = await repository.create(
+        userId: 'user-1',
+        draft: _draft(stock: 100),
+      );
+      await database.insert('brews', _brew(id: 'brew-active', beanId: beanId));
+      final brewBefore = (await database.query(
+        'brews',
+        where: 'bean_id = ?',
+        whereArgs: [beanId],
+      )).single;
+      await repository.archive(userId: 'user-1', id: beanId);
+      await database.update(
+        'beans',
+        {'sync_status': 'synced'},
+        where: 'id = ?',
+        whereArgs: [beanId],
+      );
+      expect(await repository.listActive('user-1'), isEmpty);
+      final archived = await repository.findArchived(userId: 'user-1');
+      expect(archived.single.id, beanId);
+      expect(archived.single.remainingStockG, 85);
+
+      await repository.restore(userId: 'user-1', id: beanId);
+      expect(await repository.findArchived(userId: 'user-1'), isEmpty);
+      final restored = (await repository.listActive('user-1')).single;
+      expect(restored.id, beanId);
+      expect(restored.remainingStockG, 85);
+      expect(restored.syncStatus, 'pending');
+      expect(DateTime.parse(restored.updatedAt).isUtc, isTrue);
+      expect(
+        (await database.query(
+          'brews',
+          where: 'bean_id = ?',
+          whereArgs: [beanId],
+        )).single,
+        brewBefore,
+      );
+      await expectLater(
+        repository.restore(userId: 'user-1', id: 'missing'),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'Biji tidak ditemukan.',
+          ),
+        ),
+      );
+    },
+  );
+
   test('simpan mengurutkan tag dan menyimpan hasil kurs', () async {
     final beanId = await repository.create(
       userId: 'user-1',

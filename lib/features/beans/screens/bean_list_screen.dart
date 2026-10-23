@@ -19,6 +19,7 @@ class BeanListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final beans = ref.watch(beanListProvider);
+    final archived = ref.watch(archivedBeanListProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -35,47 +36,98 @@ class BeanListScreen extends ConsumerWidget {
             message: 'Daftar biji tidak dapat dimuat.',
             onRetry: () => ref.invalidate(beanListProvider),
           ),
-          data: (items) => items.isEmpty
-              ? EmptyView(
-                  title: 'Belum ada biji',
-                  message:
-                      'Tambahkan biji pertama untuk mulai mencatat stok dan profilnya.',
-                  icon: Icons.coffee_outlined,
-                  actionLabel: 'Tambah biji',
-                  onActionPressed: () => _openForm(context),
-                )
-              : RefreshIndicator(
-                  onRefresh: () async {
-                    ref.invalidate(beanListProvider);
-                    await ref.read(beanListProvider.future);
-                  },
-                  child: ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.s20,
-                      AppSpacing.s16,
-                      AppSpacing.s20,
-                      AppSizes.floatingButtonClearance,
-                    ),
-                    itemCount: items.length + 1,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.s16),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Text(
-                          'Kelola profil dan stok biji untuk seduhanmu.',
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(color: AppColors.inkSoft),
-                        );
-                      }
-                      final bean = items[index - 1];
-                      return BeanCard(
-                        bean: bean,
-                        onTap: () => _openDetail(context, bean.id),
-                      );
+          data: (items) => archived.when(
+            loading: () => const LoadingView(message: 'Memuat biji...'),
+            error: (_, _) => ErrorView(
+              message: 'Daftar biji tidak dapat dimuat.',
+              onRetry: () => ref.invalidate(archivedBeanListProvider),
+            ),
+            data: (archivedItems) => items.isEmpty && archivedItems.isEmpty
+                ? EmptyView(
+                    title: 'Belum ada biji',
+                    message:
+                        'Tambahkan biji pertama untuk mulai mencatat stok dan profilnya.',
+                    icon: Icons.coffee_outlined,
+                    actionLabel: 'Tambah biji',
+                    onActionPressed: () => _openForm(context),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(beanListProvider);
+                      ref.invalidate(archivedBeanListProvider);
+                      await ref.read(beanListProvider.future);
+                      await ref.read(archivedBeanListProvider.future);
                     },
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s20,
+                        AppSpacing.s16,
+                        AppSpacing.s20,
+                        AppSizes.floatingButtonClearance,
+                      ),
+                      itemCount:
+                          items.length + 1 + (archivedItems.isEmpty ? 0 : 1),
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(height: AppSpacing.s16),
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return Text(
+                            'Kelola profil dan stok biji untuk seduhanmu.',
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(color: AppColors.inkSoft),
+                          );
+                        }
+                        if (index == items.length + 1) {
+                          return ExpansionTile(
+                            key: const Key('archived-beans-section'),
+                            title: Text(
+                              'Biji diarsipkan (${archivedItems.length})',
+                            ),
+                            children: archivedItems
+                                .map(
+                                  (bean) => AppCard(
+                                    child: ListTile(
+                                      title: Text(bean.name),
+                                      subtitle: Text(
+                                        bean.roastery ?? 'Roastery belum diisi',
+                                      ),
+                                      trailing: TextButton(
+                                        onPressed: () async {
+                                          final restored = await ref
+                                              .read(
+                                                beanMutationProvider.notifier,
+                                              )
+                                              .restore(bean.id);
+                                          if (restored && context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                              ..hideCurrentSnackBar()
+                                              ..showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Biji dipulihkan.',
+                                                  ),
+                                                ),
+                                              );
+                                          }
+                                        },
+                                        child: const Text('Pulihkan'),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        }
+                        final bean = items[index - 1];
+                        return BeanCard(
+                          bean: bean,
+                          onTap: () => _openDetail(context, bean.id),
+                        );
+                      },
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );
@@ -218,7 +270,10 @@ class BeanCard extends StatelessWidget {
                         '${bean.bestBrewWaterTempC}°C',
                         style: textTheme.bodyMedium,
                       ),
-                      RatingStars(score: bean.bestBrewTasteScore!, compact: true),
+                      RatingStars(
+                        score: bean.bestBrewTasteScore!,
+                        compact: true,
+                      ),
                     ],
                   ),
                 ),

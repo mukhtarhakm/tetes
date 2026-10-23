@@ -84,6 +84,9 @@ abstract final class AppSizes {
   static const stepperValueWidth = 52.0;
   static const dividerThickness = 1.0;
   static const floatingButtonClearance = 96.0;
+  static const stockBarHeight = 10.0;
+  static const historyBadge = 44.0;
+  static const historyRowHeight = 72.0;
 }
 
 abstract final class AppInsets {

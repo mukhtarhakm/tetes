@@ -37,6 +37,12 @@ final beanListProvider = AsyncNotifierProvider<BeanListController, List<Bean>>(
   BeanListController.new,
 );
 
+final archivedBeanListProvider = FutureProvider<List<Bean>>((ref) async {
+  final userId = await _activeUserId(ref);
+  final repository = await ref.watch(beanRepositoryProvider.future);
+  return repository.findArchived(userId: userId);
+});
+
 final beanDetailProvider = FutureProvider.family<Bean?, String>((
   ref,
   id,
@@ -110,6 +116,7 @@ class BeanMutationController extends AsyncNotifier<void> {
             );
       state = const AsyncData(null);
       ref.invalidate(beanListProvider);
+      ref.invalidate(archivedBeanListProvider);
       if (beanId != null) {
         ref.invalidate(beanDetailProvider(beanId));
       }
@@ -131,6 +138,25 @@ class BeanMutationController extends AsyncNotifier<void> {
       await repository.archive(userId: userId, id: beanId);
       state = const AsyncData(null);
       ref.invalidate(beanListProvider);
+      ref.invalidate(archivedBeanListProvider);
+      ref.invalidate(beanDetailProvider(beanId));
+      return true;
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      return false;
+    }
+  }
+
+  Future<bool> restore(String beanId) async {
+    if (state.isLoading) return false;
+    state = const AsyncLoading();
+    try {
+      final userId = await _activeUserId(ref);
+      final repository = await ref.read(beanRepositoryProvider.future);
+      await repository.restore(userId: userId, id: beanId);
+      state = const AsyncData(null);
+      ref.invalidate(beanListProvider);
+      ref.invalidate(archivedBeanListProvider);
       ref.invalidate(beanDetailProvider(beanId));
       return true;
     } catch (error, stackTrace) {

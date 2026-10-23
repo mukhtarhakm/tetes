@@ -18,6 +18,8 @@ Perbarui di akhir setiap sesi.
 Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## Terakhir dikerjakan
+2026-10-23: Daftar Biji kopi menampilkan bagian biji diarsipkan yang tertutup secara default dan tombol Pulihkan. Repository memulihkan flag arsip serta menandai bean pending dengan waktu UTC baru; stok tetap dihitung dari seduhan aktif, sedangkan riwayat dan hash tidak diubah. Seluruh 302 tes Flutter dan `flutter analyze --no-pub` lulus; uji di HP masih menunggu.
+
 2026-10-23: Pengaman stok seduh ditambahkan: dosis di atas sisa stok menampilkan peringatan di Atur Seduh dan menonaktifkan Mulai Sesi; Hasil menonaktifkan Simpan bila stok tidak cukup; repository menolak dalam transaksi tanpa menyimpan seduhan/tahap dan tetap memperbarui status sinkronisasi bean saat berhasil. Form biji menerima stok 0 g dan menolak nilai negatif; edit stok awal tidak boleh lebih kecil dari total dosis seduhan aktif. Pembatalan tetap memulihkan stok lewat perhitungan seduhan aktif. Data lama yang sudah minus tidak diubah otomatis. Tes terarah dan analisis lulus; suite penuh dan uji HP masih menunggu.
 
 2026-10-23: Dokumen navigasi dan Profil diselaraskan untuk empat item: Beranda sebagai hub fitur dengan satu daftar biji, ikon Profil berupa foto atau inisial, label satu baris, Logout sebagai dialog dengan peringatan data belum sinkron, dan Profil berisi header statistik, Keamanan, Sinkronisasi, Pengingat, serta Tentang dengan atribusi OpenStreetMap dan OpenFreeMap. Uji di HP tetap menunggu.

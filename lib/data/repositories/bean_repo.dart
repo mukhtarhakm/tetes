@@ -13,7 +13,12 @@ class BeanRepository implements FxCacheStore {
 
   final Database _database;
 
-  Future<List<Bean>> listActive(String userId) async {
+  Future<List<Bean>> listActive(String userId) => _listByArchived(userId, 0);
+
+  Future<List<Bean>> findArchived({required String userId}) =>
+      _listByArchived(userId, 1);
+
+  Future<List<Bean>> _listByArchived(String userId, int archived) async {
     final rows = await _database.rawQuery(
       '''
       SELECT b.*,
@@ -30,11 +35,11 @@ class BeanRepository implements FxCacheStore {
       LEFT JOIN brews br ON br.bean_id = b.id
       LEFT JOIN brews best_br ON best_br.id = b.best_brew_id AND best_br.status = 'aktif'
       LEFT JOIN settings s ON s.user_id = b.user_id AND s.key = 'low_stock_threshold_g'
-      WHERE b.user_id = ? AND b.archived = 0
+      WHERE b.user_id = ? AND b.archived = ?
       GROUP BY b.id
-      ORDER BY b.updated_at DESC, b.name COLLATE NOCASE ASC
+      ORDER BY ${archived == 1 ? 'b.name COLLATE NOCASE ASC' : 'b.updated_at DESC, b.name COLLATE NOCASE ASC'}
       ''',
-      [userId],
+      [userId, archived],
     );
     return rows.map(Bean.fromMap).toList(growable: false);
   }
@@ -128,6 +133,22 @@ class BeanRepository implements FxCacheStore {
         'sync_status': 'pending',
       },
       where: 'id = ? AND user_id = ?',
+      whereArgs: [id, userId],
+    );
+    if (changedRows != 1) {
+      throw StateError('Biji tidak ditemukan.');
+    }
+  }
+
+  Future<void> restore({required String userId, required String id}) async {
+    final changedRows = await _database.update(
+      'beans',
+      {
+        'archived': 0,
+        'updated_at': _utcNowWithoutMilliseconds(),
+        'sync_status': 'pending',
+      },
+      where: 'id = ? AND user_id = ? AND archived = 1',
       whereArgs: [id, userId],
     );
     if (changedRows != 1) {
