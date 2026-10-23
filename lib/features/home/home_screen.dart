@@ -24,6 +24,7 @@ import '../beans/state/bean_providers.dart';
 import '../brew/brew_plan.dart';
 import '../brew/screens/brew_setup_screen.dart';
 import '../brew/state/brew_setup_controller.dart';
+import '../chat/screens/chat_screen.dart';
 import '../explore/currency_calculator_screen.dart';
 import '../explore/event_model.dart';
 import '../explore/explore_screen.dart';
@@ -376,6 +377,13 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.s24),
             _ShortcutSection(
               shortcuts: [
+                _Shortcut(
+                  'Tanya Barista',
+                  'Chat soal seduhanmu',
+                  const Icon(Icons.chat_bubble_outline, color: AppColors.ink),
+                  AppColors.accent,
+                  () => _open(context, const ChatScreen()),
+                ),
                 _Shortcut(
                   'Jurnal',
                   'Riwayat & bandingkan',

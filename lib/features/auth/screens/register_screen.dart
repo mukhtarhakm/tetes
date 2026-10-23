@@ -205,6 +205,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil(AppRoutes.home, (_) => false);
+    } else if (mounted && ref.read(authControllerProvider).requiresLogin) {
+      ref.read(authControllerProvider.notifier).clearErrors();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Akun dibuat. Silakan masuk.')),
+      );
+      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
     }
   }
 

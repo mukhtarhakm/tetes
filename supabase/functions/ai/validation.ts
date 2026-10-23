@@ -1,5 +1,5 @@
 type Row = Record<string, unknown>;
-export type AiType = "recommend" | "diagnose";
+export type AiType = "recommend" | "diagnose" | "chat";
 export type AiInput = { type: AiType; payload: Row };
 
 const species = ["arabika", "robusta", "campuran"];
@@ -20,6 +20,42 @@ const optional = (value: unknown, check: (value: unknown) => boolean) => value =
 const note = (value: unknown) => value == null || typeof value === "string";
 const tasteTags = (value: unknown) => typeof value === "string" && value.length > 0 && value.split(",").every((tag) => tags.includes(tag)) && new Set(value.split(",")).size === value.split(",").length;
 const utc = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value) && !Number.isNaN(Date.parse(value));
+
+function chatPayload(payload: Row): boolean {
+  // 8 KiB caps total chat data, including context, before it reaches the model.
+  if (new TextEncoder().encode(JSON.stringify(payload)).length > 8 * 1024 || !only(payload, ["messages", "context"])) return false;
+  const messages = payload.messages;
+  if (!Array.isArray(messages) || messages.length < 1 || messages.length > 12 ||
+    !messages.every((item) => record(item) && only(item, ["role", "content"]) &&
+      choice(item.role, ["user", "assistant"]) && typeof item.content === "string" &&
+      item.content.trim().length >= 1 && item.content.trim().length <= 500) ||
+    messages[messages.length - 1].role !== "user") return false;
+  if (payload.context === undefined) return true;
+  const context = payload.context;
+  if (!record(context) || !only(context, ["bean", "recent_brews"])) return false;
+  if (context.bean !== undefined) {
+    const bean = context.bean;
+    if (!record(bean) || !only(bean, ["name", "species", "roast_level", "remaining_stock_g", "best_settings"]) ||
+      !text(bean.name, 100) || !choice(bean.species, species) ||
+      !optional(bean.roast_level, (v) => choice(v, roastLevels)) ||
+      !optional(bean.remaining_stock_g, (v) => number(v, 0, 1000000))) return false;
+    if (bean.best_settings !== undefined) {
+      const best = bean.best_settings;
+      if (!record(best) || !only(best, ["dose_g", "ratio", "water_temp_c", "grind"]) ||
+        !number(best.dose_g, 5, 60) || !number(best.ratio, 10, 20) ||
+        !integer(best.water_temp_c, 80, 100) || !choice(best.grind, grinds)) return false;
+    }
+  }
+  if (context.recent_brews !== undefined) {
+    if (!Array.isArray(context.recent_brews) || context.recent_brews.length > 5 ||
+      !context.recent_brews.every((item) => record(item) &&
+        only(item, ["brewed_at_utc", "dose_g", "ratio", "water_temp_c", "grind", "taste_score", "taste_tags"]) &&
+        utc(item.brewed_at_utc) && number(item.dose_g, 5, 60) && number(item.ratio, 10, 20) &&
+        integer(item.water_temp_c, 80, 100) && choice(item.grind, grinds) &&
+        integer(item.taste_score, 1, 5) && tasteTags(item.taste_tags))) return false;
+  }
+  return true;
+}
 
 function bean(value: unknown): value is Row {
   if (!record(value) || !only(value, ["name", "species", "bean_type", "arabica_percent", "roastery", "is_self_roasted", "origin", "process", "process_custom", "roast_level", "roast_date", "roastery_notes_tags", "roastery_notes_text", "initial_stock_g"])) return false;
@@ -61,9 +97,15 @@ function brew(value: unknown, diagnosis: boolean): value is Row {
 }
 
 export function validateInput(value: unknown): AiInput | null {
-  if (!record(value) || !only(value, ["type", "payload"]) || (value.type !== "recommend" && value.type !== "diagnose") || !record(value.payload)) return null;
+  if (!record(value) || !only(value, ["type", "payload"]) || (value.type !== "recommend" && value.type !== "diagnose" && value.type !== "chat") || !record(value.payload)) return null;
   const type = value.type;
   const payload = value.payload;
+  if (type === "chat") {
+    if (!chatPayload(payload)) return null;
+    const clean = structuredClone(payload);
+    (clean.messages as Row[]).forEach((message) => { message.content = (message.content as string).trim(); });
+    return { type, payload: clean };
+  }
   if (!only(payload, type === "recommend" ? ["bean", "history", "pouring_count"] : ["bean", "brew", "history"]) || !bean(payload.bean) ||
     !Array.isArray(payload.history) || payload.history.length > 5 || !payload.history.every((item) => brew(item, false))) return null;
   if (type === "recommend" ? !integer(payload.pouring_count, 1, 5) : !brew(payload.brew, true)) return null;

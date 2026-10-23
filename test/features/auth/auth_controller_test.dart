@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -57,25 +58,75 @@ void main() {
       expect(users.single['created_at'], '2026-10-19T01:00:00Z');
     },
   );
+
+  test('register dengan akun tersimpan tetapi sesi gagal meminta layar login', () async {
+    final client = AuthClient(
+      baseUrl: 'https://example.test/rest/v1',
+      apiKey: 'public-test-key',
+      rateLimitStorage: _MemoryStorage(),
+      client: MockClient((request) async => request.url.path.endsWith('/users')
+          ? http.Response(jsonEncode([{
+              'id': 'be159fad-b283-4ff1-ab73-1aa47418d755',
+              'username': 'rais_uji',
+              'created_at': '2026-10-19T01:00:00Z',
+            }]), 201)
+          : http.Response('', 500)),
+    );
+    final container = ProviderContainer(overrides: [
+      databaseProvider.overrideWithValue(AsyncData(database)),
+      authClientProvider.overrideWithValue(client),
+      sessionStorageProvider.overrideWithValue(const _FailingSessionStorage()),
+    ]);
+    addTearDown(container.dispose);
+
+    final succeeded = await container.read(authControllerProvider.notifier)
+        .register(username: 'rais_uji', password: 'rahasia123');
+    expect(succeeded, isFalse);
+    expect(container.read(authControllerProvider).requiresLogin, isTrue);
+    expect(container.read(authControllerProvider).errorMessage,
+        'Akun dibuat. Silakan masuk.');
+  });
 }
 
 AuthClient _successfulAuthClient() {
   return AuthClient(
+    baseUrl: 'https://example.test/rest/v1',
+    apiKey: 'public-test-key',
+    rateLimitStorage: _MemoryStorage(),
     client: MockClient(
-      (_) async => http.Response(
-        jsonEncode({
-          'user': {
+      (request) async => request.url.path.endsWith('/users')
+          ? http.Response(
+              jsonEncode([{
             'id': 'be159fad-b283-4ff1-ab73-1aa47418d755',
             'username': 'rais_uji',
             'created_at': '2026-10-19T01:00:00.456789Z',
-          },
-          'session_token': 'token-rahasia',
-          'expires_at': '2026-10-26T01:00:00Z',
-        }),
-        200,
-      ),
+            'salt': 'AAECAwQFBgcICQoLDA0ODw==',
+            'password_hash': 'BYdeqGJjr60TVfaaOv4dkfeaGbnAsHyBfFh8k/sKBps=',
+            'iterations': 1000,
+            'algo': 'pbkdf2-hmac-sha256',
+          }]), 200)
+          : http.Response('', 201),
     ),
   );
+}
+
+class _MemoryStorage implements FlutterSecureStorage {
+  final values = <String, String>{};
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final key = invocation.namedArguments[#key] as String;
+    if (invocation.memberName == #read) return Future<String?>.value(values[key]);
+    if (invocation.memberName == #write) {
+      values[key] = invocation.namedArguments[#value] as String;
+      return Future<void>.value();
+    }
+    if (invocation.memberName == #delete) {
+      values.remove(key);
+      return Future<void>.value();
+    }
+    return super.noSuchMethod(invocation);
+  }
 }
 
 class _FailingSessionStorage implements SessionStorage {

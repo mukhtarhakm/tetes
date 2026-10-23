@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cryptography_flutter/cryptography_flutter.dart';
 
 import 'app/router/app_routes.dart';
 import 'app/theme/app_theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // ignore: deprecated_member_use
+  FlutterCryptography.enable();
   runApp(const ProviderScope(child: MyApp()));
 }
 

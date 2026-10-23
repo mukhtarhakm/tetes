@@ -48,6 +48,7 @@ app.*.map.json
 /android/app/release
 
 # Rahasia dan berkas lokal
+/env/app.json
 .env
 *.env
 supabase/.env

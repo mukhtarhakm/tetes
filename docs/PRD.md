@@ -94,12 +94,12 @@ Tema teman yang dekat dengan kopi: **Brewmaster** (resep kopi, berbagi resep, pe
 Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AUTH, BEAN, dan seterusnya) dipakai di FR di `features/*.md`.
 
 ### Akun dan keamanan (AUTH)
-- **M** Register dan login online lewat Edge Function buatan sendiri, tanpa Firebase, Supabase Auth, atau layanan auth siap pakai.
-- **M** Password di-hash di server dengan PBKDF2-HMAC-SHA256, salt acak per pengguna, dan jumlah iterasi yang disimpan per pengguna.
+- **M** Register dan login online dengan logika di Flutter dan data di Supabase Postgres, tanpa Firebase, Supabase Auth, atau layanan auth siap pakai.
+- **M** Password di-hash di Flutter dengan PBKDF2-HMAC-SHA256, salt acak per pengguna, dan jumlah iterasi yang disimpan per pengguna.
 - **M** Token session disimpan di secure storage, berlaku 7 hari tanpa perpanjangan otomatis. Session valid dapat membuka aplikasi saat offline.
 - **M** Login biometrik sebagai pembuka aplikasi.
 - **M** Logout mencabut session di server; saat offline pencabutan diantrekan tanpa menghapus data lokal.
-- **M** Pembatasan percobaan login dilakukan di server per username dalam jendela 15 menit.
+- **M** Pembatasan percobaan login lokal per username dalam jendela 15 menit sebagai pengaman UX.
 
 ### Profil biji (BEAN)
 - **M** Tambah, lihat, ubah, hapus biji.
@@ -123,6 +123,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 - **M** Layar hasil: plan vs realisasi, skor rasa, tag rasa, perbandingan dengan notes roastery, catatan, biaya.
 
 ### AI (AI)
+- **M** Tanya Barista: chatbot LLM untuk tanya jawab seputar seduh V60 dan data kopi/seduhan milik pengguna. Riwayat tersimpan lokal per pengguna; 20 pesan per hari waktu Asia/Jakarta.
 - **M** Rekomendasi pengaturan seduh dari profil biji dan riwayatnya.
 - **M** Diagnosa seduhan dari hasil dan keluhan rasa, dengan saran perbaikan.
 - **M** Validasi keluaran AI di kode, dan aturan cadangan jika AI tidak tersedia.
@@ -170,7 +171,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 | Requirement dosen | Dipenuhi oleh |
 |---|---|
 | Konsep proyek akhir | PRD ini |
-| Login terenkripsi + session (tanpa Firebase) | AUTH: Edge Function sendiri, PBKDF2 dengan salt, token session 7 hari |
+| Login terenkripsi + session (tanpa Firebase) | AUTH: PBKDF2 lokal dengan salt, data Postgres, token session 7 hari |
 | Login biometrik | AUTH: biometrik pembuka aplikasi |
 | Penyimpanan lokal dan online | SQLite + Supabase Postgres |
 | Web service/API | Edge Function sendiri + API kurs |
@@ -179,7 +180,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 | Konversi mata uang (min. 3) | CUR: harga biji impor |
 | Konversi waktu (WIB, WIT, WITA, London) | EVT: agenda event |
 | Min. 2 sensor | Accelerometer (goyang timer) dan gyroscope (game) |
-| AI/LLM | AI: rekomendasi dan diagnosa |
+| AI/LLM | AI: chatbot Tanya Barista, rekomendasi, dan diagnosa |
 | Mini game | GAME: Steady Pour |
 | Pencarian dan pemilihan | JRN: pencarian, filter, pilih untuk dibandingkan |
 | Notifikasi | NOTIF |
@@ -191,9 +192,9 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 Detail ada di `ARCHITECTURE.md`.
 
 - **Aplikasi:** Flutter. **Lokal:** SQLite.
-- **Login:** online lewat Edge Function buatan sendiri. Password di-hash dan diverifikasi di server; Flutter hanya menyimpan token session dan waktu kedaluwarsa di secure storage. Tanpa Firebase dan tanpa Supabase Auth.
-- **Online:** Supabase Postgres dengan RLS aktif tanpa policy, diakses hanya lewat Edge Function.
-- **Edge Function:** `auth-register`, `auth-login`, `auth-logout`, `sync-push`, `sync-pull`, `ai`; semuanya dipasang dengan `--no-verify-jwt` dan fungsi terlindungi memakai `x-session-token`.
+- **Login:** hash dan verifikasi password di Flutter; tabel `users` dan `sessions` diakses melalui PostgREST dengan kunci publik dan RLS. Token session disimpan di secure storage. Tanpa Firebase dan tanpa Supabase Auth.
+- **Online:** Supabase Postgres; anon hanya mendapat grant kolom dan policy auth sempit. Data fitur lain tetap lewat Edge Function.
+- **Edge Function:** `sync-push`, `sync-pull`, `ai` tetap memvalidasi `x-session-token` lewat tabel `sessions`.
 - **LLM:** dipanggil hanya dari Edge Function. API key disimpan sebagai secret, tidak ada di kode Flutter.
 - **Kurs:** API kurs publik tanpa key (kandidat: Frankfurter), dipanggil dari Flutter. Kurs terakhir disimpan untuk mode offline.
 - **Peta:** OpenStreetMap. Data toko diisi manual 10-15 titik.
@@ -233,7 +234,7 @@ Aplikasi dianggap berhasil jika:
 | Risiko | Mitigasi |
 |---|---|
 | Dosen menilai tema terlalu mirip Brewmaster | Konfirmasi di awal. Jaga batas di bagian 6. Tabel pembeda masuk laporan |
-| Dosen tidak menerima autentikasi buatan sendiri lewat Edge Function | Konfirmasi di awal bahwa login server tanpa layanan auth siap pakai diperbolehkan |
+| Login lokal dengan kunci publik memungkinkan pemalsuan sesi | Catat sebagai keterbatasan nyata: siapa pun yang tahu username dapat membaca `id` dan `password_hash` lalu membuat sesi tanpa password |
 | Rasa kontrol gyroscope tidak enak | Prototipe kasar dulu, uji di HP asli. Cadangan: accelerometer untuk game |
 | Hash tidak cocok antara aplikasi dan server | Satu fungsi format, satu data contoh uji untuk dua sisi |
 | Notifikasi dan biometrik berbeda antar HP | Uji di HP demo sejak awal |
@@ -242,7 +243,7 @@ Aplikasi dianggap berhasil jika:
 
 **Status empat pertanyaan dosen (sudah aman menurut pembaruan status proyek)**
 1. Tema pelatih dan jurnal seduh V60 dibedakan dari katalog resep dan pencari kedai.
-2. Login dibuat sendiri di server melalui Edge Function, tanpa Firebase atau layanan auth siap pakai.
+2. Atas arahan dosen, login dibuat di Flutter dan data tetap di Supabase Postgres, tanpa Firebase atau layanan auth siap pakai.
 3. Supabase digunakan untuk database dan Edge Function bagian online.
 4. Penempatan menu mengikuti empat item: Beranda, Profil, Saran & Kesan, dan aksi Logout.
 

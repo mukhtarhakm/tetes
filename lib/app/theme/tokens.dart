@@ -88,6 +88,8 @@ abstract final class AppSizes {
   static const historyBadge = 44.0;
   static const historyRowHeight = 72.0;
   static const brewChartHeight = 140.0;
+  static const chatAvatar = 30.0;
+  static const chatSendButton = 52.0;
 }
 
 abstract final class AppInsets {

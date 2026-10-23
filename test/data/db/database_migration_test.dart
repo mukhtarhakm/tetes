@@ -28,7 +28,7 @@ void main() {
   });
 
   test(
-    'instalasi baru membuat semua tabel, indeks, dan user_version 2',
+    'instalasi baru membuat semua tabel, indeks, dan user_version 3',
     () async {
       final tableRows = await database.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table' "
@@ -38,6 +38,7 @@ void main() {
 
       expect(tableNames, {
         'beans',
+        'chat_messages',
         'brew_stages',
         'brews',
         'events',
@@ -56,6 +57,7 @@ void main() {
       expect(indexNames, {
         'idx_brews_bean',
         'idx_brews_user_seq',
+        'idx_chat_messages_user_time',
         'idx_events_user_time',
         'idx_stages_brew',
       });
@@ -87,25 +89,30 @@ void main() {
     },
   );
 
-  test('upgrade v1 ke v2 sama dengan instalasi baru', () async {
+  test('upgrade v2 ke v3 menjaga data lama', () async {
     final directory = await Directory.systemTemp.createTemp('tetes-migration-');
     final databasePath = path.join(directory.path, 'upgrade.db');
-    Database? versionOne;
+    Database? versionTwo;
     Database? upgraded;
 
     try {
-      versionOne = await databaseFactoryFfi.openDatabase(
+      versionTwo = await databaseFactoryFfi.openDatabase(
         databasePath,
         options: OpenDatabaseOptions(
-          version: 1,
+          version: 2,
           onConfigure: AppDatabase.configureDatabase,
           onCreate: DatabaseMigrations.create,
           onUpgrade: DatabaseMigrations.migrate,
         ),
       );
-      expect(await _userVersion(versionOne), 1);
-      await versionOne.close();
-      versionOne = null;
+      await versionTwo.insert('users', {
+        'id': 'user-1',
+        'username': 'lama',
+        'created_at': '2026-10-18T00:00:00Z',
+      });
+      expect(await _userVersion(versionTwo), 2);
+      await versionTwo.close();
+      versionTwo = null;
 
       upgraded = await databaseFactoryFfi.openDatabase(
         databasePath,
@@ -117,11 +124,13 @@ void main() {
         ),
       );
 
-      expect(await _userVersion(database), 2);
-      expect(await _userVersion(upgraded), 2);
+      expect(await _userVersion(database), 3);
+      expect(await _userVersion(upgraded), 3);
       expect(await _beanSchema(upgraded), await _beanSchema(database));
+      expect((await upgraded.query('users')).single['username'], 'lama');
+      expect(await upgraded.query('chat_messages'), isEmpty);
     } finally {
-      await versionOne?.close();
+      await versionTwo?.close();
       await upgraded?.close();
       await directory.delete(recursive: true);
     }

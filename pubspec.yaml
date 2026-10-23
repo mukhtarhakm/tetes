@@ -56,6 +56,8 @@ dependencies:
   flutter_compass: ^0.8.1
   flutter_map_location_marker: ^10.3.0
   vector_map_tiles: 9.0.0-beta.9
+  cryptography: ^2.9.0
+  cryptography_flutter: ^2.3.4
 
 dev_dependencies:
   flutter_test:

@@ -10,11 +10,13 @@ class AuthState {
     this.isLoading = false,
     this.errorMessage,
     this.fieldErrors = const {},
+    this.requiresLogin = false,
   });
 
   final bool isLoading;
   final String? errorMessage;
   final Map<String, String> fieldErrors;
+  final bool requiresLogin;
 }
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(
@@ -66,6 +68,7 @@ class AuthController extends Notifier<AuthState> {
       state = AuthState(
         errorMessage: error.message,
         fieldErrors: error.fieldErrors,
+        requiresLogin: error.message == 'Akun dibuat. Silakan masuk.',
       );
       return false;
     } catch (_) {

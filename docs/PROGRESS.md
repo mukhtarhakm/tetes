@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-10-23 - Tanya Barista tanpa UI
+- Edge Function chat dan kuota harian terpisah disiapkan; migrasi server belum diterapkan dan fungsi belum di-deploy.
+- Klien chat, SQLite `chat_messages` versi 3, repository per pengguna, controller Riverpod, context biji dan lima seduhan terakhir, serta tes Flutter ditambahkan. Layar chat dikerjakan pemilik proyek. Seluruh 308 tes Flutter lulus dan `flutter analyze --no-pub` bersih; integrasi pada HP dan server terpasang belum diuji.
+
 Perbarui di akhir setiap sesi.
 
 ## Status sprint
@@ -130,3 +134,15 @@ Status: Belum mulai / Sedang jalan / Selesai (lolos acceptance) / Terblokir
 
 ## 2026-10-22 - Fitur 05 sinkronisasi lanjutan
 - Events, game_scores, dan feedback disiapkan untuk push/pull dengan kursor waktu server, validasi per baris, tombstone event, status Profil, dan penjadwalan ulang notifikasi. Seluruh 275 tes Flutter dan flutter analyze lulus; validasi server diuji dengan Node karena Deno tidak tersedia. Migrasi, deploy, dan uji HP masih menunggu.
+
+## 2026-10-23 - Auth lokal, langkah SQL
+- Migrasi baru menyiapkan grant kolom dan policy RLS untuk akses anon ke users dan sessions berdasarkan header permintaan; login_attempts serta RPC penghitung lama dihapus. Tidak ada trigger atau RPC auth baru.
+- Test SQL untuk akses tanpa header, header salah, pembacaan baris lain, pencabutan sesi sendiri, larangan mengaktifkan ulang sesi, dan larangan DELETE disiapkan. Migrasi dan test belum dijalankan pada PostgreSQL; db push dan perubahan Flutter menunggu peninjauan pemilik.
+- Review test menambah kasus INSERT anon dan kecocokan header untuk `INSERT users ... RETURNING`; dokumen mencatat header wajib dan celah pemalsuan sesi yang nyata. Eksekusi PostgreSQL tetap menunggu lingkungan database uji.
+
+## 2026-10-23 - Auth lokal, langkah Flutter
+- AuthClient sekarang memakai PostgREST untuk dua POST register, GET login, dan PATCH logout; hash PBKDF2 dijalankan di isolate, penghitung gagal lokal disimpan di secure storage, dan kegagalan membuat sesi setelah akun jadi mengarahkan ke Login.
+- Tiga Edge Function auth dihapus dari repo; `_shared/auth.ts` dan `_shared/session.ts` tetap dipakai validasi sesi fitur lain. Konfigurasi auth dibaca dari `--dart-define-from-file=env/app.json`; file lokal diabaikan Git.
+- Vektor PBKDF2 dari Node.js mencakup ASCII, Unicode, 128 karakter, dan 600.000 iterasi. `flutter analyze --no-pub` bersih dan seluruh 311 test Flutter lulus. Migrasi/deploy dan pengukuran profile di HP belum dilakukan.
+- Pengukuran profile di Samsung SM-A546E menghasilkan 6.834 ms untuk PBKDF2 Dart murni. Jalur native Android dari `cryptography_flutter` ditambahkan dengan fallback Dart dalam isolate; iterasi tetap 600.000. Pengukuran native di HP masih menunggu.
+- `flutter pub get` berhasil dengan `cryptography` 2.9.0 dan `cryptography_flutter` 2.3.4. Vektor Node.js lulus pada jalur paket dan fallback, termasuk 600.000 iterasi; galat jalur utama juga jatuh ke fallback. `flutter analyze --no-pub` bersih dan seluruh 316 test Flutter lulus. Jalur native Android belum diuji di HP.

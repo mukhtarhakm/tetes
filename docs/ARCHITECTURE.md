@@ -17,15 +17,16 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
 └───────────────────────────────────┼─────┼────────────────────────────┘
                                     │     │ HTTPS
                        API kurs     │     ▼
-                      (publik)  ◄───┘   Supabase Edge Functions
-                                         ├─ auth-register/login/logout
-                                         ├─ sync-push/pull   ──► Postgres (RLS terkunci)
-                                         └─ ai               ──► API LLM (key = secret)
+                      (publik)  ◄───┘   Supabase
+                                         ├─ PostgREST auth ──► Postgres (RLS auth)
+                                         └─ Edge Functions
+                                            ├─ sync-push/pull ──► Postgres
+                                            └─ ai ──► API LLM (key = secret)
 ```
 
 **Prinsip:**
 1. **Offline-first.** Seduh, jurnal, dan biji jalan tanpa internet. SQLite adalah sumber utama di HP.
-2. **Server tipis.** Server menangani autentikasi, memverifikasi sinkronisasi, menyimpan cadangan, dan memegang rahasia.
+2. **Server tipis.** Flutter menangani autentikasi; Edge Function memverifikasi sesi dan sinkronisasi serta memegang rahasia AI.
 3. **Rahasia hanya di server.** API key LLM dan service role key tidak pernah ada di Flutter atau Git.
 4. **Satu sumber aturan.** Format hash dan skema hanya didefinisikan di `DATA_MODEL.md`.
 
@@ -37,7 +38,7 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
 | State | Riverpod | Putuskan di Sprint 1, jangan dicampur dengan pustaka state lain |
 | Database lokal | SQLite (`sqflite`) | Migrasi bernomor |
 | Penyimpanan aman | `flutter_secure_storage` | Token session, waktu kedaluwarsa, dan token pencabutan tertunda |
-| Hash password | PBKDF2-HMAC-SHA256 (Web Crypto bawaan Deno) | Hanya di Edge Function; salt acak per pengguna, jumlah iterasi disimpan per pengguna |
+| Hash password | `cryptography` 2.9.0 + `cryptography_flutter` 2.3.4 | PBKDF2 native Android, fallback Dart di isolate; salt acak per pengguna, jumlah iterasi disimpan per pengguna |
 | Hash chain | SHA-256 (`crypto`) | Aturan di `DATA_MODEL.md` |
 | UUID | `uuid` | ID data aplikasi dibuat di Flutter; ID pengguna dan session dibuat server |
 | Biometrik | `local_auth` | Pembuka aplikasi saja |
@@ -76,7 +77,7 @@ lib/
       (tiap fitur: screens/, widgets/, state/)
 supabase/
   functions/
-    auth-register/  auth-login/  auth-logout/
+    (auth Edge Function dihapus)
     sync-push/  sync-pull/  ai/
     _shared/                auth, hash.ts (buildHashInput), validasi, klien DB
   migrations/               SQL tabel server
@@ -89,40 +90,22 @@ Aturan lapisan:
 - **Sinkronisasi** hanya membaca dan menulis lewat repository.
 - Warna, ukuran, dan gaya teks **hanya** dari tema (`UI_SPEC.md`), tidak ditulis langsung di layar.
 
-## 4. Autentikasi Online Buatan Sendiri
+## 4. Autentikasi Lokal dengan Data Supabase
 
-Autentikasi berjalan lewat Edge Function dan Postgres sendiri, tanpa Firebase, Supabase Auth, atau layanan auth siap pakai. Semua fungsi dipasang dengan `--no-verify-jwt`; fungsi terlindungi memverifikasi header `x-session-token` terhadap hash token di tabel `sessions`.
+Register dan login memerlukan internet. Flutter menghitung PBKDF2-HMAC-SHA256 (600.000 iterasi untuk akun baru, salt 16 byte, hash 32 byte) lewat native Android bila tersedia, dengan fallback Dart di isolate, lalu memakai PostgREST dengan kunci publik. Login akun lama membaca `iterations` dari baris pengguna. Password, salt, dan hash tidak dicatat di log; hanya token sesi asli yang disimpan di secure storage. Tanpa Firebase dan tanpa Supabase Auth.
 
-**Register**
-1. Flutter memvalidasi bentuk input, lalu mengirim `username` dan password melalui HTTPS ke `auth-register`.
-2. Edge Function memvalidasi ulang, memastikan username unik, membuat salt acak, dan menghitung PBKDF2-HMAC-SHA256 memakai Web Crypto bawaan Deno.
-3. Password di-hash dengan PBKDF2-HMAC-SHA256 sebanyak **600.000 iterasi**, salt acak 16 byte, dan keluaran 32 byte. Salt dan hash disimpan sebagai base64; jumlah iterasi serta nama algoritma disimpan per pengguna.
-4. Server membuat `users.id`, membuat session, dan mengembalikan profil pengguna, token acak 32 byte berformat base64url, serta `expires_at`.
-5. Flutter menyimpan cache profil di SQLite. Token session dan `expires_at` hanya disimpan di secure storage.
+**Register:** validasi input lokal, lalu `POST users?select=id,username,created_at` dengan `Prefer: return=representation` dan header `x-login-username` yang sama dengan username. Setelah user dibuat, Flutter membuat token acak 32 byte base64url tanpa padding, menyimpan SHA-256 hex token melalui `POST sessions`, dan menyimpan token asli di secure storage. Jika POST sesi gagal, akun tetap ada dan layar mengarahkan pengguna ke Login dengan pesan "Akun dibuat. Silakan masuk."
 
-**Login**
-1. Login username/password selalu membutuhkan internet dan memanggil `auth-login`.
-2. Pembatasan dilakukan berdasarkan username yang diketik, termasuk username yang tidak ada. Jendela 15 menit dibulatkan ke awal jendela dan disimpan di `login_attempts(username, window_start, attempt_count)`.
-3. Hitung ulang PBKDF2 memakai parameter pengguna dan bandingkan hasil hash dengan cara waktu-konstan.
-4. Lima percobaan gagal pertama dalam jendela masing-masing menghasilkan `401` dan menaikkan penghitung. Permintaan berikutnya ditolak dengan `429` dan sisa waktu tunggu sebelum PBKDF2 dijalankan. Pesan kredensial gagal tetap "Username atau password salah".
-5. Login berhasil menghapus baris percobaan pada jendela itu, membuat session baru, lalu mengembalikan profil, token, dan `expires_at`.
+**Login:** `GET users?username=eq.<username>&select=id,username,password_hash,salt,iterations,algo,created_at&limit=1` wajib membawa `x-login-username`. Flutter selalu menghitung PBKDF2, termasuk dengan parameter dummy bila user tidak ada, lalu membandingkan hash dengan waktu konstan. Lima kegagalan per jendela 15 menit per username disimpan lokal sebagai pengaman UX saja; keberhasilan menghapus penghitung. Sesi baru dibuat lewat `POST sessions`.
 
-**Buka aplikasi**
-1. Baca token dan `expires_at` dari secure storage. Kedaluwarsa dibandingkan dengan jam perangkat; keterbatasan ini diterima untuk v1.
-2. Jika session lokal belum kedaluwarsa, aplikasi boleh dibuka saat offline. Jika biometrik aktif, minta biometrik sebelum membuka Beranda.
-3. Jika session kedaluwarsa, arahkan ke Login. Saat offline, tampilkan pesan bahwa internet diperlukan; tidak ada mode baca saja.
-4. Session yang dicabut server diketahui pada permintaan terlindungi berikutnya melalui `401`; hapus session lokal dan keluar paksa.
-5. Session berlaku 7 hari tanpa perpanjangan otomatis pada v1.
+**Logout:** token lokal dihapus dan pencabutan offline tetap diantrekan. `PATCH sessions?token_hash=eq.<hash>` dengan `x-token-hash` dan body `{"revoked":true}` mencabut sesi; respons sukses tanpa baris terubah tetap dianggap berhasil.
 
-**Logout**
-1. Jika ada baris `sync_status = pending`, dialog konfirmasi wajib menyebut jumlahnya. Data lokal tetap disimpan setelah logout.
-2. Hapus session aktif dari secure storage seketika dan kembali ke Login.
-3. Panggil `auth-logout`. Jika gagal karena offline, simpan token lama di kunci secure storage terpisah `pending_revoke_token`.
-4. Coba pencabutan lagi saat aplikasi dibuka dengan internet atau sebelum login berikutnya. Jika sukses atau token sudah tidak sah, hapus `pending_revoke_token`.
-5. Bila pencabutan belum terkirim, jelaskan bahwa session server akan dicabut saat tersambung. Batas cadangan adalah kedaluwarsa 7 hari di server.
+**Buka aplikasi:** sesi lokal yang belum kedaluwarsa dapat membuka aplikasi offline, melalui biometrik jika aktif. Sesi yang kedaluwarsa memerlukan login online. Edge Function `sync-push`, `sync-pull`, dan `ai` tetap memeriksa token lewat `_shared/session.ts` dan tabel `sessions`.
 
-**Biometrik** hanya membuka aplikasi saat session lokal masih valid. Biometrik bukan autentikasi server dan tidak menggantikan login username/password. Cek ketersediaan perangkat sebelum menawarkan dan sembunyikan opsi bila tidak didukung.
+**Keterbatasan keamanan:** siapa pun yang memiliki kunci publik Supabase dan mengetahui username dapat membaca `id` serta `password_hash` pengguna itu melalui header `x-login-username`, lalu membuat sesi atas `user_id` tersebut tanpa password. Ini celah nyata pada desain login lokal. Grant kolom dan RLS membatasi pembacaan tanpa header, tetapi tidak membuktikan identitas pemanggil.
 
+Migrasi RLS telah disiapkan, tetapi belum diterapkan oleh pemilik. Klien Flutter baru memerlukan migrasi tersebut sebelum alur online dapat diuji.
+`SUPABASE_URL` pada `env/app.json` harus menunjuk proyek yang sama dengan `AppConfig.functionsBaseUrl`, karena klien sync dan AI masih memakai alamat Edge Function tersebut dan hanya mengirim `x-session-token` (fungsi dipasang tanpa verifikasi JWT).
 ## 5. Alur Fitur Inti
 
 ### 5.1 Seduh
@@ -165,7 +148,7 @@ Semua pencarian dan filter lewat query SQLite (contoh di `DATA_MODEL.md` bagian 
 ### 6.1 Identitas
 - `user_id` berasal dari `users.id` yang dibuat server dan nilainya sama pada SQLite serta Postgres.
 - Token session adalah nilai acak 32 byte berformat base64url. Flutter menyimpan token asli di secure storage; server hanya menyimpan SHA-256 token.
-- Fungsi terlindungi (`auth-logout`, `sync-push`, `sync-pull`, `ai`) menerima `x-session-token: <token>`. `auth-register` dan `auth-login` tidak memerlukan header ini.
+- Fungsi terlindungi (`sync-push`, `sync-pull`, `ai`) menerima `x-session-token: <token>`. Auth memakai PostgREST dan header pada bagian 4.
 - Token valid bila hash ditemukan, belum dicabut, dan `expires_at` belum lewat.
 
 ### 6.2 Urutan
@@ -210,46 +193,7 @@ Semua fungsi menerima dan mengembalikan JSON. Kode status: `200` sukses, `400` d
 
 Semua Edge Function dipasang dengan `--no-verify-jwt`. Otorisasi fungsi terlindungi dilakukan sendiri melalui `x-session-token`. **Service role key hanya di environment fungsi.** Password dan token tidak pernah ditulis ke log.
 
-### 7.1 `auth-register`
-Permintaan:
-```json
-{ "username": "rais", "password": "…" }
-```
-Perilaku: validasi input, pastikan username unik melalui constraint database, hash password dengan PBKDF2-HMAC-SHA256 melalui Web Crypto Deno memakai 600.000 iterasi, salt acak 16 byte, dan keluaran 32 byte, lalu buat user dan session. Password harus 8-128 karakter.
-
-Respons:
-```json
-{
-  "user": { "id": "uuid", "username": "rais", "created_at": "…" },
-  "session_token": "base64url",
-  "expires_at": "…"
-}
-```
-
-Untuk pengukuran saat pengujian, lama PBKDF2 dicatat sebagai `duration_ms` di log tanpa data sensitif. Bila permintaan membawa `x-debug-timing: 1`, respons sukses juga memuat field `duration_ms`; field ini tidak dikirim pada permintaan biasa.
-
-### 7.2 `auth-login`
-Permintaan:
-```json
-{ "username": "rais", "password": "…" }
-```
-Perilaku:
-1. Tentukan `window_start` dengan membulatkan waktu server ke awal jendela 15 menit.
-2. Hitung percobaan berdasarkan username input, termasuk username yang tidak terdaftar.
-3. Periksa batas sebelum menjalankan PBKDF2. Lima kegagalan pertama pada jendela yang sama menghasilkan `401`; permintaan berikutnya menghasilkan `429` dengan `details.retry_after_s`.
-4. Username yang tidak ditemukan tetap menjalankan satu PBKDF2 pura-pura dengan konstanta 600.000 iterasi. Hash pengguna yang ditemukan dihitung memakai nilai `iterations` pada baris pengguna dan dibandingkan dengan cara waktu-konstan.
-5. Kegagalan menaikkan penghitung secara atomik melalui RPC `increment_login_attempt(p_username, p_window_start)` yang hanya dapat dijalankan service role. Login berhasil menghapus baris `login_attempts` untuk username dan jendela itu, lalu membuat session baru.
-
-Respons sama dengan `auth-register`.
-
-### 7.3 `auth-logout`
-Header: `x-session-token`.
-
-Perilaku: tandai session terkait `revoked = true`. Operasi idempoten; token yang tidak dikenal, sudah dicabut, atau kedaluwarsa tetap menghasilkan respons sukses yang sama sehingga klien boleh menghapus `pending_revoke_token`.
-
-Helper bersama `_shared/session.ts` memvalidasi `x-session-token` dengan mencari hash token yang belum dicabut dan belum kedaluwarsa, lalu mengembalikan `user_id`. Helper ini dipakai oleh fungsi terlindungi `sync-push`, `sync-pull`, dan `ai`.
-
-Respons: `{ "ok": true }`.
+Autentikasi tidak lagi memiliki Edge Function. Register, login, dan logout mengikuti alur PostgREST pada bagian 4.
 
 ### 7.4 `sync-push`
 Header: `x-session-token`.
@@ -380,10 +324,10 @@ Label di UI selalu: "Saran, bukan kepastian. Coba dan catat hasilnya."
 |---|---|
 | Tidak ada rahasia di Flutter | API key LLM dan service role key hanya di secret/environment Edge Function |
 | `.env` dan berkas kunci | Masuk `.gitignore` sejak commit pertama |
-| RLS aktif tanpa policy | Semua tabel Postgres. Akses hanya lewat Edge Function |
-| Password | Dikirim hanya melalui HTTPS ke fungsi auth, tidak pernah disimpan atau dicatat di log; hash hanya dibuat di server |
+| RLS | `users` dan `sessions` memiliki policy anon terbatas; data fitur lain tetap lewat Edge Function |
+| Password | Hash dibuat lokal dengan PBKDF2; password tidak dikirim ke PostgREST atau dicatat di log |
 | Session token | Token asli hanya di secure storage; server menyimpan SHA-256 token, masa berlaku 7 hari, dan status pencabutan |
-| Pembatasan login | Server menghitung kegagalan per username dalam jendela 15 menit, termasuk username yang tidak ada |
+| Pembatasan login | Penghitung lokal per username selama 15 menit hanya pengaman UX |
 | HTTPS | Semua panggilan jaringan |
 | Batas AI | 20 panggilan per jam per pengguna |
 | Validasi di server | Server memverifikasi hash dan skema, bukan hanya mempercayai aplikasi |

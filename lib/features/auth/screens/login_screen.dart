@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/router/app_routes.dart';
 import '../../../app/theme/tokens.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../auth_validation.dart';
@@ -34,6 +35,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
+    const configurationMissing = AppConfig.supabaseUrl == '' ||
+        AppConfig.supabaseAnonKey == '';
 
     return Scaffold(
       body: SafeArea(
@@ -98,12 +101,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onChanged: (_) => _clearFieldError('password'),
               ),
               if (authState.errorMessage != null ||
-                  widget.sessionMessage != null) ...[
+                  widget.sessionMessage != null || configurationMissing) ...[
                 const SizedBox(height: AppSpacing.s16),
                 Semantics(
                   liveRegion: true,
                   child: Text(
-                    authState.errorMessage ?? widget.sessionMessage!,
+                    authState.errorMessage ?? widget.sessionMessage ??
+                        'Konfigurasi Supabase belum tersedia. Isi env/app.json lalu jalankan ulang aplikasi.',
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: AppColors.error),

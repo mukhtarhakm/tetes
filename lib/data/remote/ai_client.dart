@@ -35,6 +35,13 @@ class AiException implements Exception {
   String toString() => message;
 }
 
+class ChatResponse {
+  const ChatResponse({required this.reply, this.remainingToday});
+
+  final String reply;
+  final int? remainingToday;
+}
+
 class AiClient {
   AiClient({
     required this.sessionStorage,
@@ -59,6 +66,31 @@ class AiClient {
     required String userId,
     required Map<String, Object?> payload,
   }) => _request(userId: userId, type: 'diagnose', payload: payload);
+
+  Future<ChatResponse> chat({
+    required String userId,
+    required List<Map<String, String>> messages,
+    Map<String, Object?>? context,
+  }) async {
+    final response = await _request(
+      userId: userId,
+      type: 'chat',
+      payload: {'messages': messages, 'context': ?context},
+    );
+    final reply = response['reply'];
+    final remaining = response['remaining_today'];
+    if (reply is! String ||
+        reply.trim().isEmpty ||
+        reply.length > 1200 ||
+        (remaining != null &&
+            (remaining is! int || remaining < 0 || remaining > 20))) {
+      throw const AiException(
+        AiFailure.invalidOutput,
+        'Jawaban barista tidak valid. Coba lagi.',
+      );
+    }
+    return ChatResponse(reply: reply.trim(), remainingToday: remaining as int?);
+  }
 
   Future<Map<String, dynamic>> _request({
     required String userId,
@@ -94,19 +126,25 @@ class AiClient {
           )
           .timeout(timeout);
     } on TimeoutException {
-      throw const AiException(
+      throw AiException(
         AiFailure.timeout,
-        'AI terlalu lama merespons. Pengaturan cadangan tersedia.',
+        type == 'chat'
+            ? 'Barista terlalu lama merespons. Coba lagi.'
+            : 'AI terlalu lama merespons. Pengaturan cadangan tersedia.',
       );
     } on SocketException {
-      throw const AiException(
+      throw AiException(
         AiFailure.network,
-        'Tidak dapat terhubung ke internet. Pengaturan cadangan tersedia.',
+        type == 'chat'
+            ? 'Tidak dapat terhubung ke internet. Coba lagi.'
+            : 'Tidak dapat terhubung ke internet. Pengaturan cadangan tersedia.',
       );
     } on http.ClientException {
-      throw const AiException(
+      throw AiException(
         AiFailure.network,
-        'Tidak dapat terhubung ke internet. Pengaturan cadangan tersedia.',
+        type == 'chat'
+            ? 'Tidak dapat terhubung ke internet. Coba lagi.'
+            : 'Tidak dapat terhubung ke internet. Pengaturan cadangan tersedia.',
       );
     }
 
@@ -121,9 +159,11 @@ class AiClient {
         } on FormatException {
           // Respons rusak memakai fallback di pemanggil.
         }
-        throw const AiException(
+        throw AiException(
           AiFailure.invalidOutput,
-          'Saran AI tidak dapat dipakai. Pengaturan cadangan tersedia.',
+          type == 'chat'
+              ? 'Jawaban barista tidak valid. Coba lagi.'
+              : 'Saran AI tidak dapat dipakai. Pengaturan cadangan tersedia.',
         );
       case 400:
         throw AiException(
@@ -141,7 +181,9 @@ class AiClient {
         final retryAfter = _retryAfterSeconds(response.body);
         throw AiException(
           AiFailure.rateLimited,
-          retryAfter == null
+          type == 'chat'
+              ? 'Batas chat hari ini tercapai. Coba lagi besok.'
+              : retryAfter == null
               ? 'Batas pemakaian AI tercapai, coba lagi nanti.'
               : 'Batas pemakaian AI tercapai, coba lagi dalam ${(retryAfter / 60).ceil()} menit.',
           retryAfterSeconds: retryAfter,
@@ -150,20 +192,26 @@ class AiClient {
       case 504:
         throw AiException(
           AiFailure.timeout,
-          'AI terlalu lama merespons. Pengaturan cadangan tersedia.',
+          type == 'chat'
+              ? 'Barista terlalu lama merespons. Coba lagi.'
+              : 'AI terlalu lama merespons. Pengaturan cadangan tersedia.',
           upstreamStatus: upstreamStatus,
         );
       case 502:
         if (_errorCode(response.body) == 'ai_invalid_output') {
           throw AiException(
             AiFailure.invalidOutput,
-            'Saran AI tidak dapat dipakai. Pengaturan cadangan tersedia.',
+            type == 'chat'
+                ? 'Jawaban barista tidak valid. Coba lagi.'
+                : 'Saran AI tidak dapat dipakai. Pengaturan cadangan tersedia.',
             upstreamStatus: upstreamStatus,
           );
         }
         throw AiException(
           AiFailure.upstream,
-          'Layanan AI sedang bermasalah. Pengaturan cadangan tersedia.',
+          type == 'chat'
+              ? 'Layanan barista sedang bermasalah. Coba lagi.'
+              : 'Layanan AI sedang bermasalah. Pengaturan cadangan tersedia.',
           upstreamStatus: upstreamStatus,
         );
       case 500:

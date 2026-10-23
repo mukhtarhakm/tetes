@@ -3,11 +3,12 @@ import 'package:sqflite/sqflite.dart';
 typedef DatabaseMigration = Future<void> Function(DatabaseExecutor database);
 
 abstract final class DatabaseMigrations {
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
 
   static final Map<int, DatabaseMigration> _migrations = {
     1: _migration1,
     2: _migration2,
+    3: _migration3,
   };
 
   static Future<void> create(Database database, int version) {
@@ -191,5 +192,22 @@ abstract final class DatabaseMigrations {
   static Future<void> _migration2(DatabaseExecutor database) async {
     await database.execute('ALTER TABLE beans ADD COLUMN pack_size_g REAL');
     await database.execute('ALTER TABLE beans ADD COLUMN process_custom TEXT');
+  }
+
+  static Future<void> _migration3(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE chat_messages (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        bean_id TEXT,
+        role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('sent', 'failed'))
+      )
+    ''');
+    await database.execute(
+      'CREATE INDEX idx_chat_messages_user_time ON chat_messages(user_id, created_at, id)',
+    );
   }
 }

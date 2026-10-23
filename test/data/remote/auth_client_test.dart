@@ -1,260 +1,154 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:tetes/data/remote/auth_client.dart';
 
+const _user = {
+  'id': 'be159fad-b283-4ff1-ab73-1aa47418d755',
+  'username': 'rais_uji',
+  'created_at': '2026-10-19T01:00:00Z',
+  'salt': 'AAECAwQFBgcICQoLDA0ODw==',
+  'password_hash': 'dQOJ/dJz5Sjewgkdt1Atjz3vtuR69OMc77q26CibMso=',
+  'iterations': 1000,
+  'algo': 'pbkdf2-hmac-sha256',
+};
+
+AuthClient _client(MockClient mock, [_MemoryStorage? storage]) => AuthClient(
+  client: mock,
+  baseUrl: 'https://example.test/rest/v1',
+  apiKey: 'public-test-key',
+  rateLimitStorage: storage ?? _MemoryStorage(),
+);
+
 void main() {
-  const successBody = {
-    'user': {
-      'id': 'be159fad-b283-4ff1-ab73-1aa47418d755',
-      'username': 'rais_uji',
-      'created_at': '2026-10-19T01:00:00Z',
-    },
-    'session_token': 'token-rahasia',
-    'expires_at': '2026-10-26T01:00:00Z',
-  };
+  test('login membaca user dengan header dan membuat sesi tanpa mengirim password', () async {
+    final requests = <http.Request>[];
+    final storage = _MemoryStorage();
+    final window = DateTime.now().toUtc().millisecondsSinceEpoch ~/ (15 * 60 * 1000);
+    storage.values['auth_attempts_rais_uji'] = '$window:2';
+    final client = _client(MockClient((request) async {
+      requests.add(request);
+      if (request.method == 'GET') return http.Response(jsonEncode([_user]), 200);
+      return http.Response('', 201);
+    }), storage);
 
-  test('login mengirim body JSON tanpa apikey atau debug timing', () async {
-    late http.Request capturedRequest;
-    final client = AuthClient(
-      client: MockClient((request) async {
-        capturedRequest = request;
-        return http.Response(jsonEncode(successBody), 200);
-      }),
-      baseUrl: 'https://example.com/functions/v1',
-    );
-
-    final session = await client.login(
-      username: 'rais_uji',
-      password: 'rahasia123',
-    );
-
-    expect(capturedRequest.url.path, endsWith('/auth-login'));
-    expect(capturedRequest.headers.containsKey('apikey'), isFalse);
-    expect(capturedRequest.headers.containsKey('x-debug-timing'), isFalse);
-    expect(jsonDecode(capturedRequest.body), {
-      'username': 'rais_uji',
-      'password': 'rahasia123',
-    });
+    final session = await client.login(username: 'rais_uji', password: 'coffee123');
     expect(session.user.username, 'rais_uji');
-    expect(session.token, 'token-rahasia');
+    expect(session.token.length, 43);
+    expect(requests.map((request) => request.method), ['GET', 'POST']);
+    expect(requests.first.url.path, '/rest/v1/users');
+    expect(requests.first.url.queryParameters['username'], 'eq.rais_uji');
+    expect(requests.first.headers['x-login-username'], 'rais_uji');
+    expect(requests.first.headers['apikey'], 'public-test-key');
+    expect(requests.first.headers['Authorization'], 'Bearer public-test-key');
+    expect(requests.first.body, isEmpty);
+    expect(requests.last.url.path, '/rest/v1/sessions');
+    expect(requests.last.headers['Prefer'], 'return=minimal');
+    expect(jsonDecode(requests.last.body), containsPair('user_id', _user['id']));
+    expect(requests.last.body, isNot(contains('coffee123')));
+    expect(storage.values.containsKey('auth_attempts_rais_uji'), isFalse);
   });
 
-  test('register memakai endpoint auth-register', () async {
-    late http.Request capturedRequest;
-    final client = AuthClient(
-      client: MockClient((request) async {
-        capturedRequest = request;
-        return http.Response(jsonEncode(successBody), 200);
-      }),
-      baseUrl: 'https://example.com/functions/v1',
-    );
-
-    await client.register(username: 'rais_uji', password: 'rahasia123');
-
-    expect(capturedRequest.url.path, endsWith('/auth-register'));
+  test('user tidak ada dan 401 memberi pesan yang sama', () async {
+    for (final response in [http.Response('[]', 200), http.Response('{}', 401)]) {
+      final client = _client(MockClient((_) async => response));
+      await expectLater(client.login(username: 'rais_uji', password: 'coffee123'),
+        throwsA(isA<AuthException>()
+          .having((e) => e.type, 'type', AuthFailureType.invalidCredentials)
+          .having((e) => e.message, 'message', 'Username atau password salah')));
+    }
   });
 
-  test('logout mengirim token di header dan body JSON kosong', () async {
-    late http.Request capturedRequest;
-    final client = AuthClient(
-      client: MockClient((request) async {
-        capturedRequest = request;
-        return http.Response('{"ok":true}', 200);
-      }),
-      baseUrl: 'https://example.com/functions/v1',
-    );
-
-    await client.revokeSession(token: 'token-rahasia');
-
-    expect(capturedRequest.url.path, endsWith('/auth-logout'));
-    expect(capturedRequest.headers['x-session-token'], 'token-rahasia');
-    expect(capturedRequest.headers.containsKey('apikey'), isFalse);
-    expect(capturedRequest.headers.containsKey('x-debug-timing'), isFalse);
-    expect(jsonDecode(capturedRequest.body), isEmpty);
+  test('lima kegagalan disimpan lokal dan permintaan keenam dibatasi', () async {
+    final storage = _MemoryStorage();
+    var calls = 0;
+    final client = _client(MockClient((_) async {
+      calls++;
+      return http.Response('{}', 401);
+    }), storage);
+    for (var i = 0; i < 5; i++) {
+      await expectLater(client.login(username: 'rais_uji', password: 'coffee123'),
+        throwsA(isA<AuthException>().having((e) => e.type, 'type', AuthFailureType.invalidCredentials)));
+    }
+    await expectLater(client.login(username: 'rais_uji', password: 'coffee123'),
+      throwsA(isA<AuthException>().having((e) => e.type, 'type', AuthFailureType.rateLimited)));
+    expect(calls, 5);
+    expect(storage.values.keys, contains('auth_attempts_rais_uji'));
   });
 
-  test('logout hanya menganggap status 200 berhasil', () async {
-    final client = AuthClient(
-      client: MockClient((_) async => http.Response('{"ok":false}', 401)),
-    );
-
-    await expectLater(
-      client.revokeSession(token: 'token-rahasia'),
-      throwsA(
-        isA<AuthException>().having(
-          (error) => error.type,
-          'type',
-          AuthFailureType.server,
-        ),
-      ),
-    );
+  test('register mengirim dua POST dengan header username', () async {
+    final requests = <http.Request>[];
+    final client = _client(MockClient((request) async {
+      requests.add(request);
+      return request.url.path.endsWith('/users')
+          ? http.Response(jsonEncode([_user]), 201)
+          : http.Response('', 201);
+    }));
+    await client.register(username: 'rais_uji', password: 'coffee123');
+    expect(requests.length, 2);
+    expect(requests.first.headers['x-login-username'], 'rais_uji');
+    expect(requests.first.headers['Prefer'], 'return=representation');
+    expect(requests.last.headers['Prefer'], 'return=minimal');
+    expect(requests.first.body, isNot(contains('coffee123')));
   });
 
-  test('400 memetakan galat per kolom', () async {
-    final client = _clientForResponse(400, {
-      'error': {
-        'code': 'invalid_input',
-        'message': 'Data tidak valid.',
-        'details': {
-          'fields': {'username': 'Username tidak valid.'},
-        },
-      },
-    });
-
-    await expectLater(
-      client.register(username: 'RAIS', password: 'rahasia123'),
-      throwsA(
-        isA<AuthException>()
-            .having((error) => error.type, 'type', AuthFailureType.invalidInput)
-            .having(
-              (error) => error.fieldErrors['username'],
-              'username',
-              'Username tidak valid.',
-            ),
-      ),
-    );
+  test('23505 dipetakan ke usernameTaken', () async {
+    final client = _client(MockClient((_) async => http.Response('{"code":"23505"}', 409)));
+    await expectLater(client.register(username: 'rais_uji', password: 'coffee123'),
+      throwsA(isA<AuthException>().having((e) => e.type, 'type', AuthFailureType.usernameTaken)));
   });
 
-  test('401 selalu menjadi pesan kredensial umum', () async {
-    final client = _clientForResponse(401, {
-      'error': {
-        'code': 'invalid_credentials',
-        'message': 'Detail yang tidak boleh ditampilkan.',
-        'details': {},
-      },
-    });
-
-    await expectLater(
-      client.login(username: 'rais_uji', password: 'password_salah'),
-      throwsA(
-        isA<AuthException>()
-            .having(
-              (error) => error.type,
-              'type',
-              AuthFailureType.invalidCredentials,
-            )
-            .having(
-              (error) => error.message,
-              'message',
-              'Username atau password salah',
-            ),
-      ),
-    );
+  test('akun dibuat tetapi sesi gagal mengarahkan pengguna masuk', () async {
+    final client = _client(MockClient((request) async => request.url.path.endsWith('/users')
+      ? http.Response(jsonEncode([_user]), 201) : http.Response('{}', 500)));
+    await expectLater(client.register(username: 'rais_uji', password: 'coffee123'),
+      throwsA(isA<AuthException>()
+        .having((e) => e.type, 'type', AuthFailureType.server)
+        .having((e) => e.message, 'message', 'Akun dibuat. Silakan masuk.')));
   });
 
-  test('409 menjadi galat username sudah digunakan', () async {
-    final client = _clientForResponse(409, {
-      'error': {
-        'code': 'username_taken',
-        'message': 'Username sudah digunakan.',
-        'details': {},
-      },
-    });
-
-    await expectLater(
-      client.register(username: 'rais_uji', password: 'rahasia123'),
-      throwsA(
-        isA<AuthException>()
-            .having(
-              (error) => error.type,
-              'type',
-              AuthFailureType.usernameTaken,
-            )
-            .having(
-              (error) => error.fieldErrors['username'],
-              'username',
-              'Username sudah digunakan.',
-            ),
-      ),
-    );
+  test('logout PATCH menerima nol baris sebagai sukses', () async {
+    late http.Request request;
+    final client = _client(MockClient((value) async {
+      request = value;
+      return http.Response('', 204);
+    }));
+    await client.revokeSession(token: 'fixture-token');
+    expect(request.method, 'PATCH');
+    expect(request.url.path, '/rest/v1/sessions');
+    expect(request.url.queryParameters['token_hash'], startsWith('eq.'));
+    expect(request.headers['x-token-hash'], request.url.queryParameters['token_hash']!.substring(3));
+    expect(request.headers['Prefer'], 'return=minimal');
+    expect(jsonDecode(request.body), {'revoked': true});
+    expect(request.body, isNot(contains('fixture-token')));
   });
 
-  test('429 membulatkan retry_after_s ke atas dalam menit', () async {
-    final client = _clientForResponse(429, {
-      'error': {
-        'code': 'login_rate_limited',
-        'message': 'Terlalu banyak percobaan.',
-        'details': {'retry_after_s': 61},
-      },
-    });
-
-    await expectLater(
-      client.login(username: 'rais_uji', password: 'password_salah'),
-      throwsA(
-        isA<AuthException>()
-            .having((error) => error.retryAfterMinutes, 'minutes', 2)
-            .having(
-              (error) => error.message,
-              'message',
-              'Terlalu banyak percobaan login. Coba lagi dalam 2 menit.',
-            ),
-      ),
-    );
-  });
-
-  test('ClientException menjadi galat jaringan', () async {
-    final client = AuthClient(
-      client: MockClient((_) async => throw http.ClientException('offline')),
-    );
-
-    await expectLater(
-      client.login(username: 'rais_uji', password: 'rahasia123'),
-      throwsA(
-        isA<AuthException>().having(
-          (error) => error.type,
-          'type',
-          AuthFailureType.network,
-        ),
-      ),
-    );
-  });
-
-  test('permintaan melewati batas waktu menjadi galat timeout', () async {
-    final client = AuthClient(
-      client: MockClient((_) async {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-        return http.Response(jsonEncode(successBody), 200);
-      }),
-      timeout: const Duration(milliseconds: 1),
-    );
-
-    await expectLater(
-      client.login(username: 'rais_uji', password: 'rahasia123'),
-      throwsA(
-        isA<AuthException>().having(
-          (error) => error.type,
-          'type',
-          AuthFailureType.timeout,
-        ),
-      ),
-    );
-  });
-
-  test('respons sukses yang rusak menjadi galat server', () async {
-    final client = AuthClient(
-      client: MockClient((_) async => http.Response('{}', 200)),
-    );
-
-    await expectLater(
-      client.login(username: 'rais_uji', password: 'rahasia123'),
-      throwsA(
-        isA<AuthException>().having(
-          (error) => error.type,
-          'type',
-          AuthFailureType.server,
-        ),
-      ),
-    );
+  test('konfigurasi kosong menghasilkan pesan jelas', () async {
+    final client = AuthClient(client: MockClient((_) async => fail('HTTP must not run')));
+    await expectLater(client.login(username: 'rais_uji', password: 'coffee123'),
+      throwsA(isA<AuthException>().having((e) => e.message, 'message',
+        contains('Konfigurasi Supabase belum tersedia'))));
   });
 }
 
-AuthClient _clientForResponse(int statusCode, Map<String, Object?> body) {
-  return AuthClient(
-    client: MockClient(
-      (_) async => http.Response(jsonEncode(body), statusCode),
-    ),
-  );
+class _MemoryStorage implements FlutterSecureStorage {
+  final values = <String, String>{};
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final key = invocation.namedArguments[#key] as String;
+    if (invocation.memberName == #read) return Future<String?>.value(values[key]);
+    if (invocation.memberName == #write) {
+      values[key] = invocation.namedArguments[#value] as String;
+      return Future<void>.value();
+    }
+    if (invocation.memberName == #delete) {
+      values.remove(key);
+      return Future<void>.value();
+    }
+    return super.noSuchMethod(invocation);
+  }
 }

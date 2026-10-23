@@ -13,6 +13,82 @@ void main() {
     'bean': {'name': 'Flores'},
   };
 
+  test('chat mengirim pesan dan context serta membaca sisa kuota', () async {
+    late http.Request captured;
+    final client = AiClient(
+      sessionStorage: _MemorySessionStorage(),
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          '{"reply":"Coba suhu 92°C.","remaining_today":19}',
+          200,
+        );
+      }),
+    );
+    final result = await client.chat(
+      userId: userId,
+      messages: [
+        {'role': 'user', 'content': 'Suhu?'},
+      ],
+      context: {
+        'bean': {'name': 'Flores'},
+      },
+    );
+    expect(jsonDecode(captured.body), {
+      'type': 'chat',
+      'payload': {
+        'messages': [
+          {'role': 'user', 'content': 'Suhu?'},
+        ],
+        'context': {
+          'bean': {'name': 'Flores'},
+        },
+      },
+    });
+    expect(result.reply, 'Coba suhu 92°C.');
+    expect(result.remainingToday, 19);
+  });
+
+  test('chat menolak respons rusak dan menampilkan galat 429', () async {
+    for (final body in [
+      '{}',
+      '{"reply":" "}',
+      '{"reply":"ok","remaining_today":21}',
+    ]) {
+      await expectLater(
+        _clientForResponse(200, body).chat(
+          userId: userId,
+          messages: [
+            {'role': 'user', 'content': 'Halo'},
+          ],
+        ),
+        throwsA(
+          isA<AiException>().having(
+            (error) => error.failure,
+            'failure',
+            AiFailure.invalidOutput,
+          ),
+        ),
+      );
+    }
+    await expectLater(
+      _clientForResponse(
+        429,
+        '{"error":{"details":{"retry_after_s":60}}}',
+      ).chat(
+        userId: userId,
+        messages: [
+          {'role': 'user', 'content': 'Halo'},
+        ],
+      ),
+      throwsA(
+        isA<AiException>()
+            .having((error) => error.failure, 'failure', AiFailure.rateLimited)
+            .having((error) => error.message, 'message', contains('besok')),
+      ),
+    );
+  });
+
   test(
     'mengirim token hanya di header dan payload JSON ke endpoint ai',
     () async {
