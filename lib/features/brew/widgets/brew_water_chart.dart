@@ -6,9 +6,14 @@ import '../brew_plan.dart';
 import 'brew_stage_colors.dart';
 
 class BrewWaterChart extends StatelessWidget {
-  const BrewWaterChart({required this.plan, super.key});
+  const BrewWaterChart({
+    required this.plan,
+    this.chartHeight = AppSizes.statePreviewHeight,
+    super.key,
+  });
 
   final BrewPlan plan;
+  final double chartHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +33,7 @@ class BrewWaterChart extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s16),
         SizedBox(
-          height: AppSizes.statePreviewHeight,
+          height: chartHeight,
           child: LineChart(
             LineChartData(
               minX: 0,

@@ -87,6 +87,7 @@ abstract final class AppSizes {
   static const stockBarHeight = 10.0;
   static const historyBadge = 44.0;
   static const historyRowHeight = 72.0;
+  static const brewChartHeight = 140.0;
 }
 
 abstract final class AppInsets {

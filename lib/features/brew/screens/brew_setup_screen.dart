@@ -91,44 +91,85 @@ class _BrewSetupContent extends ConsumerWidget {
       brewSetupControllerProvider(initialBeanId).notifier,
     );
     final selectedBean = _findBean(state.beans, state.selectedBeanId);
+    final plan = state.plan;
 
-    return ListView(
-      padding: AppInsets.screen,
+    return Column(
       children: [
-        AppDropdownField<Bean>(
-          label: 'Biji kopi',
-          items: state.beans,
-          itemLabel: (bean) => bean.name,
-          value: selectedBean,
-          hintText: 'Pilih biji aktif',
-          onChanged: (bean) => controller.selectBean(bean?.id),
-        ),
-        const SizedBox(height: AppSpacing.s20),
-        if (state.isPlanLoading)
-          const SizedBox(
-            height: AppSizes.statePreviewHeight,
-            child: LoadingView(message: 'Memuat rencana seduh...'),
-          )
-        else if (state.plan == null)
-          const SizedBox(
-            height: AppSizes.statePreviewHeight,
-            child: EmptyView(
-              title: 'Pilih biji',
-              message: 'Pilih biji aktif untuk membuat rencana seduh.',
-              icon: Icons.touch_app_outlined,
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s20,
+              AppSpacing.s16,
+              AppSpacing.s20,
+              AppSpacing.s16,
             ),
-          )
-        else
-          _BrewForm(
-            state: state,
-            controller: controller,
-            onRecommend: () async {
-              await controller.recommend(
-                isScreenCurrent: () =>
-                    context.mounted &&
-                    ModalRoute.of(context)?.isCurrent == true,
-              );
-            },
+            children: [
+              AppDropdownField<Bean>(
+                label: 'Biji kopi',
+                items: state.beans,
+                itemLabel: (bean) => bean.name,
+                value: selectedBean,
+                hintText: 'Pilih biji aktif',
+                onChanged: (bean) => controller.selectBean(bean?.id),
+              ),
+              const SizedBox(height: AppSpacing.s16),
+              if (state.isPlanLoading)
+                const SizedBox(
+                  height: AppSizes.statePreviewHeight,
+                  child: LoadingView(message: 'Memuat rencana seduh...'),
+                )
+              else if (plan == null)
+                const SizedBox(
+                  height: AppSizes.statePreviewHeight,
+                  child: EmptyView(
+                    title: 'Pilih biji',
+                    message: 'Pilih biji aktif untuk membuat rencana seduh.',
+                    icon: Icons.touch_app_outlined,
+                  ),
+                )
+              else
+                _BrewForm(
+                  state: state,
+                  controller: controller,
+                  selectedBean: selectedBean,
+                  onRecommend: () async {
+                    await controller.recommend(
+                      isScreenCurrent: () =>
+                          context.mounted &&
+                          ModalRoute.of(context)?.isCurrent == true,
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+        if (plan != null && !state.isPlanLoading)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s20,
+              AppSpacing.s12,
+              AppSpacing.s20,
+              AppSpacing.s16,
+            ),
+            decoration: const BoxDecoration(
+              color: AppColors.background,
+              boxShadow: AppShadows.card,
+            ),
+            child: AppButton(
+              label: 'Mulai Sesi',
+              icon: Icons.play_arrow_rounded,
+              onPressed: state.canStart
+                  ? () {
+                      controller.dismissAiSuggestion();
+                      Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => BrewSessionScreen(plan: plan),
+                        ),
+                      );
+                    }
+                  : null,
+            ),
           ),
       ],
     );
@@ -139,16 +180,24 @@ class _BrewForm extends StatelessWidget {
   const _BrewForm({
     required this.state,
     required this.controller,
+    required this.selectedBean,
     required this.onRecommend,
   });
 
   final BrewSetupState state;
   final BrewSetupController controller;
+  final Bean? selectedBean;
   final VoidCallback onRecommend;
 
   @override
   Widget build(BuildContext context) {
     final plan = state.plan!;
+    final textTheme = Theme.of(context).textTheme;
+    final remaining = selectedBean == null
+        ? null
+        : (selectedBean!.remainingStockG < 0
+              ? 0.0
+              : selectedBean!.remainingStockG);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -184,120 +233,144 @@ class _BrewForm extends StatelessWidget {
           const SizedBox(height: AppSpacing.s12),
           AppCard(variant: AppCardVariant.tinted, child: Text(notice)),
         ],
-        const SizedBox(height: AppSpacing.s20),
-        if (plan.fromBestBrew) ...[
-          const AppChip(label: 'Dari pengaturan terbaik', selected: true),
-          const SizedBox(height: AppSpacing.s16),
-        ],
-        _BrewNumberField(
-          key: ValueKey('dose-${plan.beanId}'),
-          label: 'Dosis (g)',
-          value: _formatNumber(plan.doseG),
-          errorText: state.fieldErrors['dose'],
-          decimal: true,
-          fromAi: state.aiSuggestion?.highlights(AiPlanField.dose) ?? false,
-          onChanged: controller.updateDose,
-        ),
-        if (state.stockWarning case final warning?) ...[
-          const SizedBox(height: AppSpacing.s8),
-          Text(
-            warning,
-            key: const Key('insufficient-stock-warning'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.error,
-            ),
+        if (plan.fromBestBrew || remaining != null) ...[
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            children: [
+              if (plan.fromBestBrew)
+                const AppChip(label: 'Dari pengaturan terbaik', selected: true),
+              const Spacer(),
+              if (remaining != null)
+                Text(
+                  'Sisa ${_formatNumber(remaining)} g',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppColors.inkSoft,
+                  ),
+                ),
+            ],
           ),
         ],
-        const SizedBox(height: AppSpacing.s16),
-        _BrewNumberField(
-          key: ValueKey('ratio-${plan.beanId}'),
-          label: 'Rasio (1:x)',
-          value: _formatNumber(plan.ratio),
-          errorText: state.fieldErrors['ratio'],
-          decimal: true,
-          fromAi: state.aiSuggestion?.highlights(AiPlanField.ratio) ?? false,
-          onChanged: controller.updateRatio,
-        ),
-        const SizedBox(height: AppSpacing.s16),
-        _BrewNumberField(
-          key: ValueKey('temperature-${plan.beanId}'),
-          label: 'Suhu air (°C)',
-          value: plan.waterTempC.toString(),
-          errorText: state.fieldErrors['temperature'],
-          fromAi:
-              state.aiSuggestion?.highlights(AiPlanField.temperature) ?? false,
-          onChanged: controller.updateTemperature,
-        ),
-        const SizedBox(height: AppSpacing.s16),
+        const SizedBox(height: AppSpacing.s12),
         AppCard(
-          variant: AppCardVariant.tinted,
-          child: Wrap(
-            spacing: AppSpacing.s12,
-            runSpacing: AppSpacing.s8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          padding: AppInsets.settingsBlock,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.water_drop_outlined),
-              Text('Total air', style: Theme.of(context).textTheme.titleLarge),
-              Text(
-                '${_formatNumber(plan.totalWaterG)} g',
-                style: Theme.of(context).textTheme.titleLarge,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _BrewNumberField(
+                      key: ValueKey('dose-${plan.beanId}'),
+                      label: 'Dosis (g)',
+                      value: _formatNumber(plan.doseG),
+                      errorText: state.fieldErrors['dose'],
+                      decimal: true,
+                      fromAi:
+                          state.aiSuggestion?.highlights(AiPlanField.dose) ??
+                          false,
+                      onChanged: controller.updateDose,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Expanded(
+                    child: _BrewNumberField(
+                      key: ValueKey('ratio-${plan.beanId}'),
+                      label: 'Rasio (1:x)',
+                      value: _formatNumber(plan.ratio),
+                      errorText: state.fieldErrors['ratio'],
+                      decimal: true,
+                      fromAi:
+                          state.aiSuggestion?.highlights(AiPlanField.ratio) ??
+                          false,
+                      onChanged: controller.updateRatio,
+                    ),
+                  ),
+                ],
               ),
+              if (state.stockWarning case final warning?) ...[
+                const SizedBox(height: AppSpacing.s8),
+                Text(
+                  warning,
+                  key: const Key('insufficient-stock-warning'),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.s16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _BrewNumberField(
+                      key: ValueKey('temperature-${plan.beanId}'),
+                      label: 'Suhu air (°C)',
+                      value: plan.waterTempC.toString(),
+                      errorText: state.fieldErrors['temperature'],
+                      fromAi:
+                          state.aiSuggestion?.highlights(
+                            AiPlanField.temperature,
+                          ) ??
+                          false,
+                      onChanged: controller.updateTemperature,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Expanded(child: _TotalWater(plan: plan)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.s20),
+              _FormLabel(
+                label: 'Ukuran gilingan',
+                fromAi:
+                    state.aiSuggestion?.highlights(AiPlanField.grind) ?? false,
+              ),
+              const SizedBox(height: AppSpacing.s8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final grind in Grind.values) ...[
+                      AppChip(
+                        label: grind.label,
+                        selected: plan.grind == grind,
+                        onSelected: (_) => controller.updateGrind(grind),
+                      ),
+                      const SizedBox(width: AppSpacing.s8),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s20),
+              _FormLabel(
+                label: 'Jumlah pouring',
+                fromAi:
+                    state.aiSuggestion?.highlights(AiPlanField.pouring) ??
+                    false,
+              ),
+              const SizedBox(height: AppSpacing.s8),
+              _PouringSelector(
+                selected: plan.pouringCount,
+                onSelected: controller.updatePouringCount,
+              ),
+              if (state.fieldErrors['pouring'] case final error?) ...[
+                const SizedBox(height: AppSpacing.s8),
+                Text(
+                  error,
+                  style: textTheme.bodySmall?.copyWith(color: AppColors.error),
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.s20),
-        _FormLabel(
-          label: 'Ukuran gilingan',
-          fromAi: state.aiSuggestion?.highlights(AiPlanField.grind) ?? false,
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        Wrap(
-          spacing: AppSpacing.s8,
-          runSpacing: AppSpacing.s8,
-          children: Grind.values
-              .map(
-                (grind) => AppChip(
-                  label: grind.label,
-                  selected: plan.grind == grind,
-                  onSelected: (_) => controller.updateGrind(grind),
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: AppSpacing.s20),
-        _FormLabel(
-          label: 'Jumlah pouring',
-          fromAi: state.aiSuggestion?.highlights(AiPlanField.pouring) ?? false,
-        ),
-        const SizedBox(height: AppSpacing.s8),
-        Wrap(
-          spacing: AppSpacing.s8,
-          runSpacing: AppSpacing.s8,
-          children: List.generate(
-            5,
-            (index) => AppChip(
-              label: '${index + 1}',
-              selected: plan.pouringCount == index + 1,
-              onSelected: (_) => controller.updatePouringCount(index + 1),
-            ),
-          ),
-        ),
-        if (state.fieldErrors['pouring'] case final error?) ...[
-          const SizedBox(height: AppSpacing.s8),
-          Text(
-            error,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.error),
-          ),
-        ],
-        const SizedBox(height: AppSpacing.s24),
-        Text('Tahap seduh', style: Theme.of(context).textTheme.titleLarge),
+        Text('Tahap seduh', style: textTheme.titleLarge),
         const SizedBox(height: AppSpacing.s12),
         ...List.generate(
           plan.stages.length,
           (index) => Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.s16),
+            padding: const EdgeInsets.only(bottom: AppSpacing.s12),
             child: _StageCard(
               plan: plan,
               stageIndex: index,
@@ -306,25 +379,119 @@ class _BrewForm extends StatelessWidget {
             ),
           ),
         ),
-        AppCard(child: BrewTimeline(plan: plan)),
-        const SizedBox(height: AppSpacing.s16),
-        AppCard(child: BrewWaterChart(plan: plan)),
-        const SizedBox(height: AppSpacing.s24),
-        AppButton(
-          label: 'Mulai Sesi',
-          icon: Icons.play_arrow_rounded,
-          onPressed: state.canStart
-              ? () {
-                  controller.dismissAiSuggestion();
-                  Navigator.of(context).push<void>(
-                    MaterialPageRoute(
-                      builder: (_) => BrewSessionScreen(plan: plan),
-                    ),
-                  );
-                }
-              : null,
+        const SizedBox(height: AppSpacing.s4),
+        AppCard(
+          padding: AppInsets.settingsBlock,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BrewTimeline(plan: plan),
+              const SizedBox(height: AppSpacing.s20),
+              BrewWaterChart(plan: plan, chartHeight: AppSizes.brewChartHeight),
+            ],
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _TotalWater extends StatelessWidget {
+  const _TotalWater({required this.plan});
+
+  final BrewPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Total air', style: textTheme.labelLarge),
+        const SizedBox(height: AppSpacing.s8),
+        Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(
+            minHeight: AppSizes.minimumTouchTarget + AppSpacing.s8,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s16,
+            vertical: AppSpacing.s12,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.primaryContainer,
+            borderRadius: BorderRadius.circular(AppRadius.navigation),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.water_drop_outlined),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: Text(
+                  '${_formatNumber(plan.totalWaterG)} g',
+                  style: textTheme.titleLarge,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PouringSelector extends StatelessWidget {
+  const _PouringSelector({required this.selected, required this.onSelected});
+
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s4),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        children: [
+          for (var count = 1; count <= 5; count++)
+            Expanded(
+              child: Semantics(
+                button: true,
+                selected: selected == count,
+                label: '$count pouring',
+                child: Material(
+                  color: selected == count
+                      ? AppColors.primary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    onTap: () => onSelected(count),
+                    child: SizedBox(
+                      height: AppSizes.minimumTouchTarget,
+                      child: Center(
+                        child: ExcludeSemantics(
+                          child: Text(
+                            '$count',
+                            style: textTheme.titleLarge?.copyWith(
+                              fontWeight: selected == count
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -440,54 +607,59 @@ class _StageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final stage = plan.stages[stageIndex];
     final isLast = stageIndex == plan.stages.length - 1;
+    final textTheme = Theme.of(context).textTheme;
     return AppCard(
       backgroundColor: BrewStageColors.forPosition(stage.position),
+      padding: AppInsets.settingsBlock,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: AppSpacing.s12,
-            runSpacing: AppSpacing.s8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                stage.name.label,
-                style: Theme.of(context).textTheme.titleLarge,
+              Expanded(
+                child: Text(stage.name.label, style: textTheme.titleLarge),
               ),
               Text(
                 'Mulai ${_formatTime(stage.startSeconds)}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+                style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.s16),
-          _BrewNumberField(
-            key: ValueKey('duration-${plan.beanId}-$stageIndex'),
-            label: 'Durasi (detik)',
-            value: stage.durationSeconds.toString(),
-            errorText: errors['duration_$stageIndex'],
-            onChanged: (value) =>
-                controller.updateStageDuration(stageIndex, value),
-          ),
           const SizedBox(height: AppSpacing.s12),
-          _BrewNumberField(
-            key: ValueKey('target-${plan.beanId}-$stageIndex'),
-            label: isLast
-                ? 'Target air per tuang (sisa)'
-                : 'Target air per tuang (g)',
-            value: _formatNumber(stage.targetPourG),
-            errorText: errors['target_$stageIndex'],
-            decimal: true,
-            enabled: !isLast,
-            onChanged: (value) =>
-                controller.updateStageTarget(stageIndex, value),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _BrewNumberField(
+                  key: ValueKey('duration-${plan.beanId}-$stageIndex'),
+                  label: 'Durasi (detik)',
+                  value: stage.durationSeconds.toString(),
+                  errorText: errors['duration_$stageIndex'],
+                  onChanged: (value) =>
+                      controller.updateStageDuration(stageIndex, value),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: _BrewNumberField(
+                  key: ValueKey('target-${plan.beanId}-$stageIndex'),
+                  label: isLast ? 'Target air (sisa)' : 'Target air (g)',
+                  value: _formatNumber(stage.targetPourG),
+                  errorText: errors['target_$stageIndex'],
+                  decimal: true,
+                  enabled: !isLast,
+                  onChanged: (value) =>
+                      controller.updateStageTarget(stageIndex, value),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.s12),
+          const SizedBox(height: AppSpacing.s8),
           Text(
-            'Target kumulatif: ${_formatNumber(plan.cumulativeWaterAt(stageIndex))} g',
-            style: Theme.of(context).textTheme.bodyLarge,
+            'Kumulatif ${_formatNumber(plan.cumulativeWaterAt(stageIndex))} g',
+            style: textTheme.bodySmall,
           ),
         ],
       ),
