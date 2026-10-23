@@ -83,6 +83,7 @@ abstract final class AppSizes {
   static const stepperButton = 40.0;
   static const stepperValueWidth = 52.0;
   static const dividerThickness = 1.0;
+  static const floatingButtonClearance = 96.0;
 }
 
 abstract final class AppInsets {

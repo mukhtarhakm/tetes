@@ -35,6 +35,61 @@ void main() {
   });
 
   test(
+    'dosis melebihi stok ditolak atomik; dosis sama menghabiskan stok',
+    () async {
+      final beanId = await _createBean(beanRepository);
+      await database.update(
+        'beans',
+        {'initial_stock_g': 10},
+        where: 'id = ?',
+        whereArgs: [beanId],
+      );
+      final plan = BrewCalculator.createDefault(beanId: beanId);
+      final result = BrewSessionResult(
+        plan: plan,
+        totalTimeS: 135,
+        drawdownS: null,
+        brewedAtUtc: '2026-10-20T01:00:00Z',
+      );
+      Future<String> save(BrewSessionResult value) => brewRepository.save(
+        userId: 'user-1',
+        result: value,
+        tasteScore: 4,
+        tasteTags: [RoasteryNoteTag.manis],
+        actualWaterG: List.filled(value.plan.stages.length, null),
+      );
+      await expectLater(
+        save(result),
+        throwsA(isA<InsufficientStockException>()),
+      );
+      expect(
+        await brewRepository.remainingStockG(userId: 'user-1', beanId: beanId),
+        10,
+      );
+      expect((await database.query('brews')).length, 0);
+      expect((await database.query('brew_stages')).length, 0);
+      final equalPlan = BrewCalculator.updateParameters(plan, doseG: 10);
+      await save(
+        BrewSessionResult(
+          plan: equalPlan,
+          totalTimeS: 135,
+          drawdownS: null,
+          brewedAtUtc: result.brewedAtUtc,
+        ),
+      );
+      expect(
+        await brewRepository.remainingStockG(userId: 'user-1', beanId: beanId),
+        0,
+      );
+      await expectLater(
+        save(result),
+        throwsA(isA<InsufficientStockException>()),
+      );
+      expect((await database.query('brews')).length, 1);
+    },
+  );
+
+  test(
     'ringkasan mengambil satu seduhan aktif terbaru milik pengguna',
     () async {
       final beanId = await _createBean(beanRepository);

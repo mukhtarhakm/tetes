@@ -69,6 +69,9 @@ class BeanRepository implements FxCacheStore {
     required String userId,
     required BeanDraft draft,
   }) async {
+    if (!draft.initialStockG.isFinite || draft.initialStockG < 0) {
+      throw StateError('Stok tidak boleh negatif.');
+    }
     final id = createUuidV4();
     final now = _utcNowWithoutMilliseconds();
     await _database.insert('beans', {
@@ -89,19 +92,31 @@ class BeanRepository implements FxCacheStore {
     required String id,
     required BeanDraft draft,
   }) async {
-    final changedRows = await _database.update(
-      'beans',
-      {
-        ..._draftValues(draft),
-        'updated_at': _utcNowWithoutMilliseconds(),
-        'sync_status': 'pending',
-      },
-      where: 'id = ? AND user_id = ?',
-      whereArgs: [id, userId],
-    );
-    if (changedRows != 1) {
-      throw StateError('Biji tidak ditemukan.');
+    if (!draft.initialStockG.isFinite || draft.initialStockG < 0) {
+      throw StateError('Stok tidak boleh negatif.');
     }
+    await _database.transaction((txn) async {
+      final used = await txn.rawQuery(
+        "SELECT COALESCE(SUM(dose_g), 0) AS used FROM brews WHERE user_id = ? AND bean_id = ? AND status = 'aktif'",
+        [userId, id],
+      );
+      if (draft.initialStockG < (used.single['used'] as num).toDouble()) {
+        throw StateError(
+          'Stok awal tidak boleh kurang dari biji yang sudah diseduh.',
+        );
+      }
+      final changedRows = await txn.update(
+        'beans',
+        {
+          ..._draftValues(draft),
+          'updated_at': _utcNowWithoutMilliseconds(),
+          'sync_status': 'pending',
+        },
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [id, userId],
+      );
+      if (changedRows != 1) throw StateError('Biji tidak ditemukan.');
+    });
   }
 
   Future<void> archive({required String userId, required String id}) async {

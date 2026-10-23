@@ -46,6 +46,43 @@ void main() {
     expect(bean.brewCount, 2);
   });
 
+  test('edit stok awal tidak boleh membuat stok tersisa negatif', () async {
+    final beanId = await repository.create(
+      userId: 'user-1',
+      draft: _draft(stock: 20),
+    );
+    await database.insert('brews', _brew(id: 'brew-active', beanId: beanId));
+    final before = (await database.query(
+      'beans',
+      where: 'id = ?',
+      whereArgs: [beanId],
+    )).single;
+    await expectLater(
+      repository.update(userId: 'user-1', id: beanId, draft: _draft(stock: 10)),
+      throwsStateError,
+    );
+    final after = (await database.query(
+      'beans',
+      where: 'id = ?',
+      whereArgs: [beanId],
+    )).single;
+    expect(after['initial_stock_g'], before['initial_stock_g']);
+    expect(after['updated_at'], before['updated_at']);
+    expect(after['sync_status'], before['sync_status']);
+    await repository.update(
+      userId: 'user-1',
+      id: beanId,
+      draft: _draft(stock: 15),
+    );
+    expect(
+      (await repository.findById(
+        userId: 'user-1',
+        id: beanId,
+      ))!.remainingStockG,
+      0,
+    );
+  });
+
   test('daftar dibatasi user dan menyembunyikan biji terarsip', () async {
     final activeId = await repository.create(
       userId: 'user-1',

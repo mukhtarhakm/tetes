@@ -68,6 +68,43 @@ void main() {
     );
   });
 
+  testWidgets('dosis melebihi stok menampilkan pesan dan menonaktifkan mulai', (
+    tester,
+  ) async {
+    final bean = _bean(remainingStockG: 10);
+    final plan = BrewCalculator.createDefault(beanId: bean.id);
+    await tester.pumpWidget(
+      _app(
+        () async =>
+            BrewSetupState(beans: [bean], selectedBeanId: bean.id, plan: plan),
+        initialBeanId: bean.id,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Biji Biji Uji tinggal 10 g. Dosis 15 g melebihi stok.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('insufficient-stock-warning')), findsOneWidget);
+    expect(
+      BrewSetupState(
+        beans: [bean],
+        selectedBeanId: bean.id,
+        plan: plan,
+      ).canStart,
+      isFalse,
+    );
+    final equalPlan = BrewCalculator.updateParameters(plan, doseG: 10);
+    expect(
+      BrewSetupState(
+        beans: [bean],
+        selectedBeanId: bean.id,
+        plan: equalPlan,
+      ).canStart,
+      isTrue,
+    );
+  });
+
   testWidgets('Atur Seduh tidak overflow pada lebar 320 dan teks 1,3x', (
     tester,
   ) async {
@@ -116,9 +153,9 @@ Widget _app(
     ],
     child: MaterialApp(
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          textScaler: TextScaler.linear(textScale),
-        ),
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,
       ),
       home: BrewSetupScreen(initialBeanId: initialBeanId),
@@ -135,15 +172,15 @@ class _FakeBrewSetupController extends BrewSetupController {
   Future<BrewSetupState> build() => load();
 }
 
-Bean _bean() {
-  return const Bean(
+Bean _bean({double remainingStockG = 250}) {
+  return Bean(
     id: 'bean-1',
     userId: 'user-1',
     name: 'Biji Uji',
     species: BeanSpecies.arabika,
     isSelfRoasted: false,
     initialStockG: 250,
-    remainingStockG: 250,
+    remainingStockG: remainingStockG,
     roasteryNotesTags: [],
     archived: false,
     createdAt: '2026-10-19T00:00:00Z',

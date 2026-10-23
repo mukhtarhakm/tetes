@@ -16,7 +16,7 @@ void main() {
     expect(errors, containsPair('species', 'Pilih spesies biji.'));
   });
 
-  test('harga, stok, dan ukuran kemasan harus lebih dari nol', () {
+  test('stok nol diterima; stok negatif, harga, dan kemasan ditolak', () {
     final errors = _validate(
       stockText: '0',
       priceText: '-1000',
@@ -24,7 +24,8 @@ void main() {
       currency: 'IDR',
     );
 
-    expect(errors['stock'], 'Stok harus lebih dari 0 gram.');
+    expect(errors['stock'], isNull);
+    expect(_validate(stockText: '-1')['stock'], 'Stok tidak boleh negatif.');
     expect(errors['price'], 'Harga harus lebih dari 0.');
     expect(errors['packSize'], 'Ukuran kemasan harus lebih dari 0 gram.');
   });

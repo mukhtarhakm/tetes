@@ -16,6 +16,21 @@ class BrewSaveException implements Exception {
   final String message;
 }
 
+class InsufficientStockException implements Exception {
+  const InsufficientStockException(this.beanName, this.remainingG, this.doseG);
+
+  final String beanName;
+  final double remainingG;
+  final double doseG;
+
+  String get message =>
+      'Biji $beanName tinggal ${_stockNumber(remainingG < 0 ? 0 : remainingG)} g. Dosis ${_stockNumber(doseG)} g melebihi stok.';
+}
+
+String _stockNumber(double value) => value == value.truncateToDouble()
+    ? value.toInt().toString()
+    : value.toString();
+
 double? brewCost(double doseG, double? priceIdrPerKg) =>
     priceIdrPerKg == null ? null : doseG * priceIdrPerKg / 1000;
 
@@ -83,7 +98,7 @@ class BrewRepository {
       await _database.transaction((txn) async {
         final beans = await txn.query(
           'beans',
-          columns: ['price_idr_per_kg'],
+          columns: ['name', 'price_idr_per_kg', 'initial_stock_g'],
           where: 'id = ? AND user_id = ? AND archived = 0',
           whereArgs: [plan.beanId, userId],
           limit: 1,
@@ -91,6 +106,20 @@ class BrewRepository {
         if (beans.isEmpty) {
           throw const BrewSaveException(
             'Biji tidak ditemukan atau sudah diarsipkan.',
+          );
+        }
+        final used = await txn.rawQuery(
+          "SELECT COALESCE(SUM(dose_g), 0) AS used FROM brews WHERE user_id = ? AND bean_id = ? AND status = 'aktif'",
+          [userId, plan.beanId],
+        );
+        final remaining =
+            (beans.single['initial_stock_g'] as num).toDouble() -
+            (used.single['used'] as num).toDouble();
+        if (plan.doseG > remaining) {
+          throw InsufficientStockException(
+            beans.single['name'] as String,
+            remaining,
+            plan.doseG,
           );
         }
         final last = await txn.query(
@@ -166,6 +195,8 @@ class BrewRepository {
         );
       });
     } on BrewSaveException {
+      rethrow;
+    } on InsufficientStockException {
       rethrow;
     } on DatabaseException {
       throw const BrewSaveException('Seduhan gagal disimpan. Coba lagi.');

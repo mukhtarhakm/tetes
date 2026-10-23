@@ -77,12 +77,29 @@ class BrewSetupState {
   final Map<String, String> fieldErrors;
   final String? notice;
 
+  String? get stockWarning {
+    final selected = beans
+        .where((bean) => bean.id == selectedBeanId)
+        .firstOrNull;
+    if (selected == null ||
+        plan == null ||
+        plan!.doseG <= selected.remainingStockG) {
+      return null;
+    }
+    return InsufficientStockException(
+      selected.name,
+      selected.remainingStockG,
+      plan!.doseG,
+    ).message;
+  }
+
   bool get canStart =>
       selectedBeanId != null &&
       plan != null &&
       !isPlanLoading &&
       !isAiLoading &&
-      fieldErrors.isEmpty;
+      fieldErrors.isEmpty &&
+      stockWarning == null;
 
   BrewSetupState copyWith({
     List<Bean>? beans,

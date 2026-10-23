@@ -30,8 +30,8 @@ abstract final class BeanValidation {
     final stock = double.tryParse(stockText.trim().replaceAll(',', '.'));
     if (stock == null) {
       errors['stock'] = 'Stok harus berupa angka.';
-    } else if (stock <= 0) {
-      errors['stock'] = 'Stok harus lebih dari 0 gram.';
+    } else if (!stock.isFinite || stock < 0) {
+      errors['stock'] = 'Stok tidak boleh negatif.';
     }
 
     final normalizedPrice = priceText.trim().replaceAll(',', '.');

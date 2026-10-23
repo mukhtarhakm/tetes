@@ -29,7 +29,7 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
   Bean? bean;
   String? userId;
   String? error;
-  bool loading = true, saving = false;
+  bool loading = true, saving = false, stockRejected = false;
   int? score;
   final tags = <RoasteryNoteTag>{};
   final notes = TextEditingController(), drawdown = TextEditingController();
@@ -58,6 +58,7 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
     setState(() {
       loading = true;
       error = null;
+      stockRejected = false;
     });
     try {
       final session = await ref.read(sessionControllerProvider.future);
@@ -165,6 +166,13 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
       messenger.showSnackBar(
         const SnackBar(content: Text('Seduhan tersimpan')),
       );
+    } on InsufficientStockException catch (e) {
+      if (mounted) {
+        setState(() {
+          stockRejected = true;
+          error = e.message;
+        });
+      }
     } on BrewSaveException catch (e) {
       if (mounted) setState(() => error = e.message);
     } catch (_) {
@@ -364,6 +372,17 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                     'Biaya seduhan: ${brewCost(plan.doseG, bean!.priceIdrPerKg)?.toStringAsFixed(0) ?? '-'} IDR',
                   ),
                   if (error != null) Text(error!),
+                  if (bean != null && plan.doseG > bean!.remainingStockG)
+                    Text(
+                      InsufficientStockException(
+                        bean!.name,
+                        bean!.remainingStockG,
+                        plan.doseG,
+                      ).message,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
                   const SizedBox(height: AppSpacing.s8),
                   Text(
                     'Diagnosa AI tersedia setelah menyimpan',
@@ -373,7 +392,12 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                   AppButton(
                     label: 'Simpan',
                     isLoading: saving,
-                    onPressed: score != null && tags.isNotEmpty && !saving
+                    onPressed:
+                        score != null &&
+                            tags.isNotEmpty &&
+                            !saving &&
+                            !stockRejected &&
+                            plan.doseG <= bean!.remainingStockG
                         ? save
                         : null,
                   ),

@@ -198,6 +198,16 @@ class _BrewForm extends StatelessWidget {
           fromAi: state.aiSuggestion?.highlights(AiPlanField.dose) ?? false,
           onChanged: controller.updateDose,
         ),
+        if (state.stockWarning case final warning?) ...[
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            warning,
+            key: const Key('insufficient-stock-warning'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
         const SizedBox(height: AppSpacing.s16),
         _BrewNumberField(
           key: ValueKey('ratio-${plan.beanId}'),
@@ -227,10 +237,7 @@ class _BrewForm extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Icon(Icons.water_drop_outlined),
-              Text(
-                'Total air',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('Total air', style: Theme.of(context).textTheme.titleLarge),
               Text(
                 '${_formatNumber(plan.totalWaterG)} g',
                 style: Theme.of(context).textTheme.titleLarge,
