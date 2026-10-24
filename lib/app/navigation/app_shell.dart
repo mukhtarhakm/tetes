@@ -13,6 +13,7 @@ import '../../data/db/database_provider.dart';
 import '../../data/remote/sync_client.dart';
 import '../../data/repositories/brew_repo.dart';
 import '../../data/sync/sync_service.dart';
+import '../../features/anchor/state/chain_anchor_status.dart';
 import '../../features/auth/session/force_logout.dart';
 import '../../features/auth/state/auth_providers.dart';
 import '../../features/auth/state/session_controller.dart';
@@ -39,6 +40,10 @@ final appSyncServiceFactoryProvider = Provider<Future<SyncService> Function()>((
       (userId, oldBaseId) async => (await ref.read(
         notificationCoordinatorProvider.future,
       )).rescheduleEvent(userId, oldBaseId),
+      (userId) async {
+        await ref.read(chainAnchorStatusProvider.future);
+        await ref.read(chainAnchorStatusProvider.notifier).requestAfterPush(userId);
+      },
     );
   };
 });
@@ -183,7 +188,16 @@ class _AppShellState extends ConsumerState<AppShell> {
     } catch (_) {
       // Sinkronisasi tetap dapat berjalan bila daftar biji gagal dimuat.
     }
-    if (mounted) await _automaticSync();
+    if (mounted) {
+      final userId = ref.read(sessionControllerProvider).asData?.value.userId;
+      if (userId != null) {
+        unawaited(() async {
+          await ref.read(chainAnchorStatusProvider.future);
+          await ref.read(chainAnchorStatusProvider.notifier).resumePending(userId);
+        }());
+      }
+      await _automaticSync();
+    }
   }
 
   Future<void> _automaticSync() async {
@@ -212,6 +226,10 @@ class _AppShellState extends ConsumerState<AppShell> {
         }
       }
       await service.run(userId: userId);
+      unawaited(() async {
+        await ref.read(chainAnchorStatusProvider.future);
+        await ref.read(chainAnchorStatusProvider.notifier).resumePending(userId);
+      }());
     } catch (_) {
       // Sinkronisasi otomatis tetap senyap; baris gagal tidak berubah.
     } finally {

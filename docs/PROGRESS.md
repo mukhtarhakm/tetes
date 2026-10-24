@@ -1,5 +1,16 @@
 # PROGRESS: Tetes
 
+## 2026-10-24 - Jangkar Sepolia sisi aplikasi (tanpa UI)
+- Migrasi `chain_anchors` dan Edge Function `anchor` sudah diterapkan ke Supabase; secret rantai sudah di-set. Kontrak BrewAnchor ada di Sepolia, alamat `0x8d80e52E86BDc990f6787D7DD5faF46BeC369324`.
+- Flutter: `AnchorClient` (memanggil `anchor` dengan `x-session-token`), `ChainVerifier` (JSON-RPC `eth_call` ke `latest(bytes32)`, selector `0x79feb107`, RPC publik tanpa kunci), `ChainAnchorRepository`, SQLite versi 4 (tabel `chain_anchors` dan `chain_anchor_cooldowns`), dan `chainAnchorStatusProvider` dengan aksi `verifyNow()`. Pemicu: setelah push sinkronisasi dan saat aplikasi dibuka untuk jangkar `pending`. Logout menghapus data jangkar lokal pengguna.
+- Verifikasi menghitung ulang rantai lokal (`verifyChain`) lalu membandingkan hash pada seq on-chain. Hasil: `match`, `mismatch`, `not_found`, `unknown` (jangkar di rantai lebih baru dari data perangkat). RPC tidak terjangkau tidak disimpan sebagai hasil.
+- `flutter analyze` bersih dan `flutter test` lulus 327 test. Perbaikan: `home_navigation_test` menambah override status jangkar karena `AppShell` kini membacanya.
+- Belum: UI lencana "Tercatat di Sepolia" dan tombol Verifikasi, uji ujung-ke-ujung di HP (seduh, sinkron, cek event `Anchored` di Etherscan), test Deno fungsi `anchor` (Deno belum terpasang di laptop).
+
+## 2026-10-24 - Server jangkar Sepolia
+- Migrasi `chain_anchors` dengan RLS dan reservasi SQL atomik, Edge Function `anchor`, serta test logika Deno disiapkan. Kontrak telah di-deploy sebelumnya oleh pemilik proyek; migrasi dan fungsi pada langkah ini belum diterapkan. Flutter tidak diubah.
+- Vektor `userKey` dihitung dengan ethers di Node dan dicantumkan di test Deno. Pemeriksaan sintaks TypeScript untuk tiga berkas fungsi bersih; Deno dan PostgreSQL lokal tidak tersedia, sehingga test Deno dan migrasi SQL belum dijalankan. `graphify update .` gagal karena instalasi `uv trampoline` lokal.
+
 ## 2026-10-24 - Kontrak jangkar Sepolia
 - BrewAnchor, test Hardhat lokal, skrip deploy Sepolia, dan petunjuk operator disiapkan. Hash chain tetap untuk integritas; jangkar publik hanya menyimpan kepala rantai per pengguna. Integrasi Flutter/Edge Function dan deploy belum dilakukan.
 - `npm test` lulus (5 test) pada jaringan lokal Hardhat dan pemeriksaan TypeScript bersih. Anchor pertama memakai 72.532 gas; pembaruan pengguna yang sama memakai 38.332 gas. Belum ada uji Sepolia atau HP.

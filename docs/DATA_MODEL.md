@@ -188,6 +188,31 @@ CREATE INDEX idx_events_user_time ON events(user_id, start_utc);
 
 Data toko (`stores`) bukan data pengguna. Tabel ini diisi dari berkas seed bawaan aplikasi (10-15 titik), tanpa sinkronisasi dan tanpa `user_id`. Hanya toko biji, toko alat seduh, dan roastery. **Bukan kedai kopi.**
 
+Jangkar blockchain (SQLite versi 4, tidak ikut hash chain dan tidak disinkronkan):
+
+```sql
+CREATE TABLE chain_anchors (
+  user_id       TEXT NOT NULL,
+  seq           INTEGER NOT NULL,
+  head_hash     TEXT,                  -- SHA-256 hex kepala rantai pada seq itu
+  user_key      TEXT,                  -- keccak256 UUID pengguna (0x + 64 hex) dari server
+  tx_hash       TEXT,
+  status        TEXT NOT NULL CHECK (status IN ('pending', 'confirmed')),
+  explorer_url  TEXT,
+  anchored_at   TEXT NOT NULL,         -- UTC ISO-8601
+  verified_at   TEXT,
+  verify_result TEXT CHECK (verify_result IN ('match', 'mismatch', 'not_found', 'unknown')),
+  PRIMARY KEY (user_id, seq)
+);
+
+CREATE TABLE chain_anchor_cooldowns (    -- Retry-After dari server, bertahan setelah restart
+  user_id        TEXT PRIMARY KEY,
+  retry_after_at TEXT NOT NULL
+);
+```
+
+Kedua tabel dihapus per pengguna saat logout. Sumber kebenaran jangkar tetap kontrak di Sepolia dan tabel `chain_anchors` Postgres (hanya `service_role`).
+
 Hal yang disimpan di luar database:
 - Session aktif: token, `user_id`, dan `expires_at` di secure storage, bukan SQLite.
 - `pending_revoke_token`: token session lama yang belum berhasil dicabut karena offline, di secure storage terpisah.
@@ -435,5 +460,6 @@ ORDER BY seq ASC;
 
 - Versi skema SQLite disimpan lewat `PRAGMA user_version`. Tiap perubahan skema = migrasi bernomor, bukan menghapus database.
 - Migrasi 2 menambahkan `beans.pack_size_g REAL` dan `beans.process_custom TEXT` melalui dua perintah `ALTER TABLE`; data biji lama dibiarkan bernilai `NULL`.
+- Migrasi 4 menambahkan tabel `chain_anchors` dan `chain_anchor_cooldowns`; data lama tidak diubah.
 - Menambah kolom opsional aman. Mengubah atau menghapus kolom yang ikut hash **dilarang** setelah ada data.
 - Setelah Sprint 3, perubahan pada format hash harus dianggap perubahan besar dan dikonfirmasi dulu.

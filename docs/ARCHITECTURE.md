@@ -299,6 +299,14 @@ Respons `diagnose`:
 ```
 Nilai `variable` hanya dari: `dose_g`, `ratio`, `water_temp_c`, `grind`. Nilai suhu 80-100, rasio 10-20, `grind` dari enum.
 
+### 7.7 `anchor`
+
+`POST` dengan header `x-session-token`; body diabaikan. Fungsi memakai `requireValidSession`, membaca `seq` dan `hash` seduhan terakhir pengguna dari Postgres, lalu mereservasi `(user_id, seq)` melalui RPC SQL yang hanya dapat dipanggil `service_role`. Tanpa seduhan: `200 {"anchored":false,"reason":"no_brews"}`. Seq yang sudah tercatat: `200` dengan `reason: "already_anchored"`. Pencatatan baru dibatasi satu per pengguna per lima menit (`429`).
+
+Fungsi menghitung `userKey = keccak256(UTF-8 UUID huruf kecil)` dan mengubah SHA-256 hex kepala rantai menjadi `bytes32` tanpa mengubah isinya. Sebelum mengirim, fungsi membaca `latest(userKey)` dari kontrak Sepolia. Transaksi ditandatangani dompet server, dan hash transaksi disimpan sebagai `pending` sebelum menunggu satu konfirmasi hingga 25 detik. Bila belum terkonfirmasi, respons `202` memuat `tx_hash`. Panggilan berikutnya memeriksa receipt: sukses menjadi `confirmed`; reverted menjadi `failed`. Reservasi tanpa hash yang lebih tua dari 10 menit dilepas bila seq belum terlihat on-chain. Bila seq sudah terlihat, baris menjadi `confirmed`; pencarian event `Anchored` pada 5.000 blok terakhir mencoba mengisi `tx_hash`, yang boleh tetap `null` bila event tidak ditemukan. Galat nonce sebelum hash transaksi diperoleh dicoba sekali lagi dengan nonce segar; kegagalan kedua menghasilkan `503 retryable_error`.
+
+RLS `chain_anchors` aktif tanpa policy untuk `anon` dan `authenticated`; hanya `service_role` mendapat akses. Rahasia `CHAIN_RPC_URL`, `CHAIN_PRIVATE_KEY`, dan `CHAIN_CONTRACT_ADDRESS` dibaca dari environment Edge Function; nama dan placeholder tersedia di `supabase/functions/.env.example`. Galat dan log tidak memuat nilainya atau pesan internal.
+
 ## 8. Prompt AI (ringkas)
 
 **Sistem (rekomendasi):**
@@ -354,8 +362,16 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 
 ## 11. Jangkar hash Sepolia
 
-`blockchain/contracts/BrewAnchor.sol` menyimpan pasangan hash kepala rantai dan `seq` terbaru per pengguna pada Ethereum Sepolia. Kunci mapping adalah `keccak256` UUID pengguna yang dihitung off-chain; hash kepala rantai berasal dari SHA-256 hex 32 byte sesuai `DATA_MODEL.md`. Data seduhan lengkap tetap di SQLite/Postgres karena biaya dan privasi. Hanya owner boleh menulis, `seq` harus meningkat, dan owner dapat dipindah untuk rotasi kunci. Event menyimpan riwayat jangkar. Kontrak tidak membaca atau memverifikasi isi rantai. Verifikasi penuh kelak menghitung ulang rantai di aplikasi dan membandingkan kepala rantai dengan nilai on-chain. Langkah ini hanya menyiapkan kontrak, test lokal, dan skrip deploy; integrasi Flutter/Edge Function serta deploy belum dilakukan.
+`blockchain/contracts/BrewAnchor.sol` menyimpan pasangan hash kepala rantai dan `seq` terbaru per pengguna pada Ethereum Sepolia, chainId 11155111, alamat `0x8d80e52E86BDc990f6787D7DD5faF46BeC369324`. Kunci mapping adalah `keccak256` UUID pengguna yang dihitung off-chain; hash kepala rantai berasal dari SHA-256 hex 32 byte sesuai `DATA_MODEL.md`. Data seduhan lengkap tetap di SQLite/Postgres karena biaya dan privasi. Dompet server adalah pengirim transaksi; hanya alamat owner kontrak boleh menulis, dan owner dapat dipindah untuk rotasi kunci. Event menyimpan riwayat jangkar. Kontrak hanya membuktikan hash tercatat pada waktu tertentu, bukan memverifikasi isi rantai. Verifikasi penuh kelak menghitung ulang rantai di aplikasi dan membandingkan kepala rantai dengan nilai on-chain. Kontrak telah di-deploy; Edge Function dan migrasi masih perlu diterapkan.
 
+**Batas skala kelas:** nonce dompet server yang dipakai lintas pengguna dapat bertabrakan saat permintaan serentak. Fungsi mencoba ulang galat nonce sekali, lalu mengembalikan `503`; ini belum rancangan antrean transaksi untuk produksi besar. Saat RPC menerima transaksi tetapi jawaban hilang sebelum `tx_hash` tersimpan, reservasi bertahan sampai pengecekan on-chain dan batas 10 menit; percobaan ulang dapat mengirim transaksi kedua yang akan ditolak kontrak jika seq pertama sudah tercatat. Pencarian event dibatasi 5.000 blok, jadi `tx_hash` hasil pemulihan dapat `null`. Jika nilai on-chain sudah melampaui seq yang direservasi dan event untuk seq lama tidak ditemukan, status pemulihan `confirmed` hanya menunjukkan rantai telah maju, bukan membuktikan hash pada baris lama pernah dicatat. Nilai `anchored_at` di database adalah waktu server mengonfirmasi, bukan cap waktu blok.
+
+
+### 11.1 Sisi aplikasi
+
+Alur: seduhan baru, sinkronisasi push sukses, lalu `ChainAnchorController.requestAfterPush` memanggil `AnchorClient.requestAnchor()` di latar belakang (`POST /functions/v1/anchor`, header `x-session-token`, timeout 40 detik). Hanya satu permintaan berjalan sekaligus. Hasil dipetakan ke `Confirmed`, `Pending`, `NothingToAnchor`, `RateLimited`, `Unauthorized`, atau `Failed`, lalu disimpan di tabel lokal `chain_anchors` (versi SQLite 4). `RateLimited` menyimpan `retry_after_at` di `chain_anchor_cooldowns`; permintaan berikutnya menghormatinya, termasuk setelah aplikasi dibuka ulang. Jangkar `pending` diperiksa lagi saat aplikasi dibuka atau setelah sinkronisasi berikutnya, tanpa timer. Sebelum menulis hasil, controller memastikan pengguna aktif masih sama; hasil permintaan lama dibuang bila akun berganti. Logout menghapus baris jangkar dan cooldown pengguna itu.
+
+Verifikasi (`verifyNow()`): `ChainVerifier` memanggil `eth_call` `latest(bytes32)` (selector `0x79feb107`) pada kontrak lewat RPC publik Sepolia (`AppConfig.chainRpcUrl`, dapat dioverride dengan `CHAIN_RPC_URL`), memakai `user_key` yang disimpan dari respons server. `BrewRepository.verifiedHashAtSeq` memverifikasi seluruh rantai lokal lalu mengembalikan hash pada seq on-chain. Hasil `match`, `mismatch`, `not_found`, atau `unknown` disimpan di `verify_result` bersama `verified_at`. Aplikasi tidak memegang kunci privat dan tidak pernah mengirim transaksi.
 
 ## 12. Pengujian
 
@@ -378,7 +394,7 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 | API kurs | (isi setelah diuji) |
 | Platform uji | HP Android 16 (API 36) |
 
-Environment Edge Function: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY`, `AI_MODEL`. Tidak ada satu pun yang ditulis di kode.
+Environment Edge Function: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY`, `AI_MODEL`; khusus `anchor`: `CHAIN_RPC_URL`, `CHAIN_PRIVATE_KEY`, `CHAIN_CONTRACT_ADDRESS`. Tidak ada nilai rahasia yang ditulis di kode.
 
 ## 14. Aturan Kerja dengan AI
 

@@ -16,7 +16,9 @@ import 'package:tetes/core/ui/rating_stars.dart';
 import 'package:tetes/data/db/app_database.dart';
 import 'package:tetes/data/db/database_migrations.dart';
 import 'package:tetes/data/db/database_provider.dart';
+import 'package:tetes/data/repositories/chain_anchor_repo.dart';
 import 'package:tetes/data/repositories/user_repo.dart';
+import 'package:tetes/features/anchor/state/chain_anchor_status.dart';
 import 'package:tetes/data/sync/sync_service.dart';
 import 'package:tetes/features/auth/state/auth_providers.dart';
 import 'package:tetes/features/auth/state/session_controller.dart';
@@ -380,6 +382,8 @@ Future<void> _pumpShell(
           (ref) async => FakeNotificationCoordinator(),
         ),
         sessionControllerProvider.overrideWith(_AuthenticatedSession.new),
+        chainAnchorStatusProvider.overrideWith(_IdleChainAnchor.new),
+        clearChainAnchorsProvider.overrideWithValue((_) async {}),
         userRepositoryProvider.overrideWith((ref) async => _UserRepository()),
         homeDataProvider.overrideWith(
           (ref) async => const HomeData(
@@ -405,6 +409,18 @@ Future<void> _pumpShell(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+class _IdleChainAnchor extends ChainAnchorController {
+  @override
+  Future<ChainAnchorStatus> build() async =>
+      const ChainAnchorStatus(ChainAnchorPhase.noBrews);
+
+  @override
+  Future<void> requestAfterPush(String userId) async {}
+
+  @override
+  Future<void> resumePending(String userId) async {}
 }
 
 class _AuthenticatedSession extends SessionController {

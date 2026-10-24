@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
@@ -8,6 +9,7 @@ import '../remote/sync_client.dart';
 
 typedef SyncUnauthorized = Future<void> Function();
 typedef SyncEventChanged = Future<void> Function(String userId, int? oldBaseId);
+typedef SyncBrewsAccepted = Future<void> Function(String userId);
 
 class SyncStatus {
   const SyncStatus({
@@ -33,12 +35,14 @@ class SyncService {
     this._client,
     this._onUnauthorized, [
     this._onEventChanged,
+    this._onBrewsAccepted,
   ]);
 
   final Database _database;
   final SyncClient _client;
   final SyncUnauthorized _onUnauthorized;
   final SyncEventChanged? _onEventChanged;
+  final SyncBrewsAccepted? _onBrewsAccepted;
   bool _running = false;
 
   void close() => _client.close();
@@ -598,6 +602,15 @@ class SyncService {
         );
         await _saveSummary(userId, acceptedCounts, rejectedCounts);
         if (blocked) break;
+      }
+      if (acceptedCounts['brews']! > 0 && _onBrewsAccepted != null) {
+        unawaited(() async {
+          try {
+            await _onBrewsAccepted(userId);
+          } catch (_) {
+            // Kegagalan jangkar tidak membatalkan sinkronisasi seduhan.
+          }
+        }());
       }
       SyncException? groupError;
       for (final group in const ['events', 'game_scores', 'feedback']) {

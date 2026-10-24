@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/notifications/notification_service.dart';
+import '../../../data/repositories/chain_anchor_repo.dart';
 
 import '../session/session_decision.dart';
 import '../session/session_revocation_queue.dart';
@@ -88,6 +89,9 @@ class SessionController extends AsyncNotifier<SessionState> {
       await ref.read(sessionRevocationQueueProvider).enqueue(token);
     }
     await ref.read(notificationServiceProvider).cancelAll();
+    if (storedSession != null) {
+      await ref.read(clearChainAnchorsProvider)(storedSession.userId);
+    }
     await storage.clearSession();
     state = const AsyncData(
       SessionState.unauthenticated(message: 'Kamu sudah keluar.'),
@@ -103,7 +107,14 @@ class SessionController extends AsyncNotifier<SessionState> {
       try {
         await ref.read(notificationServiceProvider).cancelAll();
       } finally {
-        await ref.read(sessionStorageProvider).clearSession();
+        try {
+          final session = await ref.read(sessionStorageProvider).readSession();
+          if (session != null) {
+            await ref.read(clearChainAnchorsProvider)(session.userId);
+          }
+        } finally {
+          await ref.read(sessionStorageProvider).clearSession();
+        }
       }
     } finally {
       state = const AsyncData(

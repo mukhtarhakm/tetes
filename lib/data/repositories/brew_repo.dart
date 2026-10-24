@@ -227,6 +227,21 @@ class BrewRepository {
     );
   }
 
+  Future<String?> verifiedHashAtSeq(String userId, int seq) async {
+    if (!(await verifyUserChain(userId)).startsWith('utuh')) {
+      throw const BrewSaveException('Rantai seduhan lokal tidak utuh.');
+    }
+    final rows = await _database.query(
+      'brews',
+      where: 'user_id = ? AND seq = ?',
+      whereArgs: [userId, seq],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final row = rows.single;
+    return hashEntry(_hashData(row), row['prev_hash'] as String);
+  }
+
   Future<double> remainingStockG({
     required String userId,
     required String beanId,

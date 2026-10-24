@@ -28,7 +28,7 @@ void main() {
   });
 
   test(
-    'instalasi baru membuat semua tabel, indeks, dan user_version 3',
+    'instalasi baru membuat semua tabel, indeks, dan user_version 4',
     () async {
       final tableRows = await database.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table' "
@@ -39,6 +39,8 @@ void main() {
       expect(tableNames, {
         'beans',
         'chat_messages',
+        'chain_anchors',
+        'chain_anchor_cooldowns',
         'brew_stages',
         'brews',
         'events',
@@ -89,7 +91,7 @@ void main() {
     },
   );
 
-  test('upgrade v2 ke v3 menjaga data lama', () async {
+  test('upgrade v2 ke v4 menjaga data lama', () async {
     final directory = await Directory.systemTemp.createTemp('tetes-migration-');
     final databasePath = path.join(directory.path, 'upgrade.db');
     Database? versionTwo;
@@ -124,13 +126,43 @@ void main() {
         ),
       );
 
-      expect(await _userVersion(database), 3);
-      expect(await _userVersion(upgraded), 3);
+      expect(await _userVersion(database), 4);
+      expect(await _userVersion(upgraded), 4);
       expect(await _beanSchema(upgraded), await _beanSchema(database));
       expect((await upgraded.query('users')).single['username'], 'lama');
       expect(await upgraded.query('chat_messages'), isEmpty);
     } finally {
       await versionTwo?.close();
+      await upgraded?.close();
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test('upgrade v3 ke v4 menjaga pengguna dan chat', () async {
+    final directory = await Directory.systemTemp.createTemp('tetes-anchor-upgrade-');
+    final databasePath = path.join(directory.path, 'upgrade.db');
+    Database? old;
+    Database? upgraded;
+    try {
+      old = await databaseFactoryFfi.openDatabase(databasePath,
+        options: OpenDatabaseOptions(version: 3,
+          onCreate: DatabaseMigrations.create,
+          onUpgrade: DatabaseMigrations.migrate));
+      await old.insert('users', {'id': 'user-1', 'username': 'lama',
+        'created_at': '2026-10-24T00:00:00Z'});
+      await old.insert('chat_messages', {'id': 'chat-1', 'user_id': 'user-1',
+        'role': 'user', 'content': 'test', 'created_at': '2026-10-24T00:00:00Z',
+        'status': 'sent'});
+      await old.close();
+      old = null;
+      upgraded = await databaseFactoryFfi.openDatabase(databasePath,
+        options: OpenDatabaseOptions(version: 4,
+          onUpgrade: DatabaseMigrations.migrate));
+      expect((await upgraded.query('users')).single['username'], 'lama');
+      expect((await upgraded.query('chat_messages')).single['content'], 'test');
+      expect(await upgraded.query('chain_anchors'), isEmpty);
+    } finally {
+      await old?.close();
       await upgraded?.close();
       await directory.delete(recursive: true);
     }

@@ -3,12 +3,13 @@ import 'package:sqflite/sqflite.dart';
 typedef DatabaseMigration = Future<void> Function(DatabaseExecutor database);
 
 abstract final class DatabaseMigrations {
-  static const schemaVersion = 3;
+  static const schemaVersion = 4;
 
   static final Map<int, DatabaseMigration> _migrations = {
     1: _migration1,
     2: _migration2,
     3: _migration3,
+    4: _migration4,
   };
 
   static Future<void> create(Database database, int version) {
@@ -209,5 +210,29 @@ abstract final class DatabaseMigrations {
     await database.execute(
       'CREATE INDEX idx_chat_messages_user_time ON chat_messages(user_id, created_at, id)',
     );
+  }
+
+  static Future<void> _migration4(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE chain_anchors (
+        user_id TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        head_hash TEXT,
+        user_key TEXT,
+        tx_hash TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed')),
+        explorer_url TEXT,
+        anchored_at TEXT NOT NULL,
+        verified_at TEXT,
+        verify_result TEXT CHECK (verify_result IN ('match', 'mismatch', 'not_found', 'unknown')),
+        PRIMARY KEY (user_id, seq)
+      )
+    ''');
+    await database.execute('''
+      CREATE TABLE chain_anchor_cooldowns (
+        user_id TEXT PRIMARY KEY,
+        retry_after_at TEXT NOT NULL
+      )
+    ''');
   }
 }

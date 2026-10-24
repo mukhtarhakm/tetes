@@ -5,6 +5,10 @@ abstract final class AppConfig {
   static const functionsBaseUrl =
       'https://osqznapcbeceaizpvccc.supabase.co/functions/v1';
   static const fxBaseUrl = 'https://api.frankfurter.dev/v1';
+  static const chainRpcUrl = String.fromEnvironment(
+    'CHAIN_RPC_URL',
+    defaultValue: 'https://ethereum-sepolia-rpc.publicnode.com',
+  );
   static const authRequestTimeout = Duration(seconds: 20);
   static const fxRequestTimeout = Duration(seconds: 12);
   static const fxInputDebounce = Duration(milliseconds: 500);

@@ -194,13 +194,13 @@ Detail ada di `ARCHITECTURE.md`.
 - **Aplikasi:** Flutter. **Lokal:** SQLite.
 - **Login:** hash dan verifikasi password di Flutter; tabel `users` dan `sessions` diakses melalui PostgREST dengan kunci publik dan RLS. Token session disimpan di secure storage. Tanpa Firebase dan tanpa Supabase Auth.
 - **Online:** Supabase Postgres; anon hanya mendapat grant kolom dan policy auth sempit. Data fitur lain tetap lewat Edge Function.
-- **Edge Function:** `sync-push`, `sync-pull`, `ai` tetap memvalidasi `x-session-token` lewat tabel `sessions`.
+- **Edge Function:** `sync-push`, `sync-pull`, `ai`, dan `anchor` memvalidasi `x-session-token` lewat tabel `sessions`. Fungsi `anchor` membaca kepala rantai dari database dan mengirimnya dengan dompet server ke kontrak Sepolia.
 - **LLM:** dipanggil hanya dari Edge Function. API key disimpan sebagai secret, tidak ada di kode Flutter.
 - **Kurs:** API kurs publik tanpa key (kandidat: Frankfurter), dipanggil dari Flutter. Kurs terakhir disimpan untuk mode offline.
 - **Peta:** OpenStreetMap. Data toko diisi manual 10-15 titik.
 - **ID:** ID data aplikasi berupa UUID yang dibuat di Flutter; ID pengguna dan session dibuat server.
 
-**Keterbatasan yang jujur (untuk laporan):** register dan login password memerlukan internet. Aplikasi dapat dibuka offline hanya selama session lokal belum kedaluwarsa; waktu kedaluwarsa dibandingkan dengan jam perangkat. Session yang dicabut di server baru diketahui saat permintaan berikutnya menghasilkan `401`. Sinkronisasi lintas perangkat hanya menarik suffix dari rantai yang cocok; cabang tidak digabung otomatis. Perubahan `notes` atau `status` dari perangkat lain belum ditarik pada v1. Hash chain bersifat tamper-evident (perubahan terdeteksi), bukan tamper-proof. Kontrak Sepolia hanya membuktikan hash kepala rantai tercatat pada waktu tertentu, bukan memverifikasi isi rantai; verifikasi penuh menghitung ulang rantai di aplikasi lalu membandingkan kepala rantai dengan hash on-chain. Integrasi aplikasi dan deploy kontrak belum termasuk langkah ini.
+**Keterbatasan yang jujur (untuk laporan):** register dan login password memerlukan internet. Aplikasi dapat dibuka offline hanya selama session lokal belum kedaluwarsa; waktu kedaluwarsa dibandingkan dengan jam perangkat. Session yang dicabut di server baru diketahui saat permintaan berikutnya menghasilkan `401`. Sinkronisasi lintas perangkat hanya menarik suffix dari rantai yang cocok; cabang tidak digabung otomatis. Perubahan `notes` atau `status` dari perangkat lain belum ditarik pada v1. Hash chain bersifat tamper-evident (perubahan terdeteksi), bukan tamper-proof. Kontrak Sepolia hanya membuktikan hash kepala rantai tercatat pada waktu tertentu, bukan memverifikasi isi rantai; verifikasi penuh menghitung ulang rantai di aplikasi lalu membandingkan kepala rantai dengan hash on-chain. Dompet server adalah pengirim transaksi dan hanya owner kontrak yang boleh menulis. Kontrak sudah ter-deploy; migrasi dan Edge Function anchoring belum diterapkan, dan integrasi Flutter belum termasuk langkah ini.
 
 ## 10. Kriteria Keberhasilan
 

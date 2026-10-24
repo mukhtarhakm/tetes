@@ -428,3 +428,8 @@ entrypoint = "./functions/sync-pull/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/ai/index.ts"
+
+[functions.anchor]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/anchor/index.ts"

@@ -166,6 +166,23 @@ Future<void> _brew(
 void main() {
   setUpAll(sqfliteFfiInit);
 
+  test('pemicu jangkar hanya setelah push seduhan diterima', () async {
+    final db = await _database();
+    addTearDown(db.close);
+    await _bean(db, beanId);
+    final calls = <String>[];
+    final service = SyncService(db, _FakeClient(), () async {}, null,
+      (userId) async { calls.add(userId); });
+    await service.run(userId: user);
+    expect(calls, isEmpty);
+    await _brew(db, brewId, 1);
+    await service.run(userId: user);
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, [user]);
+    await service.run(userId: user);
+    expect(calls, [user]);
+  });
+
   test('SyncClient sends token without apikey and parses response', () async {
     final client = SyncClient(
       sessionStorage: _Storage(),

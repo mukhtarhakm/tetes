@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tetes/core/notifications/notification_service.dart';
 import 'package:tetes/data/remote/auth_client.dart';
 import 'package:tetes/data/secure/session_storage.dart';
+import 'package:tetes/data/repositories/chain_anchor_repo.dart';
 import 'package:tetes/features/auth/session/session_revocation_queue.dart';
 import 'package:tetes/features/auth/state/auth_providers.dart';
 import 'package:tetes/features/auth/state/session_controller.dart';
@@ -21,6 +22,7 @@ void main() {
         notificationServiceProvider.overrideWithValue(notifications),
         sessionStorageProvider.overrideWithValue(storage),
         sessionRevocationQueueProvider.overrideWithValue(queue),
+        clearChainAnchorsProvider.overrideWithValue((_) async {}),
       ],
     );
     addTearDown(container.dispose);
@@ -56,6 +58,7 @@ void main() {
         sessionRevocationQueueProvider.overrideWithValue(
           SessionRevocationQueue(client, storage),
         ),
+        clearChainAnchorsProvider.overrideWithValue((_) async {}),
       ],
     );
     addTearDown(container.dispose);
@@ -78,6 +81,7 @@ void main() {
         sessionRevocationQueueProvider.overrideWithValue(
           SessionRevocationQueue(client, storage),
         ),
+        clearChainAnchorsProvider.overrideWithValue((_) async {}),
       ],
     );
     addTearDown(container.dispose);
