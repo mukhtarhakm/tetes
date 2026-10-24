@@ -56,3 +56,10 @@ supabase/functions/.env
 key.properties
 *.jks
 *.keystore
+
+# Hardhat lokal
+/blockchain/node_modules/
+/blockchain/.env
+/blockchain/artifacts/
+/blockchain/cache/
+/blockchain/.npm-cache/

@@ -352,7 +352,12 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 | Session dicabut server | Permintaan berikutnya mendapat `401`; hapus session lokal dan keluar paksa |
 | Aplikasi dimatikan di tengah sesi seduh | Sesi yang belum disimpan boleh hilang. Tidak ada entri setengah jadi karena penyimpanan satu transaksi |
 
-## 11. Pengujian
+## 11. Jangkar hash Sepolia
+
+`blockchain/contracts/BrewAnchor.sol` menyimpan pasangan hash kepala rantai dan `seq` terbaru per pengguna pada Ethereum Sepolia. Kunci mapping adalah `keccak256` UUID pengguna yang dihitung off-chain; hash kepala rantai berasal dari SHA-256 hex 32 byte sesuai `DATA_MODEL.md`. Data seduhan lengkap tetap di SQLite/Postgres karena biaya dan privasi. Hanya owner boleh menulis, `seq` harus meningkat, dan owner dapat dipindah untuk rotasi kunci. Event menyimpan riwayat jangkar. Kontrak tidak membaca atau memverifikasi isi rantai. Verifikasi penuh kelak menghitung ulang rantai di aplikasi dan membandingkan kepala rantai dengan nilai on-chain. Langkah ini hanya menyiapkan kontrak, test lokal, dan skrip deploy; integrasi Flutter/Edge Function serta deploy belum dilakukan.
+
+
+## 12. Pengujian
 
 - **Tes unit wajib:** `buildHashInput` dan `sha256` memakai vektor uji di `DATA_MODEL.md` bagian 5.7 (Flutter **dan** Edge Function). Hitung stok, pengaturan terbaik, total air, dan konversi zona waktu.
 - **Tes auth server wajib:** register unik, hash PBKDF2 dan verifikasi, session kedaluwarsa/dicabut, lima kegagalan login menghasilkan `401`, serta permintaan berikutnya dalam jendela 15 menit menghasilkan `429`.
@@ -361,7 +366,7 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 - **Uji tamper:** ubah satu nilai langsung di database, lalu verifikasi integritas harus menyatakan rantai putus.
 - Setiap sprint ditutup dengan acceptance criteria di `PRD.md`/`features/*.md` dan satu commit.
 
-## 12. Lingkungan dan Versi (isi saat setup)
+## 13. Lingkungan dan Versi (isi saat setup)
 
 | Item | Nilai |
 |---|---|
@@ -375,7 +380,7 @@ Tiap layar punya empat keadaan: **memuat, kosong, galat, berhasil**. Pesan galat
 
 Environment Edge Function: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY`, `AI_MODEL`. Tidak ada satu pun yang ditulis di kode.
 
-## 13. Aturan Kerja dengan AI
+## 14. Aturan Kerja dengan AI
 
 - Satu fitur per sesi, berpegang pada `features/*.md`.
 - Rencana dulu (file yang diubah, paket yang dipakai), setuju, baru kode.

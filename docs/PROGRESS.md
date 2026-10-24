@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-10-24 - Kontrak jangkar Sepolia
+- BrewAnchor, test Hardhat lokal, skrip deploy Sepolia, dan petunjuk operator disiapkan. Hash chain tetap untuk integritas; jangkar publik hanya menyimpan kepala rantai per pengguna. Integrasi Flutter/Edge Function dan deploy belum dilakukan.
+- `npm test` lulus (5 test) pada jaringan lokal Hardhat dan pemeriksaan TypeScript bersih. Anchor pertama memakai 72.532 gas; pembaruan pengguna yang sama memakai 38.332 gas. Belum ada uji Sepolia atau HP.
+
 ## 2026-10-23 - Tanya Barista tanpa UI
 - Edge Function chat dan kuota harian terpisah disiapkan; migrasi server belum diterapkan dan fungsi belum di-deploy.
 - Klien chat, SQLite `chat_messages` versi 3, repository per pengguna, controller Riverpod, context biji dan lima seduhan terakhir, serta tes Flutter ditambahkan. Layar chat dikerjakan pemilik proyek. Seluruh 308 tes Flutter lulus dan `flutter analyze --no-pub` bersih; integrasi pada HP dan server terpasang belum diuji.
