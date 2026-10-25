@@ -7,6 +7,7 @@ import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
+import '../../../core/ui/custom_taste_chip.dart';
 import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
@@ -454,15 +455,16 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
                 style: textTheme.labelLarge?.copyWith(color: AppColors.inkSoft),
               ),
               const SizedBox(height: AppSpacing.s8),
-              if (item.tasteTags.isEmpty)
+              if (item.tasteTags.isEmpty && item.customTasteTags.isEmpty)
                 Text('Tidak ada tag rasa.', style: textTheme.bodySmall)
               else
                 Wrap(
                   spacing: AppSpacing.s4,
                   runSpacing: AppSpacing.s4,
-                  children: item.tasteTags
-                      .map((tag) => AppChip(label: tag))
-                      .toList(growable: false),
+                  children: [
+                    ...item.tasteTags.map((tag) => AppChip(label: tag)),
+                    ...item.customTasteTags.map((tag) => CustomTasteChip(label: tag)),
+                  ],
                 ),
               const SizedBox(height: AppSpacing.s16),
               const Divider(color: AppColors.divider),

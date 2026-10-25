@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/tokens.dart';
@@ -7,6 +8,7 @@ import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
 import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/app_text_field.dart';
+import '../../../core/ui/custom_taste_chip.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/notifications/notification_coordinator.dart';
 import '../../../data/repositories/brew_repo.dart';
@@ -16,6 +18,7 @@ import '../../beans/state/bean_providers.dart';
 import '../../journal/state/journal_controller.dart';
 import '../../journal/screens/brew_detail_screen.dart';
 import '../brew_session_result.dart';
+import '../custom_taste_tags.dart';
 import '../state/brew_setup_controller.dart';
 
 class BrewResultScreen extends ConsumerStatefulWidget {
@@ -32,6 +35,7 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
   bool loading = true, saving = false, stockRejected = false;
   int? score;
   final tags = <RoasteryNoteTag>{};
+  final customTags = <String>[];
   final notes = TextEditingController(), drawdown = TextEditingController();
   late final water = List.generate(
     widget.result.plan.stages.length,
@@ -122,6 +126,7 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
         result: widget.result,
         tasteScore: score!,
         tasteTags: tags,
+        customTasteTags: customTags,
         actualWaterG: actual,
         drawdownS: drawdownS,
         notes: notes.text,
@@ -183,6 +188,18 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
     }
   }
 
+  Future<void> _addCustomTasteTag() async {
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _CustomTasteTagDialog(existing: List.of(customTags)),
+    );
+    if (result != null && mounted) {
+      setState(() => customTags
+        ..clear()
+        ..addAll(result));
+    }
+  }
+
   /// Kolom timbangan berisi angka kumulatif di timbangan. Yang disimpan tetap
   /// air per tahap (selisih dengan angka terisi sebelumnya), sehingga format
   /// data, sinkronisasi, dan diagnosa AI tidak berubah.
@@ -219,6 +236,9 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
     }
     return (actual, drawdownS);
   }
+
+  String _n(num v) =>
+      v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
 
   String _formatDuration(int seconds) =>
       '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
@@ -293,8 +313,8 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
               spacing: AppSpacing.s16,
               runSpacing: AppSpacing.s12,
               children: [
-                stat('Dosis', '${plan.doseG} g'),
-                stat('Rasio', '1:${plan.ratio}'),
+                stat('Dosis', '${_n(plan.doseG)} g'),
+                stat('Rasio', '1:${_n(plan.ratio)}'),
                 stat('Suhu', '${plan.waterTempC}°C'),
                 stat('Waktu', _formatDuration(widget.result.totalTimeS)),
               ],
@@ -411,7 +431,7 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                           ),
                         ),
                         Text(
-                          'target ${plan.cumulativeWaterAt(index)} g',
+                          'target ${_n(plan.cumulativeWaterAt(index))} g',
                           style: textTheme.bodySmall?.copyWith(
                             color: AppColors.inkSoft,
                           ),
@@ -424,7 +444,7 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                     width: 120,
                     child: AppTextField(
                       controller: water[index],
-                      hintText: '${plan.cumulativeWaterAt(index)}',
+                      hintText: _n(plan.cumulativeWaterAt(index)),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -549,7 +569,8 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                         Wrap(
                           spacing: AppSpacing.s8,
                           runSpacing: AppSpacing.s8,
-                          children: RoasteryNoteTag.values
+                          children: [
+                            ...RoasteryNoteTag.values
                               .map(
                                 (tag) => AppChip(
                                   label: tag.label,
@@ -564,13 +585,20 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                                   },
                                 ),
                               )
-                              .toList(),
+                              ,
+                            ...customTags.map((tag) => CustomTasteChip(
+                              label: tag,
+                              onRemove: () => setState(() => customTags.remove(tag)),
+                            )),
+                            if (customTags.length < 3)
+                              AddCustomTasteChip(onPressed: _addCustomTasteTag),
+                          ],
                         ),
                         const SizedBox(height: AppSpacing.s12),
                         Text(
                           [
                             'Kata roastery: ${bean!.roasteryNotesTags.isEmpty ? '-' : bean!.roasteryNotesTags.join(', ')}',
-                            'Rasamu: ${tags.isEmpty ? '-' : tags.map((tag) => tag.label).join(', ')}',
+                            'Rasamu: ${tags.isEmpty && customTags.isEmpty ? '-' : [...tags.map((tag) => tag.label), ...customTags].join(', ')}',
                           ].join(' · '),
                           style: textTheme.bodySmall?.copyWith(
                             color: AppColors.inkSoft,
@@ -659,6 +687,65 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                 ],
               ),
       ),
+    );
+  }
+}
+
+/// Dialog "Rasa lain". Controller dimiliki dan dibuang oleh State dialog
+/// sendiri, bukan oleh pemanggil, supaya tidak dibuang saat animasi tutup.
+class _CustomTasteTagDialog extends StatefulWidget {
+  const _CustomTasteTagDialog({required this.existing});
+  final List<String> existing;
+
+  @override
+  State<_CustomTasteTagDialog> createState() => _CustomTasteTagDialogState();
+}
+
+class _CustomTasteTagDialogState extends State<_CustomTasteTagDialog> {
+  final _input = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _input.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    try {
+      final normalized = normalizeCustomTasteTags([
+        ...widget.existing,
+        _input.text,
+      ]);
+      if (normalized.length == widget.existing.length) {
+        setState(() => _error = 'Rasa ini sudah ditambahkan.');
+        return;
+      }
+      Navigator.of(context).pop(normalized);
+    } on FormatException catch (error) {
+      setState(() => _error = error.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDialog(
+      title: 'Rasa lain',
+      message: 'Tambahkan rasa yang kamu rasakan.',
+      content: AppTextField(
+        controller: _input,
+        label: 'Rasa lain',
+        maxLength: 20,
+        maxLengthEnforcement: MaxLengthEnforcement.none,
+        errorText: _error,
+        onChanged: (_) {
+          if (_error != null) setState(() => _error = null);
+        },
+      ),
+      primaryLabel: 'Tambah',
+      onPrimaryPressed: _submit,
+      secondaryLabel: 'Batal',
+      onSecondaryPressed: () => Navigator.of(context).pop(),
     );
   }
 }

@@ -10,9 +10,9 @@ Tab Jurnal berupa satu daftar seduhan (sub-tab Biji dihapus, daftar biji tetap d
 
 ### Sub-tab Seduhan
 - **Daftar:** kartu per seduhan: tanggal dan jam, nama biji, rasio dan suhu, skor rasa, tag, status sinkronisasi (tersinkron, menunggu, galat), penanda pengaturan terbaik, tampilan pudar bila dibatalkan. Terbaru di atas.
-- **Pencarian:** satu kolom, mencari di nama biji, roastery, tag, dan catatan.
+- **Pencarian:** satu kolom, mencari di nama biji, roastery, tag bawaan dan buatan sendiri, serta catatan.
 - **Filter:** biji (satu atau banyak), skor minimal, tag rasa, rentang tanggal (7 hari, 30 hari, pilih sendiri). Tombol reset dan jumlah hasil. Urutkan: terbaru, skor tertinggi, biaya.
-- **Detail seduhan:** ringkasan, tabel plan vs realisasi, rasa vs notes roastery, catatan, saran AI bila ada, biaya, status integritas (hash dan penanda), aksi: "Seduh lagi dengan pengaturan ini", "Jadikan pengaturan terbaik", "Pilih untuk dibandingkan", "Tandai dibatalkan".
+- **Detail seduhan:** ringkasan, tabel plan vs realisasi, rasa bawaan dan rasa buatan sendiri (chip kuning) vs notes roastery, catatan, saran AI bila ada, biaya, status integritas (hash dan penanda), aksi: "Seduh lagi dengan pengaturan ini", "Jadikan pengaturan terbaik", "Pilih untuk dibandingkan", "Tandai dibatalkan".
 - **Bandingkan:** pilih tepat dua entri lewat kotak centang lalu "Bandingkan". Dua kolom berdampingan (biji, rasio, suhu, grind, waktu total, skor, tag, biaya). Baris yang berbeda disorot. Satu kalimat ringkasan dibuat dengan aturan sederhana, bukan AI (contoh: "Skor naik 1 setelah suhu turun 2°C dan rasio diperkecil"). Bila bijinya berbeda, beri catatan "biji berbeda".
 
 ### Sub-tab Biji

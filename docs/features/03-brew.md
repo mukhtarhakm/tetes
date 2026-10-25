@@ -34,7 +34,7 @@ Validasi: dosis, rasio, suhu sesuai DATA_MODEL.md bagian 4. Total target air tah
 ### Layar Hasil (urutan dari atas)
 1. Ringkasan: biji, dosis, rasio, suhu, grind, total waktu.
 2. Tabel per tahap menampilkan target waktu dan target air serta **air aktual** yang diisi manual. Waktu aktual tahap tidak dicatat. Ringkasan menampilkan `total_time_s` dan `drawdown_s` bila ada.
-3. Skor rasa (bintang 1-5) dan tag rasa (pilih dari enum, minimal satu).
+3. Skor rasa (bintang 1-5) dan tag rasa bawaan (pilih dari enum, minimal satu). Hingga tiga rasa buatan sendiri dapat ditambahkan lewat dialog "Rasa lain"; disimpan terpisah dan tidak ikut hash.
 4. Perbandingan: notes roastery (dari profil biji) berdampingan dengan tag rasa pengguna.
 5. Catatan bebas.
 6. Biaya seduhan (dosis dikali harga per gram, dalam rupiah). Kosong bila harga tidak ada.

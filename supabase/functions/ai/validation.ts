@@ -1,3 +1,5 @@
+import { normalizeCustomTasteTags } from "../_shared/custom_taste_tags.ts";
+
 type Row = Record<string, unknown>;
 export type AiType = "recommend" | "diagnose" | "chat";
 export type AiInput = { type: AiType; payload: Row };
@@ -86,9 +88,10 @@ function stage(value: unknown, position: number): value is Row {
 }
 
 function brew(value: unknown, diagnosis: boolean): value is Row {
-  if (!record(value) || !only(value, ["dose_g", "ratio", "water_temp_c", "grind", "total_time_s", "taste_score", "taste_tags", "brewed_at_utc", "status", "notes", "stages"])) return false;
+  if (!record(value) || !only(value, ["dose_g", "ratio", "water_temp_c", "grind", "total_time_s", "taste_score", "taste_tags", "custom_taste_tags", "brewed_at_utc", "status", "notes", "stages"])) return false;
   if (!number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) || !integer(value.water_temp_c, 80, 100) || !choice(value.grind, grinds) ||
     !integer(value.taste_score, 1, 5) || !tasteTags(value.taste_tags) || !note(value.notes) ||
+    normalizeCustomTasteTags(value.custom_taste_tags ?? []) === null ||
     !optional(value.total_time_s, (v) => integer(v, 0, 3600)) ||
     !optional(value.brewed_at_utc, utc) ||
     !optional(value.status, (v) => v === "aktif" || v === "dibatalkan")) return false;
@@ -114,7 +117,10 @@ export function validateInput(value: unknown): AiInput | null {
   const trimNotes = (row: Row) => { if (typeof row.notes === "string") row.notes = trim(row.notes); };
   if (typeof (clean.bean as Row).roastery_notes_text === "string") (clean.bean as Row).roastery_notes_text = trim((clean.bean as Row).roastery_notes_text as string);
   for (const item of clean.history as Row[]) trimNotes(item);
-  if (type === "diagnose") trimNotes(clean.brew as Row);
+  if (type === "diagnose") {
+    trimNotes(clean.brew as Row);
+    (clean.brew as Row).custom_taste_tags = normalizeCustomTasteTags((clean.brew as Row).custom_taste_tags ?? []);
+  }
   return { type, payload: clean };
 }
 

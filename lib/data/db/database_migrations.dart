@@ -3,13 +3,14 @@ import 'package:sqflite/sqflite.dart';
 typedef DatabaseMigration = Future<void> Function(DatabaseExecutor database);
 
 abstract final class DatabaseMigrations {
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
 
   static final Map<int, DatabaseMigration> _migrations = {
     1: _migration1,
     2: _migration2,
     3: _migration3,
     4: _migration4,
+    5: _migration5,
   };
 
   static Future<void> create(Database database, int version) {
@@ -234,5 +235,11 @@ abstract final class DatabaseMigrations {
         retry_after_at TEXT NOT NULL
       )
     ''');
+  }
+
+  static Future<void> _migration5(DatabaseExecutor database) async {
+    await database.execute(
+      "ALTER TABLE brews ADD COLUMN custom_taste_tags TEXT NOT NULL DEFAULT '[]'",
+    );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
+import '../../../core/ui/custom_taste_chip.dart';
 import '../../../core/ui/status_pill.dart';
 import '../../../core/ui/rating_stars.dart';
 import '../../../core/utils/format_ratio.dart';
@@ -117,14 +118,15 @@ class JournalBrewCard extends StatelessWidget {
             ],
           ),
         ),
-        if (item.tasteTags.isNotEmpty) ...[
+        if (item.tasteTags.isNotEmpty || item.customTasteTags.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.s12),
           Wrap(
             spacing: AppSpacing.s4,
             runSpacing: AppSpacing.s4,
-            children: item.tasteTags
-                .map((tag) => AppChip(label: tag))
-                .toList(growable: false),
+            children: [
+              ...item.tasteTags.map((tag) => AppChip(label: tag)),
+              ...item.customTasteTags.map((tag) => CustomTasteChip(label: tag)),
+            ],
           ),
         ],
       ],

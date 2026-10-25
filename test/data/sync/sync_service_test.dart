@@ -145,6 +145,7 @@ Future<void> _brew(
     'total_time_s': 195,
     'taste_score': 3,
     'taste_tags': 'asam,cokelat',
+    'custom_taste_tags': '[]',
     'status': 'aktif',
     'prev_hash': seq == 1 ? '0' : 'prev-$seq',
     'hash': 'hash-$seq',
@@ -292,6 +293,7 @@ void main() {
       expect(client.calls.first.beans.single['is_self_roasted'], false);
       expect(client.calls.first.beans.single['bean_type'], isNull);
       expect(client.calls.last.brews.single['stages'], isA<List>());
+      expect(client.calls.last.brews.single['custom_taste_tags'], isA<List>());
       expect((client.calls.last.brews.single['stages'] as List), hasLength(1));
       expect(client.calls.last.brews.single['hash'], 'hash-1');
       expect(client.calls.last.brews.single['prev_hash'], '0');

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/utils/hash.dart';
+import '../../features/brew/custom_taste_tags.dart';
 import '../repositories/event_repo.dart';
 import '../remote/sync_client.dart';
 
@@ -389,7 +390,7 @@ class SyncService {
   static const _beanColumns =
       'id name species bean_type arabica_percent roastery is_self_roasted origin process process_custom roast_level roast_date pack_size_g price_original currency fx_rate fx_date price_idr_per_kg initial_stock_g roastery_notes_tags roastery_notes_text best_brew_id archived created_at updated_at';
   static const _brewColumns =
-      'id seq bean_id brewed_at_utc dose_g ratio water_temp_c grind total_time_s taste_score taste_tags notes ai_advice cost_idr status prev_hash hash created_at';
+      'id seq bean_id brewed_at_utc dose_g ratio water_temp_c grind total_time_s taste_score taste_tags custom_taste_tags notes ai_advice cost_idr status prev_hash hash created_at';
   static const _stageColumns =
       'id brew_id position name target_start_s target_duration_s target_water_cum_g target_pour_g actual_start_s actual_duration_s actual_water_g drawdown_s';
 
@@ -426,6 +427,7 @@ class SyncService {
         row['total_time_s'] is! int ||
         row['taste_score'] is! int ||
         row['taste_tags'] is! String ||
+        value['custom_taste_tags'] is! List ||
         row['prev_hash'] is! String ||
         row['hash'] is! String ||
         row['status'] is! String ||
@@ -435,6 +437,19 @@ class SyncService {
         'Data dari server tidak lolos verifikasi.',
       );
     }
+    final custom = value['custom_taste_tags'] as List;
+    if (custom.any((tag) => tag is! String)) {
+      throw const SyncException(SyncFailure.server, 'Data dari server tidak lolos verifikasi.');
+    }
+    try {
+      if (normalizeCustomTasteTags(custom.cast<String>()).join('\u0000') !=
+          custom.join('\u0000')) {
+        throw const FormatException();
+      }
+    } on FormatException {
+      throw const SyncException(SyncFailure.server, 'Data dari server tidak lolos verifikasi.');
+    }
+    row['custom_taste_tags'] = jsonEncode(custom);
     return row;
   }
 
@@ -727,6 +742,7 @@ class SyncService {
     return Map<String, Object?>.of(row)
       ..remove('sync_status')
       ..remove('user_id')
+      ..['custom_taste_tags'] = jsonDecode(row['custom_taste_tags'] as String)
       ..['stages'] = stages
           .map((stage) => Map<String, Object?>.of(stage))
           .toList();

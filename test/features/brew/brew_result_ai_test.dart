@@ -186,6 +186,7 @@ class _BrewRepository extends Fake implements BrewRepository {
     required BrewSessionResult result,
     required int tasteScore,
     required Iterable<RoasteryNoteTag> tasteTags,
+    Iterable<String> customTasteTags = const [],
     required List<double?> actualWaterG,
     int? drawdownS,
     String? notes,

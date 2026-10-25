@@ -31,8 +31,11 @@ abstract final class AppColors {
 
 abstract final class AppSpacing {
   static const s4 = 4.0;
+  static const s6 = 6.0;
   static const s8 = 8.0;
+  static const s10 = 10.0;
   static const s12 = 12.0;
+  static const s14 = 14.0;
   static const s16 = 16.0;
   static const s20 = 20.0;
   static const s24 = 24.0;
@@ -73,6 +76,9 @@ abstract final class AppSizes {
   static const dialogMaxWidth = 420.0;
   static const progressStroke = 2.0;
   static const chipHeight = 36.0;
+  static const customTagIcon = 14.0;
+  static const customTagBorder = 2.0;
+  static const customTagDashBorder = 1.5;
   static const profileAvatar = 84.0;
   static const profileBadge = 32.0;
   static const profileBadgeBorder = 3.0;

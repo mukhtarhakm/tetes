@@ -127,11 +127,12 @@ Deno.test("input diagnosa memakai brew tunggal dan memotong catatan", () => {
   const input = validateInput({ type: "diagnose", payload: {
     bean: { name: "Biji", species: "arabika" }, history: [],
     brew: { dose_g: 15, ratio: 16, water_temp_c: 92, grind: "sedang", taste_score: 3,
-      taste_tags: "asam", notes: "x".repeat(700), stages: [{ position: 1, name: "bloom",
+      taste_tags: "asam", custom_taste_tags: [" Teh   Hitam "], notes: "x".repeat(700), stages: [{ position: 1, name: "bloom",
         target_start_s: 0, target_duration_s: 40, target_water_cum_g: 45, target_pour_g: 45,
         actual_start_s: null, actual_duration_s: null, actual_water_g: 43, drawdown_s: null }] },
   } });
   if (!input || ((input.payload.brew as Record<string, unknown>).notes as string).length !== 500) throw new Error("input invalid");
+  if (JSON.stringify((input.payload.brew as Record<string, unknown>).custom_taste_tags) !== '["teh hitam"]') throw new Error("custom tags not normalized");
 });
 
 Deno.test("riwayat lebih dari lima ditolak", () => {

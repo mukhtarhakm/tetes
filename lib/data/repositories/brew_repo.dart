@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
+import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
 
@@ -9,6 +10,7 @@ import '../../features/beans/bean_model.dart';
 import '../../features/brew/brew_calculator.dart';
 import '../../features/brew/brew_plan.dart';
 import '../../features/brew/brew_session_result.dart';
+import '../../features/brew/custom_taste_tags.dart';
 import '../../features/journal/journal_model.dart';
 
 class BrewSaveException implements Exception {
@@ -41,6 +43,9 @@ String escapeSqlLike(String input) {
       .replaceAll('_', r'\_');
 }
 
+List<String> _customTags(Map<String, Object?> row) =>
+    (jsonDecode(row['custom_taste_tags'] as String) as List).cast<String>();
+
 class BrewRepository {
   const BrewRepository(this._database);
 
@@ -72,6 +77,7 @@ class BrewRepository {
     required BrewSessionResult result,
     required int tasteScore,
     required Iterable<RoasteryNoteTag> tasteTags,
+    Iterable<String> customTasteTags = const [],
     required List<double?> actualWaterG,
     int? drawdownS,
     String? notes,
@@ -79,6 +85,12 @@ class BrewRepository {
     final plan = result.plan;
     final tags = tasteTags.map((tag) => tag.databaseValue).toSet().toList()
       ..sort();
+    late final List<String> customTags;
+    try {
+      customTags = normalizeCustomTasteTags(customTasteTags);
+    } on FormatException catch (error) {
+      throw BrewSaveException(error.message);
+    }
     if (tasteScore < 1 ||
         tasteScore > 5 ||
         tags.isEmpty ||
@@ -145,6 +157,7 @@ class BrewRepository {
           'total_time_s': result.totalTimeS,
           'taste_score': tasteScore,
           'taste_tags': tags.join(','),
+          'custom_taste_tags': jsonEncode(customTags),
           'cost_idr': brewCost(
             plan.doseG,
             (beans.single['price_idr_per_kg'] as num?)?.toDouble(),
@@ -416,10 +429,11 @@ class BrewRepository {
           b.name LIKE ? ESCAPE '\\' OR
           (b.roastery IS NOT NULL AND b.roastery LIKE ? ESCAPE '\\') OR
           br.taste_tags LIKE ? ESCAPE '\\' OR
+          br.custom_taste_tags LIKE ? ESCAPE '\\' OR
           (br.notes IS NOT NULL AND br.notes LIKE ? ESCAPE '\\')
         )
       ''');
-      whereArgs.addAll([pattern, pattern, pattern, pattern]);
+      whereArgs.addAll([pattern, pattern, pattern, pattern, pattern]);
     }
 
     // Filter biji: salah satu dari yang dipilih (OR)
@@ -506,6 +520,7 @@ class BrewRepository {
         totalTimeS: (row['total_time_s'] as num).toInt(),
         tasteScore: (row['taste_score'] as num).toInt(),
         tasteTags: tags,
+        customTasteTags: _customTags(row),
         costIdr: (row['cost_idr'] as num?)?.toDouble(),
         status: row['status'] as String,
         syncStatus: row['sync_status'] as String,
@@ -570,6 +585,7 @@ class BrewRepository {
       totalTimeS: (row['total_time_s'] as num).toInt(),
       tasteScore: (row['taste_score'] as num).toInt(),
       tasteTags: tasteTags,
+      customTasteTags: _customTags(row),
       costIdr: (row['cost_idr'] as num?)?.toDouble(),
       status: row['status'] as String,
       syncStatus: row['sync_status'] as String,
@@ -691,6 +707,7 @@ class BrewRepository {
         totalTimeS: (row['total_time_s'] as num).toInt(),
         tasteScore: (row['taste_score'] as num).toInt(),
         tasteTags: tags,
+        customTasteTags: _customTags(row),
         costIdr: (row['cost_idr'] as num?)?.toDouble(),
         status: row['status'] as String,
         syncStatus: row['sync_status'] as String,

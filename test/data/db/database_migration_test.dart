@@ -28,7 +28,7 @@ void main() {
   });
 
   test(
-    'instalasi baru membuat semua tabel, indeks, dan user_version 4',
+    'instalasi baru membuat semua tabel, indeks, dan user_version 5',
     () async {
       final tableRows = await database.rawQuery(
         "SELECT name FROM sqlite_master WHERE type = 'table' "
@@ -91,7 +91,7 @@ void main() {
     },
   );
 
-  test('upgrade v2 ke v4 menjaga data lama', () async {
+  test('upgrade v2 ke v5 menjaga data lama', () async {
     final directory = await Directory.systemTemp.createTemp('tetes-migration-');
     final databasePath = path.join(directory.path, 'upgrade.db');
     Database? versionTwo;
@@ -126,8 +126,8 @@ void main() {
         ),
       );
 
-      expect(await _userVersion(database), 4);
-      expect(await _userVersion(upgraded), 4);
+      expect(await _userVersion(database), 5);
+      expect(await _userVersion(upgraded), 5);
       expect(await _beanSchema(upgraded), await _beanSchema(database));
       expect((await upgraded.query('users')).single['username'], 'lama');
       expect(await upgraded.query('chat_messages'), isEmpty);
@@ -161,6 +161,42 @@ void main() {
       expect((await upgraded.query('users')).single['username'], 'lama');
       expect((await upgraded.query('chat_messages')).single['content'], 'test');
       expect(await upgraded.query('chain_anchors'), isEmpty);
+    } finally {
+      await old?.close();
+      await upgraded?.close();
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test('upgrade v4 ke v5 menjaga hash seduhan dan memberi daftar kosong', () async {
+    final directory = await Directory.systemTemp.createTemp('tetes-custom-tags-');
+    final databasePath = path.join(directory.path, 'upgrade.db');
+    Database? old;
+    Database? upgraded;
+    try {
+      old = await databaseFactoryFfi.openDatabase(databasePath,
+        options: OpenDatabaseOptions(version: 4,
+          onCreate: DatabaseMigrations.create,
+          onUpgrade: DatabaseMigrations.migrate));
+      await old.insert('users', {'id': 'u1', 'username': 'lama',
+        'created_at': '2026-10-24T00:00:00Z'});
+      await old.insert('beans', {'id': 'b1', 'user_id': 'u1', 'name': 'Biji',
+        'species': 'arabika', 'created_at': '2026-10-24T00:00:00Z',
+        'updated_at': '2026-10-24T00:00:00Z'});
+      await old.insert('brews', {'id': 'brew1', 'user_id': 'u1', 'seq': 1,
+        'bean_id': 'b1', 'brewed_at_utc': '2026-10-24T00:00:00Z',
+        'dose_g': 15, 'ratio': 16, 'water_temp_c': 92, 'grind': 'sedang',
+        'total_time_s': 180, 'taste_score': 4, 'taste_tags': 'manis',
+        'prev_hash': '0', 'hash': 'hash-lama',
+        'created_at': '2026-10-24T00:00:00Z'});
+      await old.close();
+      old = null;
+      upgraded = await databaseFactoryFfi.openDatabase(databasePath,
+        options: OpenDatabaseOptions(version: 5,
+          onUpgrade: DatabaseMigrations.migrate));
+      final row = (await upgraded.query('brews')).single;
+      expect(row['custom_taste_tags'], '[]');
+      expect(row['hash'], 'hash-lama');
     } finally {
       await old?.close();
       await upgraded?.close();

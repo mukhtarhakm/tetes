@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,6 +97,7 @@ Map<String, dynamic> brew(int seq, String prevHash, {String? hashOverride}) {
     'total_time_s': 195,
     'taste_score': seq + 2,
     'taste_tags': 'asam',
+    'custom_taste_tags': <String>[],
     'notes': null,
     'ai_advice': null,
     'cost_idr': null,
@@ -156,7 +158,7 @@ Future<Database> database() async {
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, seq INTEGER NOT NULL, bean_id TEXT NOT NULL,
     brewed_at_utc TEXT NOT NULL, dose_g REAL NOT NULL, ratio REAL NOT NULL,
     water_temp_c INTEGER NOT NULL, grind TEXT NOT NULL, total_time_s INTEGER NOT NULL,
-    taste_score INTEGER NOT NULL, taste_tags TEXT NOT NULL, notes TEXT, ai_advice TEXT,
+    taste_score INTEGER NOT NULL, taste_tags TEXT NOT NULL, custom_taste_tags TEXT NOT NULL DEFAULT '[]', notes TEXT, ai_advice TEXT,
     cost_idr REAL, status TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL,
     created_at TEXT NOT NULL, sync_status TEXT NOT NULL, UNIQUE(user_id,seq))''',
   );
@@ -185,6 +187,7 @@ Future<void> seedBrew(
   String userId = user,
 }) async {
   final row = Map<String, Object?>.of(value)..remove('stages');
+  row['custom_taste_tags'] = jsonEncode(value['custom_taste_tags']);
   await db.insert('brews', {
     ...row,
     'user_id': userId,
@@ -227,7 +230,8 @@ void main() {
 
   test('prefix menarik suffix tanpa mengubah biji dan seduhan lama', () async {
     final first = brew(1, '0');
-    final second = brew(2, first['hash'] as String);
+    final second = {...brew(2, first['hash'] as String),
+      'custom_taste_tags': ['teh hitam']};
     await db.insert('beans', {
       ...bean(),
       'name': 'Nama lokal',
@@ -249,6 +253,8 @@ void main() {
       'Catatan lokal',
     );
     expect((await db.query('brews')).length, 2);
+    expect((await db.query('brews', where: 'seq = 2')).single['custom_taste_tags'],
+      '["teh hitam"]');
   });
 
   test(

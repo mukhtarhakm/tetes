@@ -37,6 +37,7 @@ class BrewJournalItem {
     required this.totalTimeS,
     required this.tasteScore,
     required this.tasteTags,
+    this.customTasteTags = const [],
     this.costIdr,
     required this.status,
     required this.syncStatus,
@@ -58,6 +59,7 @@ class BrewJournalItem {
   final int totalTimeS;
   final int tasteScore;
   final List<String> tasteTags;
+  final List<String> customTasteTags;
   final double? costIdr;
   final String status;
   final String syncStatus;

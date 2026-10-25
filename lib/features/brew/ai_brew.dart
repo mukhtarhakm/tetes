@@ -3,6 +3,7 @@ import '../journal/journal_model.dart';
 import 'brew_calculator.dart';
 import 'brew_plan.dart';
 import 'brew_session_result.dart';
+import 'custom_taste_tags.dart';
 
 class AiRecommendation {
   const AiRecommendation({
@@ -120,6 +121,7 @@ abstract final class AiBrew {
     required BrewSessionResult result,
     required int tasteScore,
     required Iterable<RoasteryNoteTag> tasteTags,
+    Iterable<String> customTasteTags = const [],
     required List<double?> actualWaterG,
     required List<BrewDetailData> history,
     int? drawdownS,
@@ -139,6 +141,7 @@ abstract final class AiBrew {
         'total_time_s': result.totalTimeS,
         'taste_score': tasteScore,
         'taste_tags': tasteTags.map((tag) => tag.databaseValue).join(','),
+        'custom_taste_tags': normalizeCustomTasteTags(customTasteTags),
         'notes': _short(notes),
         'stages': [
           for (var index = 0; index < plan.stages.length; index++)
@@ -173,6 +176,7 @@ abstract final class AiBrew {
       'total_time_s': detail.item.totalTimeS,
       'taste_score': detail.item.tasteScore,
       'taste_tags': detail.item.tasteTags.join(','),
+      'custom_taste_tags': detail.item.customTasteTags,
       'notes': _short(detail.notes),
       'stages': [
         for (final stage in detail.stages)

@@ -1,6 +1,7 @@
 import { buildHashInput, sha256Hex, type BrewHashFields } from "../_shared/hash.ts";
 import { requireValidSession, SessionUnauthorizedError } from "../_shared/session.ts";
 import { validateEvent, validateScore, validateFeedback } from "./validation.ts";
+import { normalizeCustomTasteTags } from "../_shared/custom_taste_tags.ts";
 
 const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -87,7 +88,7 @@ async function handle(request: Request, count: (beans: number, brews: number) =>
     else if (existing) {
       const update = await fetch(`${url}/rest/v1/brews?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`, {
         method: "PATCH", headers: { ...headers, Prefer: "return=minimal" },
-        body: JSON.stringify({ notes: brew.notes, ai_advice: brew.ai_advice, cost_idr: brew.cost_idr, status: brew.status }),
+        body: JSON.stringify({ notes: brew.notes, ai_advice: brew.ai_advice, cost_idr: brew.cost_idr, status: brew.status, custom_taste_tags: brew.custom_taste_tags }),
       });
       if (!update.ok) throw new Error("brew update failed");
       accepted.brews.push(id);
@@ -175,7 +176,7 @@ function validateBean(value: unknown): Row | null {
   return { ...value, is_self_roasted: value.is_self_roasted ?? false, archived: value.archived ?? false };
 }
 
-type ValidBrew = Row & Omit<BrewHashFields, "taste_tags"> & { id: string; seq: number; hash: string; taste_tags: string; stages: Row[] };
+type ValidBrew = Row & Omit<BrewHashFields, "taste_tags"> & { id: string; seq: number; hash: string; taste_tags: string; custom_taste_tags: string[]; stages: Row[] };
 function validateBrew(value: unknown): ValidBrew | null {
   if (!record(value) || typeof value.id !== "string" || !uuid.test(value.id) || typeof value.bean_id !== "string" || !uuid.test(value.bean_id) ||
     !integer(value.seq, 1) || !timestamp(value.brewed_at_utc) || !number(value.dose_g, 5, 60) || Math.abs((value.dose_g as number) * 10 - Math.round((value.dose_g as number) * 10)) > 0.0000001 ||
@@ -190,6 +191,8 @@ function validateBrew(value: unknown): ValidBrew | null {
     typeof value.hash !== "string" || !/^[0-9a-f]{64}$/.test(value.hash) ||
     !Array.isArray(value.stages) || value.stages.length < 1 || value.stages.length > 5) return null;
   const tags = value.taste_tags === "" ? [] : value.taste_tags.split(",");
+  const customTags = normalizeCustomTasteTags(value.custom_taste_tags ?? []);
+  if (customTags === null) return null;
   if (new Set(tags).size !== tags.length || tags.join(",") !== [...tags].sort().join(",") || tags.some((tag) => !tag)) return null;
   if (value.ai_advice != null) {
     try { JSON.parse(value.ai_advice as string); } catch { return null; }
@@ -206,7 +209,7 @@ function validateBrew(value: unknown): ValidBrew | null {
       (i < value.stages.length - 1 && stage.drawdown_s != null)) return null;
     stageIds.add(stage.id);
   }
-  return { ...value, status: value.status ?? "aktif", taste_tags: value.taste_tags as string, stages: value.stages as Row[] } as ValidBrew;
+  return { ...value, status: value.status ?? "aktif", taste_tags: value.taste_tags as string, custom_taste_tags: customTags, stages: value.stages as Row[] } as ValidBrew;
 }
 
 function sameHashedFields(existing: Row, incoming: ValidBrew): boolean {

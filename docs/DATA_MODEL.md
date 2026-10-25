@@ -105,6 +105,7 @@ CREATE TABLE brews (
   total_time_s       INTEGER NOT NULL,         -- detik aktif dari mulai sampai sesi berakhir; tidak termasuk jeda
   taste_score        INTEGER NOT NULL,         -- 1-5
   taste_tags         TEXT NOT NULL,            -- dipisah koma, urut abjad
+  custom_taste_tags  TEXT NOT NULL DEFAULT '[]', -- JSON daftar rasa tambahan, maksimal 3
   notes              TEXT,                     -- tidak ikut hash
   ai_advice          TEXT,                     -- JSON, tidak ikut hash
   cost_idr           REAL,                     -- tidak ikut hash
@@ -249,6 +250,7 @@ Hal yang disimpan di luar database:
 | `initial_stock_g` | > 0 |
 | `process_custom` | Wajib bila `process = lainnya`, maksimal 40 karakter; kosong untuk proses lain |
 | `roastery_notes_tags` | Maksimal 10 tag total; tag sendiri di-trim, huruf kecil, tanpa koma, maksimal 30 karakter, dan tidak boleh kembar |
+| `custom_taste_tags` | Maksimal 3 tag per seduhan; tiap tag 1-20 karakter setelah trim, spasi ganda menjadi satu, huruf kecil, tanpa duplikat atau label tag bawaan; hanya huruf, angka, spasi, dan tanda hubung |
 | pengingat event | Setidaknya satu, maksimal tiga |
 
 Angka batas ini adalah default awal, boleh disesuaikan, tapi ubah di sini dulu.
@@ -299,7 +301,7 @@ hash = SHA-256( UTF-8( teks_yang_di_hash ) )   // hasil: 64 karakter hex huruf k
 
 ### 5.5 Field yang tidak ikut hash (boleh berubah)
 
-`notes`, `ai_advice`, `cost_idr`, `status`, `sync_status`, `created_at`. Field di tabel `brew_stages` juga tidak ikut hash.
+`custom_taste_tags`, `notes`, `ai_advice`, `cost_idr`, `status`, `sync_status`, `created_at`. Field di tabel `brew_stages` juga tidak ikut hash. `taste_tags` bawaan tetap wajib minimal satu dan tetap masuk hash; rasa tambahan tidak mengubah verifikasi seduhan lama.
 
 ### 5.6 Larangan
 
@@ -447,7 +449,7 @@ FROM brews br JOIN beans b ON b.id = br.bean_id
 WHERE br.user_id = ?
   AND br.status = 'aktif'
   AND br.taste_score >= ?
-  AND (b.name LIKE ? OR b.roastery LIKE ? OR br.taste_tags LIKE ? OR br.notes LIKE ?)
+  AND (b.name LIKE ? OR b.roastery LIKE ? OR br.taste_tags LIKE ? OR br.custom_taste_tags LIKE ? OR br.notes LIKE ?)
 ORDER BY br.brewed_at_utc DESC;
 
 -- Seduhan yang belum tersinkron, berurutan
@@ -461,5 +463,6 @@ ORDER BY seq ASC;
 - Versi skema SQLite disimpan lewat `PRAGMA user_version`. Tiap perubahan skema = migrasi bernomor, bukan menghapus database.
 - Migrasi 2 menambahkan `beans.pack_size_g REAL` dan `beans.process_custom TEXT` melalui dua perintah `ALTER TABLE`; data biji lama dibiarkan bernilai `NULL`.
 - Migrasi 4 menambahkan tabel `chain_anchors` dan `chain_anchor_cooldowns`; data lama tidak diubah.
+- Migrasi 5 menambahkan `brews.custom_taste_tags` sebagai teks JSON `NOT NULL DEFAULT '[]'`. Postgres memakai `jsonb NOT NULL DEFAULT '[]'` dengan CHECK array dan maksimal 3 elemen. Fungsi `insert_brew_with_stages` memvalidasi tiap elemen teks 1-20 karakter sebelum menyimpan.
 - Menambah kolom opsional aman. Mengubah atau menghapus kolom yang ikut hash **dilarang** setelah ada data.
 - Setelah Sprint 3, perubahan pada format hash harus dianggap perubahan besar dan dikonfirmasi dulu.

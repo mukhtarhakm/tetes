@@ -3,7 +3,7 @@ import { requireValidSession, SessionUnauthorizedError } from "../_shared/sessio
 const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
 const hash = /^[0-9a-f]{64}$/;
 const beanColumns = "id,name,species,bean_type,arabica_percent,roastery,is_self_roasted,origin,process,process_custom,roast_level,roast_date,pack_size_g,price_original,currency,fx_rate,fx_date,price_idr_per_kg,initial_stock_g,roastery_notes_tags,roastery_notes_text,best_brew_id,archived,created_at,updated_at";
-const brewColumns = "id,seq,bean_id,brewed_at_text,dose_g,ratio,water_temp_c,grind,total_time_s,taste_score,taste_tags,notes,ai_advice,cost_idr,status,prev_hash,hash,created_at";
+const brewColumns = "id,seq,bean_id,brewed_at_text,dose_g,ratio,water_temp_c,grind,total_time_s,taste_score,taste_tags,custom_taste_tags,notes,ai_advice,cost_idr,status,prev_hash,hash,created_at";
 const stageColumns = "id,brew_id,position,name,target_start_s,target_duration_s,target_water_cum_g,target_pour_g,actual_start_s,actual_duration_s,actual_water_g,drawdown_s";
 type Row = Record<string, unknown>;
 

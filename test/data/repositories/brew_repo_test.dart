@@ -34,6 +34,29 @@ void main() {
     await database.close();
   });
 
+  test('tag buatan tersimpan, tercari, dan tidak mengubah hash', () async {
+    final beanId = await _createBean(beanRepository);
+    final plan = BrewCalculator.createDefault(beanId: beanId);
+    final id = await brewRepository.save(
+      userId: 'user-1',
+      result: BrewSessionResult(plan: plan, totalTimeS: 135,
+        drawdownS: null, brewedAtUtc: '2026-10-20T01:00:00Z'),
+      tasteScore: 4,
+      tasteTags: [RoasteryNoteTag.manis],
+      customTasteTags: [' Teh   Hitam ', 'teh hitam'],
+      actualWaterG: List.filled(plan.stages.length, null),
+    );
+    final before = (await database.query('brews', where: 'id = ?', whereArgs: [id])).single;
+    expect(before['custom_taste_tags'], '["teh hitam"]');
+    expect((await brewRepository.findJournalBrews(userId: 'user-1',
+      searchQuery: 'teh hitam')).single.id, id);
+    await database.update('brews', {'custom_taste_tags': '[]'},
+      where: 'id = ?', whereArgs: [id]);
+    final after = (await database.query('brews', where: 'id = ?', whereArgs: [id])).single;
+    expect(after['hash'], before['hash']);
+    expect(await brewRepository.verifyUserChain('user-1'), 'utuh (1 entri)');
+  });
+
   test(
     'dosis melebihi stok ditolak atomik; dosis sama menghabiskan stok',
     () async {

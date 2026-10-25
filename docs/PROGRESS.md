@@ -1,5 +1,10 @@
 # PROGRESS: Tetes
 
+## 2026-10-25 - Fitur 10-D, tag rasa buatan sendiri
+- SQLite versi 5 dan migrasi Postgres baru menambah `custom_taste_tags` terpisah dari `taste_tags`; fungsi insert seduhan memvalidasi payload JSON. Hash rantai tetap memakai field lama.
+- Hasil seduh menerima maksimal tiga rasa buatan, Jurnal dan detail menampilkan chip kuning, pencarian dan sinkronisasi menyertakannya, serta AI diagnose menerimanya sebagai data rasa.
+- `flutter analyze --no-pub` bersih dan seluruh 332 tes Flutter lulus. Migrasi Postgres belum diterapkan; tes Deno dan uji HP belum dijalankan.
+
 ## 2026-10-25 - Fitur 10-A, login biometrik
 - Sesi valid langsung membuka Beranda tanpa gerbang biometrik. Tombol sidik jari terpisah muncul di Login hanya untuk perangkat yang mendukung dan akun dengan flag serta kredensial tersimpan.
 - Setelah login password dan konfirmasi biometrik, username serta hash, salt, iterasi, dan algoritma server disimpan per username di secure storage. Login sidik jari memakai PostgREST dan perbandingan hash waktu konstan tanpa PBKDF2. Hash berubah atau akun hilang menghapus kredensial dan mematikan flag; logout mempertahankannya, sedangkan saklar Profil yang dimatikan menghapusnya.

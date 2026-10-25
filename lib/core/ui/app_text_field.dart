@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/tokens.dart';
 
@@ -18,6 +19,7 @@ class AppTextField extends StatelessWidget {
     this.onChanged,
     this.maxLines = 1,
     this.maxLength,
+    this.maxLengthEnforcement,
     super.key,
   });
 
@@ -35,6 +37,7 @@ class AppTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final int maxLines;
   final int? maxLength;
+  final MaxLengthEnforcement? maxLengthEnforcement;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +55,7 @@ class AppTextField extends StatelessWidget {
       onChanged: onChanged,
       maxLines: obscureText ? 1 : maxLines,
       maxLength: maxLength,
+      maxLengthEnforcement: maxLengthEnforcement,
       style: Theme.of(context).textTheme.bodyLarge,
       decoration: InputDecoration(
         hintText: hintText,

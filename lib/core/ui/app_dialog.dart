@@ -9,6 +9,7 @@ class AppDialog extends StatelessWidget {
     required this.message,
     required this.primaryLabel,
     required this.onPrimaryPressed,
+    this.content,
     this.secondaryLabel,
     this.onSecondaryPressed,
     super.key,
@@ -18,6 +19,7 @@ class AppDialog extends StatelessWidget {
   final String message;
   final String primaryLabel;
   final VoidCallback onPrimaryPressed;
+  final Widget? content;
   final String? secondaryLabel;
   final VoidCallback? onSecondaryPressed;
 
@@ -35,6 +37,10 @@ class AppDialog extends StatelessWidget {
               Text(title, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: AppSpacing.s12),
               Text(message, style: Theme.of(context).textTheme.bodyLarge),
+              if (content != null) ...[
+                const SizedBox(height: AppSpacing.s16),
+                content!,
+              ],
               const SizedBox(height: AppSpacing.s24),
               AppButton(label: primaryLabel, onPressed: onPrimaryPressed),
               if (secondaryLabel != null) ...[

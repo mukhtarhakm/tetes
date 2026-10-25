@@ -24,6 +24,7 @@
 - Klien sinkronisasi berada di `lib/data/sync/`: antrean baris `pending`, pengiriman per kelompok, pemetaan baris ke JSON, serta penanganan `accepted` dan `rejected`.
 - Urutan tabel: `beans` → `brews` (+ `brew_stages`) → `events` → `game_scores` → `feedback`.
 - `brews` dikirim menurut `seq` naik. Jika satu entri ditolak, hentikan kelompok karena entri sesudahnya tidak dapat melanjutkan rantai.
+- `custom_taste_tags` dikirim dan ditarik sebagai daftar JSON; nilainya tidak ikut hash. Fungsi server memvalidasi sebelum menulisnya.
 - Status lokal: `pending`, `synced`, `error`. Pesan galat tampil di detail atau Profil.
 - Pemicu: otomatis saat online dan ada data pending, serta tombol manual "Sinkronkan sekarang" di Profil.
 
@@ -55,6 +56,7 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 - Klien AI di `lib/data/remote/ai_client.dart`.
 - **Atur Seduh:** tombol "Rekomendasikan dengan AI" mengirim profil biji dan riwayat singkat. Hasil mengisi form dan tetap dapat diubah.
 - **Hasil:** tombol "Minta Diagnosa AI" aktif bila skor dan minimal satu tag terisi. Hasil tampil sebagai kartu diagnosa, kemungkinan penyebab, saran, dan catatan.
+- Diagnosa menerima `custom_taste_tags` sebagai "rasa tambahan dari pengguna". Tag diperlakukan sebagai data, bukan instruksi untuk model.
 - Tombol "Terapkan ke seduhan berikutnya" mengisi Atur Seduh dari saran.
 - Simpan JSON diagnosa di `brews.ai_advice`. Memperbarui `ai_advice` hanya mengubah `sync_status` menjadi `pending`, bukan hash.
 - Label tetap: "Saran, bukan kepastian. Coba dan catat hasilnya."
