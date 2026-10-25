@@ -90,6 +90,9 @@ Semua layar wajib memakai komponen ini. Tambah komponen baru di sini, jangan mem
 | `StatusPill` | Pil kecil untuk status sinkronisasi dan stok: tersinkron (mint), menunggu (abu), galat (`error`), menipis (`warning`) |
 | `RatingStars` | Ikon bintang bulat untuk skor 1–5, warna `rating`, nilai `n/5` tetap tertulis dan diumumkan pembaca layar; mode ringkas memakai satu ikon |
 | `StateViews` | `LoadingView`, `EmptyView`, `ErrorView` |
+| `TetesLogo`, `TetesBrand` | Logo buatan sendiri (kotak hitam dengan kerucut V60 putih dan setetes cyan) digambar dengan `CustomPainter`, tanpa aset gambar atau paket. `TetesBrand` menambah nama "Tetes" dan tagline; dipakai di Login dan Register |
+| `ChainAnchorCard` | Status jangkar Sepolia. Mode `compact`: satu baris (ikon, judul, keterangan, chevron) yang membuka kartu lengkap di bottom sheet; mode penuh memuat teks penjelasan, tombol Verifikasi, dan Etherscan. Garis tepi `primary` bila cocok, `error` bila tidak cocok atau tidak ditemukan; tersembunyi bila belum ada seduhan |
+| `CustomTasteChip`, `AddCustomTasteChip` | Rasa buatan sendiri: chip kuning (`stage3Soft` dengan garis `stage3`) berikon x untuk menghapus, dan chip putus-putus "Rasa lain" dengan ikon plus untuk menambah. Tinggi 36, tidak dipakai untuk tag bawaan |
 | `AppDialog`, `AppBottomSheet` | Radius 24, tombol memakai `AppButton` |
 | `Avatar` | Bulat, foto atau inisial |
 
@@ -112,15 +115,15 @@ Deskripsi bentuk. Isi dan alur ada di spec fitur.
 | Layar | Pola |
 |---|---|
 | **Splash** | Latar `background`, nama "Tetes" besar di tengah |
-| **Login / Register** | Judul besar, isian bertumpuk, satu `AppButton` primary penuh lebar, tautan teks di bawah |
+| **Login / Register** | `TetesBrand` di atas, judul, isian bertumpuk, satu `AppButton` primary penuh lebar, tautan teks di bawah. Login menambah pembatas "atau" dan tombol sekunder "Masuk dengan sidik jari" bila perangkat dan akun mendukung |
 | **Beranda (tab)** | Tanggal kecil di atas sapaan dua baris dan status sinkron di sisi kanan; kartu putih berisi tombol Mulai seduh dan baris Seduh lagi hanya bila ada pengaturan; ringkasan Seduhan terakhir selebar layar di atas pasangan Stok menipis dan Event berikutnya; satu bagian Pintasan dengan enam kartu dua kolom. Layar fitur dibuka penuh tanpa bottom navigation |
 | **Daftar biji** | `AppCard` per biji, chip kecil untuk spesies dan sangrai, `StatusPill` untuk stok |
 | **Form biji** | Isian bertumpuk; setiap kelompok `AppChip` memakai `Wrap` dengan jarak horizontal dan vertikal dari token `AppSpacing`, sehingga chip berpindah baris tanpa memotong teks; slider untuk persen arabika |
 | **Atur Seduh** | Isian angka besar, chip grind, daftar tahap sebagai kartu, `ScoreChart` atau grafik air di atas atau bawah kartu tahap, tombol "Mulai Sesi" di dasar layar |
 | **Sesi (layar gelap)** | `SegmentProgress` di atas, nama tahap dan target air, **timer `display`**, tombol putih besar "Tahap berikutnya" di bawah, tombol batal berupa teks |
-| **Hasil** | Kartu ringkasan, tabel plan vs realisasi di dalam kartu, bintang 1-5 atau wajah sederhana untuk skor rasa, chip tag rasa (boleh dalam bottom sheet gelap), kartu notes roastery vs rasa, tombol simpan |
-| **Jurnal** | Kolom cari, baris chip filter, kartu seduhan; daftar biji hanya ada di layar Biji kopi dari Beranda |
-| **Detail seduhan** | Seperti Hasil, ditambah `StatusPill` integritas |
+| **Hasil** | Dirancang muat dalam satu layar, tombol Simpan menempel di bawah. Kartu ringkasan kecil (nama biji, biaya, empat angka Dosis/Rasio/Suhu/Waktu yang turun baris bila sempit), lima tombol skor 1-5 (wajib), chip tag rasa bawaan (wajib minimal satu) ditambah chip rasa buatan maksimal tiga, satu baris teks bantu "Kata roastery ... Rasamu ...", kartu "Timbangan tiap tahap" (opsional) berisi angka kumulatif di timbangan per tahap dengan target sebagai petunjuk, dan Catatan yang dilipat. Tuangan per tahap dihitung dari selisih angka kumulatif; angka tidak boleh turun. Angka bulat tampil tanpa ".0" |
+| **Jurnal** | Baris jangkar ringkas (`ChainAnchorCard` mode `compact`) di atas, lalu kolom cari, tombol filter, kartu seduhan; baris jangkar dibuka sebagai bottom sheet. Daftar biji hanya ada di layar Biji kopi dari Beranda |
+| **Detail seduhan** | Seperti Hasil, ditambah `StatusPill` integritas dan chip rasa buatan di samping tag bawaan |
 | **Bandingkan** | Dua kolom dalam satu kartu, baris yang berbeda memakai latar `primaryContainer` lembut |
 | **Pintasan fitur** | Agenda, Toko, Kurs, dan Game dibuka dari Beranda sebagai layar penuh, masing-masing mempertahankan isi fiturnya |
 | **Agenda event** | Kartu event dengan empat jam (WIB, WITA, WIT, London) sebagai baris kecil |

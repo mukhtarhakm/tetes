@@ -1,9 +1,15 @@
 # PROGRESS: Tetes
 
+## 2026-10-25 - Fitur 10-B dan 10-C, perombakan UI
+- 10-B: logo Tetes (`TetesLogo`/`TetesBrand`) di Login dan Register, pembatas "atau" dan tombol sidik jari bergaya pil di Login, serta kartu status jangkar Sepolia (`ChainAnchorCard`) di Jurnal dengan tombol Verifikasi dan salin tautan Etherscan.
+- 10-C: kartu jangkar di Jurnal menjadi satu baris ringkas yang membuka bottom sheet, sehingga daftar seduhan lebih luas. Hasil seduh dirombak menjadi satu layar: skor lima tombol, kolom timbangan kumulatif per tahap (disimpan sebagai selisih per tahap, format data tidak berubah), Catatan dilipat, Simpan menempel di bawah.
+- Perbaikan: tes overflow Hasil pada lebar 320 dengan teks 1,3x (ringkasan memakai `Wrap`), dialog "Rasa lain" memiliki controller sendiri (sebelumnya dibuang saat animasi tutup dan memunculkan layar galat), tanda plus ganda pada chip, dan angka tanpa ".0".
+- Uji HP lolos untuk Jurnal, Hasil, dan tag rasa buatan. Etherscan masih berupa salin tautan sampai `url_launcher` disetujui.
+
 ## 2026-10-25 - Fitur 10-D, tag rasa buatan sendiri
 - SQLite versi 5 dan migrasi Postgres baru menambah `custom_taste_tags` terpisah dari `taste_tags`; fungsi insert seduhan memvalidasi payload JSON. Hash rantai tetap memakai field lama.
 - Hasil seduh menerima maksimal tiga rasa buatan, Jurnal dan detail menampilkan chip kuning, pencarian dan sinkronisasi menyertakannya, serta AI diagnose menerimanya sebagai data rasa.
-- `flutter analyze --no-pub` bersih dan seluruh 332 tes Flutter lulus. Migrasi Postgres belum diterapkan; tes Deno dan uji HP belum dijalankan.
+- `flutter analyze --no-pub` bersih dan seluruh 332 tes Flutter lulus. Migrasi `20261025120000` sudah diterapkan dengan `supabase db push` dan fungsi `sync-push`, `sync-pull`, `ai` sudah di-deploy. Uji HP untuk menambah, menghapus, dan memvalidasi tag lolos; tes Deno belum dijalankan karena Deno belum terpasang.
 
 ## 2026-10-25 - Fitur 10-A, login biometrik
 - Sesi valid langsung membuka Beranda tanpa gerbang biometrik. Tombol sidik jari terpisah muncul di Login hanya untuk perangkat yang mendukung dan akun dengan flag serta kredensial tersimpan.
