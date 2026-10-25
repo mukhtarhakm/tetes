@@ -10,7 +10,8 @@ class BiometricLoginButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppButton(
     label: 'Masuk dengan sidik jari',
-    variant: AppButtonVariant.text,
+    variant: AppButtonVariant.secondary,
+    icon: Icons.fingerprint_rounded,
     onPressed: onPressed,
   );
 }

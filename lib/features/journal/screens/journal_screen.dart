@@ -7,6 +7,7 @@ import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/ui/state_views.dart';
+import '../../anchor/widgets/chain_anchor_card.dart';
 import '../../brew/screens/brew_setup_screen.dart';
 import '../state/journal_controller.dart';
 import '../widgets/journal_brew_card.dart';
@@ -79,6 +80,17 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
         bottom: false,
         child: Column(
           children: [
+            // Status jangkar blockchain
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.s20,
+                AppSpacing.s8,
+                AppSpacing.s20,
+                AppSpacing.s4,
+              ),
+              child: ChainAnchorCard(),
+            ),
+
             // Pencarian & Tombol Filter
             Padding(
               padding: const EdgeInsets.fromLTRB(

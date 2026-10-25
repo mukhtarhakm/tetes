@@ -5,6 +5,7 @@ import '../../../app/router/app_routes.dart';
 import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_text_field.dart';
+import '../../../core/ui/tetes_logo.dart';
 import '../auth_validation.dart';
 import '../state/auth_controller.dart';
 
@@ -43,6 +44,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const TetesBrand(),
+              const SizedBox(height: AppSpacing.s32),
               Text(
                 'Buat akun Tetes',
                 style: Theme.of(context).textTheme.headlineMedium,

@@ -6,6 +6,7 @@ import '../../../app/theme/tokens.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_text_field.dart';
+import '../../../core/ui/tetes_logo.dart';
 import '../auth_validation.dart';
 import '../state/auth_controller.dart';
 import '../state/auth_providers.dart';
@@ -54,6 +55,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const TetesBrand(),
+              const SizedBox(height: AppSpacing.s32),
               Text(
                 'Masuk ke Tetes',
                 style: Theme.of(context).textTheme.headlineMedium,
@@ -135,7 +138,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: authState.isLoading ? null : _submit,
               ),
               if (_biometricUsername != null) ...[
-                const SizedBox(height: AppSpacing.s12),
+                const SizedBox(height: AppSpacing.s16),
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s12,
+                      ),
+                      child: Text(
+                        'atau',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.inkSoft,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s16),
                 BiometricLoginButton(
                   onPressed: authState.isLoading ? null : _loginBiometric,
                 ),
