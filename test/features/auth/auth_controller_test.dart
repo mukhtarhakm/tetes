@@ -12,6 +12,7 @@ import 'package:tetes/data/remote/auth_client.dart';
 import 'package:tetes/data/secure/session_storage.dart';
 import 'package:tetes/features/auth/state/auth_controller.dart';
 import 'package:tetes/features/auth/state/auth_providers.dart';
+import 'package:tetes/features/auth/biometric/biometric_authenticator.dart';
 
 void main() {
   late Database database;
@@ -25,6 +26,20 @@ void main() {
 
   tearDown(() async {
     await database.close();
+  });
+
+  test('biometrik ditolak OS tidak mencoba login atau menghitung kegagalan', () async {
+    final client = AuthClient(baseUrl: 'https://example.test/rest/v1',
+      apiKey: 'public-test-key', client: MockClient((_) async => fail('HTTP tidak boleh dipanggil')));
+    final container = ProviderContainer(overrides: [
+      authClientProvider.overrideWithValue(client),
+      biometricAuthenticatorProvider.overrideWithValue(_DeniedBiometric()),
+    ]);
+    addTearDown(container.dispose);
+    expect(await container.read(authControllerProvider.notifier)
+        .loginBiometric('rais_uji'), isFalse);
+    expect(container.read(authControllerProvider).errorMessage,
+        'Pemeriksaan sidik jari dibatalkan.');
   });
 
   test(
@@ -86,6 +101,14 @@ void main() {
     expect(container.read(authControllerProvider).errorMessage,
         'Akun dibuat. Silakan masuk.');
   });
+}
+
+class _DeniedBiometric implements BiometricAuthenticator {
+  @override
+  Future<bool> isAvailable() async => true;
+  @override
+  Future<BiometricAuthenticationOutcome> authenticate() async =>
+      BiometricAuthenticationOutcome.canceled;
 }
 
 AuthClient _successfulAuthClient() {

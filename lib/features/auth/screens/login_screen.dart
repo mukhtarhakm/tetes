@@ -8,6 +8,8 @@ import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../auth_validation.dart';
 import '../state/auth_controller.dart';
+import '../state/auth_providers.dart';
+import '../widgets/biometric_login_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({this.sessionMessage, super.key});
@@ -24,6 +26,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Map<String, String> _validationErrors = const {};
   bool _obscurePassword = true;
+  String? _biometricUsername;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshBiometric();
+  }
 
   @override
   void dispose() {
@@ -35,8 +44,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
-    const configurationMissing = AppConfig.supabaseUrl == '' ||
-        AppConfig.supabaseAnonKey == '';
+    const configurationMissing =
+        AppConfig.supabaseUrl == '' || AppConfig.supabaseAnonKey == '';
 
     return Scaffold(
       body: SafeArea(
@@ -67,7 +76,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 prefixIcon: Icons.person_outline_rounded,
                 enabled: !authState.isLoading,
                 textInputAction: TextInputAction.next,
-                onChanged: (_) => _clearFieldError('username'),
+                onChanged: (_) {
+                  _clearFieldError('username');
+                  _refreshBiometric();
+                },
               ),
               const SizedBox(height: AppSpacing.s20),
               AppTextField(
@@ -101,12 +113,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onChanged: (_) => _clearFieldError('password'),
               ),
               if (authState.errorMessage != null ||
-                  widget.sessionMessage != null || configurationMissing) ...[
+                  widget.sessionMessage != null ||
+                  configurationMissing) ...[
                 const SizedBox(height: AppSpacing.s16),
                 Semantics(
                   liveRegion: true,
                   child: Text(
-                    authState.errorMessage ?? widget.sessionMessage ??
+                    authState.errorMessage ??
+                        widget.sessionMessage ??
                         'Konfigurasi Supabase belum tersedia. Isi env/app.json lalu jalankan ulang aplikasi.',
                     style: Theme.of(
                       context,
@@ -120,6 +134,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 isLoading: authState.isLoading,
                 onPressed: authState.isLoading ? null : _submit,
               ),
+              if (_biometricUsername != null) ...[
+                const SizedBox(height: AppSpacing.s12),
+                BiometricLoginButton(
+                  onPressed: authState.isLoading ? null : _loginBiometric,
+                ),
+              ],
               const SizedBox(height: AppSpacing.s12),
               AppButton(
                 label: 'Belum punya akun? Daftar',
@@ -138,6 +158,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _refreshBiometric() async {
+    try {
+      final available = await ref
+          .read(biometricAuthenticatorProvider)
+          .isAvailable();
+      final typed = _usernameController.text.trim();
+      final username = available
+          ? await (await ref.read(
+              userRepositoryProvider.future,
+            )).availableBiometricUsername(typed.isEmpty ? null : typed)
+          : null;
+      if (mounted && _usernameController.text.trim() == typed) {
+        setState(() => _biometricUsername = username);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _biometricUsername = null);
+    }
+  }
+
+  Future<void> _loginBiometric() async {
+    final username = _biometricUsername;
+    if (username == null) return;
+    final succeeded = await ref
+        .read(authControllerProvider.notifier)
+        .loginBiometric(username);
+    if (succeeded && mounted) {
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRoutes.home, (_) => false);
+    } else {
+      _refreshBiometric();
+    }
   }
 
   Future<void> _submit() async {

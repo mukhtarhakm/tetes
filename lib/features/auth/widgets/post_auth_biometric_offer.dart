@@ -61,8 +61,7 @@ class _PostAuthBiometricOfferState
         barrierDismissible: false,
         builder: (dialogContext) => AppDialog(
           title: 'Aktifkan biometrik?',
-          message:
-              'Gunakan biometrik untuk membuka Tetes saat sesi masih berlaku.',
+          message: 'Gunakan sidik jari untuk masuk setelah keluar dari Tetes.',
           primaryLabel: 'Ya',
           onPrimaryPressed: () =>
               Navigator.of(dialogContext).pop(_BiometricOfferChoice.enable),

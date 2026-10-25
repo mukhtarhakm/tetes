@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -5,6 +8,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:tetes/data/db/database_migrations.dart';
 import 'package:tetes/data/remote/auth_client.dart';
 import 'package:tetes/data/repositories/user_repo.dart';
+import 'package:tetes/data/secure/biometric_credential_storage.dart';
 import 'package:tetes/data/secure/session_storage.dart';
 
 void main() {
@@ -19,6 +23,58 @@ void main() {
 
   tearDown(() async {
     await database.close();
+  });
+
+  test('hash berubah membersihkan kredensial dan flag biometrik', () async {
+    await database.insert('users', {
+      'id': 'u1',
+      'username': 'rais_uji',
+      'created_at': '2026-10-20T00:00:00Z',
+    });
+    final secure = _MemoryStorage();
+    final credentials = BiometricCredentialStorage(secure);
+    var hash = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+    final client = AuthClient(
+      baseUrl: 'https://example.test/rest/v1',
+      apiKey: 'public-test-key',
+      rateLimitStorage: secure,
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode([
+            {
+              'id': 'u1',
+              'username': 'rais_uji',
+              'created_at': '2026-10-20T00:00:00Z',
+              'salt': 'AAECAwQFBgcICQoLDA0ODw==',
+              'password_hash': hash,
+              'iterations': 600000,
+              'algo': 'pbkdf2-hmac-sha256',
+            },
+          ]),
+          200,
+        ),
+      ),
+    );
+    final repository = UserRepository(
+      database,
+      client,
+      const _UnusedSessionStorage(),
+      credentials,
+    );
+    await repository.enableBiometric('u1');
+    hash = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=';
+    await expectLater(
+      repository.loginBiometric('rais_uji'),
+      throwsA(
+        isA<AuthException>().having(
+          (error) => error.message,
+          'message',
+          'Masuk dengan password, lalu aktifkan lagi sidik jari',
+        ),
+      ),
+    );
+    expect(await credentials.read('rais_uji'), isNull);
+    expect(await repository.isBiometricEnabled('u1'), isFalse);
   });
 
   test(
@@ -101,6 +157,26 @@ void main() {
       expect(count, 5);
     },
   );
+}
+
+class _MemoryStorage implements FlutterSecureStorage {
+  final values = <String, String>{};
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final key = invocation.namedArguments[#key] as String;
+    if (invocation.memberName == #read) {
+      return Future<String?>.value(values[key]);
+    }
+    if (invocation.memberName == #write) {
+      values[key] = invocation.namedArguments[#value] as String;
+      return Future<void>.value();
+    }
+    if (invocation.memberName == #delete) {
+      values.remove(key);
+      return Future<void>.value();
+    }
+    return super.noSuchMethod(invocation);
+  }
 }
 
 class _UnusedSessionStorage implements SessionStorage {

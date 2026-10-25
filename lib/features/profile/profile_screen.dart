@@ -258,9 +258,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 style: Theme.of(sheet).textTheme.titleLarge,
               ),
               const SizedBox(height: AppSpacing.s12),
-              const Text(
-                'Tetes: jurnal dan pendamping seduh kopi V60.',
-              ),
+              const Text('Tetes: jurnal dan pendamping seduh kopi V60.'),
               const SizedBox(height: AppSpacing.s12),
               const Text(
                 'Data peta © OpenStreetMap contributors. Gaya dan tile vektor © OpenFreeMap bila tersedia; tile OSM standar dipakai sebagai cadangan.',
@@ -307,7 +305,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   icon: Icons.fingerprint_rounded,
                   title: 'Biometrik',
                   subtitle: _biometricAvailable
-                      ? 'Buka aplikasi dengan sidik jari'
+                      ? 'Masuk dengan sidik jari'
                       : 'Tidak tersedia atau belum terdaftar di perangkat',
                   trailing: AppSwitch(
                     value: _biometricEnabled,

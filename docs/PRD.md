@@ -97,7 +97,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 - **M** Register dan login online dengan logika di Flutter dan data di Supabase Postgres, tanpa Firebase, Supabase Auth, atau layanan auth siap pakai.
 - **M** Password di-hash di Flutter dengan PBKDF2-HMAC-SHA256, salt acak per pengguna, dan jumlah iterasi yang disimpan per pengguna.
 - **M** Token session disimpan di secure storage, berlaku 7 hari tanpa perpanjangan otomatis. Session valid dapat membuka aplikasi saat offline.
-- **M** Login biometrik sebagai pembuka aplikasi.
+- **M** Sidik jari sebagai cara login di layar Login setelah kredensial hash disimpan di secure storage perangkat. Sesi yang masih valid langsung membuka Beranda.
 - **M** Logout mencabut session di server; saat offline pencabutan diantrekan tanpa menghapus data lokal.
 - **M** Pembatasan percobaan login lokal per username dalam jendela 15 menit sebagai pengaman UX.
 
@@ -172,7 +172,7 @@ Prioritas: **M** = wajib, **S** = sebaiknya, **C** = bila sempat. Kode modul (AU
 |---|---|
 | Konsep proyek akhir | PRD ini |
 | Login terenkripsi + session (tanpa Firebase) | AUTH: PBKDF2 lokal dengan salt, data Postgres, token session 7 hari |
-| Login biometrik | AUTH: biometrik pembuka aplikasi |
+| Login biometrik | AUTH: tombol sidik jari di layar Login |
 | Penyimpanan lokal dan online | SQLite + Supabase Postgres |
 | Web service/API | Edge Function sendiri + API kurs |
 | LBS terkait tema | LBS: toko biji dan alat seduh |

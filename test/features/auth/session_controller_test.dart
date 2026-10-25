@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:tetes/core/notifications/notification_service.dart';
 import 'package:tetes/data/remote/auth_client.dart';
 import 'package:tetes/data/secure/session_storage.dart';
+import 'package:tetes/data/secure/biometric_credential_storage.dart';
 import 'package:tetes/data/repositories/chain_anchor_repo.dart';
 import 'package:tetes/features/auth/session/session_revocation_queue.dart';
 import 'package:tetes/features/auth/state/auth_providers.dart';
@@ -12,6 +14,10 @@ import 'package:tetes/features/auth/state/session_controller.dart';
 
 void main() {
   test('logout mengantrekan token sebelum menghapus session aktif', () async {
+    final biometricStorage = BiometricCredentialStorage(_MemoryStorage());
+    await biometricStorage.save(const BiometricCredential(
+      username: 'rais_uji', passwordHash: 'hash', salt: 'salt',
+      iterations: 1, algo: 'pbkdf2-hmac-sha256'));
     final storage = _RecordingSessionStorage(_validSession());
     final response = Completer<void>();
     final client = _InspectingClient(storage, response.future);
@@ -38,6 +44,7 @@ void main() {
     expect(client.sawQueuedToken, isTrue);
     expect(storage.pendingTokens, ['token-1']);
     expect(notifications.cancelCount, 1);
+    expect(await biometricStorage.read('rais_uji'), isNotNull);
 
     response.complete();
     await Future<void>.delayed(Duration.zero);
@@ -93,6 +100,24 @@ void main() {
     expect(client.callCount, 0);
     expect(notifications.cancelCount, 1);
   });
+}
+
+class _MemoryStorage implements FlutterSecureStorage {
+  final values = <String, String>{};
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final key = invocation.namedArguments[#key] as String;
+    if (invocation.memberName == #read) return Future<String?>.value(values[key]);
+    if (invocation.memberName == #write) {
+      values[key] = invocation.namedArguments[#value] as String;
+      return Future<void>.value();
+    }
+    if (invocation.memberName == #delete) {
+      values.remove(key);
+      return Future<void>.value();
+    }
+    return super.noSuchMethod(invocation);
+  }
 }
 
 class _FakeNotificationService extends NotificationService {

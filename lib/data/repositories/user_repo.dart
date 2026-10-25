@@ -1,14 +1,24 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../remote/auth_client.dart';
+import '../secure/biometric_credential_storage.dart';
 import '../secure/session_storage.dart';
 
 class UserRepository {
-  const UserRepository(this._database, this._authClient, this._sessionStorage);
+  const UserRepository(
+    this._database,
+    this._authClient,
+    this._sessionStorage, [
+    this._biometricStorage = const BiometricCredentialStorage(
+      FlutterSecureStorage(),
+    ),
+  ]);
 
   final Database _database;
   final AuthClient _authClient;
   final SessionStorage _sessionStorage;
+  final BiometricCredentialStorage _biometricStorage;
 
   static const _biometricEnabledKey = 'biometric_enabled';
   static const _biometricPromptedKey = 'biometric_prompted';
@@ -35,6 +45,90 @@ class UserRepository {
     );
     await _persistAuthentication(session);
     return session.user.id;
+  }
+
+  Future<String> loginBiometric(String username) async {
+    final userId = await _userIdForUsername(username);
+    if (userId == null || !await isBiometricEnabled(userId)) {
+      throw const AuthException(
+        type: AuthFailureType.invalidCredentials,
+        message: 'Masuk dengan password, lalu aktifkan lagi sidik jari',
+      );
+    }
+    BiometricCredential? credential;
+    try {
+      credential = await _biometricStorage.read(username);
+    } catch (_) {
+      await _clearInvalidBiometric(userId);
+      throw const AuthException(
+        type: AuthFailureType.localStorage,
+        message: 'Masuk dengan password, lalu aktifkan lagi sidik jari',
+      );
+    }
+    if (credential == null) {
+      await _clearInvalidBiometric(userId);
+      throw const AuthException(
+        type: AuthFailureType.invalidCredentials,
+        message: 'Masuk dengan password, lalu aktifkan lagi sidik jari',
+      );
+    }
+    try {
+      final session = await _authClient.loginBiometric(credential,
+          expectedUserId: userId);
+      await _persistAuthentication(session);
+      return userId;
+    } on AuthException catch (error) {
+      if (error.type != AuthFailureType.invalidCredentials) rethrow;
+      await _clearInvalidBiometric(userId);
+      throw const AuthException(
+        type: AuthFailureType.invalidCredentials,
+        message: 'Masuk dengan password, lalu aktifkan lagi sidik jari',
+      );
+    }
+  }
+
+  Future<String?> availableBiometricUsername([String? username]) async {
+    final rows = await _database.rawQuery(
+      '''
+      SELECT users.id, users.username FROM users
+      JOIN settings ON settings.user_id = users.id
+      WHERE settings.key = ? AND settings.value = '1'
+        ${username == null || username.isEmpty ? '' : 'AND users.username = ?'}
+      ORDER BY users.last_login_at DESC
+    ''',
+      [
+        _biometricEnabledKey,
+        if (username != null && username.isNotEmpty) username,
+      ],
+    );
+    for (final row in rows) {
+      final candidate = row['username'] as String;
+      try {
+        if (await _biometricStorage.read(candidate) != null) return candidate;
+      } catch (_) {
+        await _clearInvalidBiometric(row['id'] as String);
+      }
+    }
+    return null;
+  }
+
+  Future<void> _clearInvalidBiometric(String userId) async {
+    try {
+      await disableBiometric(userId);
+    } catch (_) {
+      // The flag is disabled even if the invalid Keystore entry cannot be deleted.
+    }
+  }
+
+  Future<String?> _userIdForUsername(String username) async {
+    final rows = await _database.query(
+      'users',
+      columns: ['id'],
+      where: 'username = ?',
+      whereArgs: [username],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single['id'] as String;
   }
 
   Future<int> countPendingSyncData(String userId) async {
@@ -85,13 +179,19 @@ class UserRepository {
     if (changed != 1) throw StateError('Profil pengguna tidak tersedia.');
   }
 
-  Future<void> disableBiometric(String userId) {
-    return _upsertSetting(
-      _database,
-      userId: userId,
-      key: _biometricEnabledKey,
-      value: '0',
-    );
+  Future<void> disableBiometric(String userId) async {
+    final profile = await this.profile(userId);
+    final username = profile?['username'] as String?;
+    try {
+      if (username != null) await _biometricStorage.delete(username);
+    } finally {
+      await _upsertSetting(
+        _database,
+        userId: userId,
+        key: _biometricEnabledKey,
+        value: '0',
+      );
+    }
   }
 
   Future<bool> wasBiometricPrompted(String userId) {
@@ -99,6 +199,11 @@ class UserRepository {
   }
 
   Future<void> enableBiometric(String userId) async {
+    final profile = await this.profile(userId);
+    final username = profile?['username'] as String?;
+    if (username == null) throw StateError('Profil pengguna tidak tersedia.');
+    final credential = await _authClient.biometricCredential(username);
+    await _biometricStorage.save(credential);
     await _database.transaction((transaction) async {
       await _upsertSetting(
         transaction,

@@ -38,7 +38,7 @@
 
 ### Layar Profil
 - **Header:** foto profil (ambil dari kamera atau galeri, simpan berkas di folder aplikasi dan path di `users.photo_path`), username.
-- **Pengaturan:** toggle biometrik, pengingat seduh (aktif, jam, hari), ambang stok menipis (default 15 g).
+- **Pengaturan:** toggle sidik jari untuk login (konfirmasi biometrik saat mengaktifkan; hapus kredensial saat mematikan), pengingat seduh (aktif, jam, hari), ambang stok menipis (default 15 g).
 - **Data:** tombol "Sinkronkan sekarang" dan status terakhir sinkron (dari Fitur 05).
 - **Keamanan:** tombol "Verifikasi Integritas Jurnal" menampilkan "utuh (N entri)" atau "rantai putus di entri ke-K".
 

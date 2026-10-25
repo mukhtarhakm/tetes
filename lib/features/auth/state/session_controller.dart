@@ -16,15 +16,18 @@ class SessionState {
     this.userId,
     this.message,
     this.isFreshAuthentication = false,
+    this.offerBiometric = false,
   });
 
   const SessionState.authenticated(
     String userId, {
     bool isFreshAuthentication = false,
+    bool offerBiometric = false,
   }) : this._(
          status: SessionStatus.authenticated,
          userId: userId,
          isFreshAuthentication: isFreshAuthentication,
+         offerBiometric: offerBiometric,
        );
 
   const SessionState.unauthenticated({String? message})
@@ -34,6 +37,7 @@ class SessionState {
   final String? userId;
   final String? message;
   final bool isFreshAuthentication;
+  final bool offerBiometric;
 }
 
 final sessionControllerProvider =
@@ -74,9 +78,10 @@ class SessionController extends AsyncNotifier<SessionState> {
     };
   }
 
-  void markAuthenticated(String userId) {
+  void markAuthenticated(String userId, {bool offerBiometric = false}) {
     state = AsyncData(
-      SessionState.authenticated(userId, isFreshAuthentication: true),
+      SessionState.authenticated(userId,
+          isFreshAuthentication: true, offerBiometric: offerBiometric),
     );
   }
 

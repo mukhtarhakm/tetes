@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +10,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:tetes/core/ui/app_avatar.dart';
 import 'package:tetes/data/db/database_migrations.dart';
 import 'package:tetes/data/remote/auth_client.dart';
+import 'package:tetes/data/secure/biometric_credential_storage.dart';
+import 'dart:convert';
 import 'package:tetes/data/repositories/user_repo.dart';
 import 'package:tetes/data/secure/session_storage.dart';
 import 'package:tetes/features/auth/biometric/biometric_authenticator.dart';
@@ -19,12 +22,14 @@ void main() {
   late Database database;
   late UserRepository repository;
   late Directory directory;
+  late _MemoryStorage biometricSecure;
 
   setUpAll(sqfliteFfiInit);
   setUp(() async {
     database = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
     await DatabaseMigrations.create(database, DatabaseMigrations.schemaVersion);
     directory = await Directory.systemTemp.createTemp('tetes-profile-');
+    biometricSecure = _MemoryStorage();
     await database.insert('users', {
       'id': 'u1',
       'username': 'Satu',
@@ -37,8 +42,28 @@ void main() {
     });
     repository = UserRepository(
       database,
-      AuthClient(client: MockClient((_) async => http.Response('', 500))),
+      AuthClient(
+        baseUrl: 'https://example.test/rest/v1',
+        apiKey: 'public-test-key',
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode([
+              {
+                'id': 'u1',
+                'username': 'Satu',
+                'created_at': '2026-10-20T00:00:00Z',
+                'salt': 'AAECAwQFBgcICQoLDA0ODw==',
+                'password_hash': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+                'iterations': 600000,
+                'algo': 'pbkdf2-hmac-sha256',
+              },
+            ]),
+            200,
+          ),
+        ),
+      ),
       const _UnusedSessionStorage(),
+      BiometricCredentialStorage(biometricSecure),
     );
   });
   tearDown(() async {
@@ -124,13 +149,22 @@ void main() {
       documentsDirectory: () async => directory,
     );
     await expectLater(
-      service.replace(userId: 'missing', previousName: 'old.jpg',
-        source: ImageSource.gallery, repository: repository),
+      service.replace(
+        userId: 'missing',
+        previousName: 'old.jpg',
+        source: ImageSource.gallery,
+        repository: repository,
+      ),
       throwsStateError,
     );
     expect(await old.exists(), isTrue);
-    expect(await directory.list().where((item) => item.path.contains('profile_missing_')).isEmpty,
-      isTrue);
+    expect(
+      await directory
+          .list()
+          .where((item) => item.path.contains('profile_missing_'))
+          .isEmpty,
+      isTrue,
+    );
   });
 
   testWidgets('berkas foto hilang memakai inisial', (tester) async {
@@ -170,6 +204,10 @@ void main() {
         enabled: true,
       );
       expect(await repository.isBiometricEnabled('u1'), isTrue);
+      expect(
+        await BiometricCredentialStorage(biometricSecure).read('Satu'),
+        isNotNull,
+      );
       expect(await repository.isBiometricEnabled('u2'), isFalse);
       await updateBiometricSetting(
         repository: repository,
@@ -178,9 +216,33 @@ void main() {
         enabled: false,
       );
       expect(await repository.isBiometricEnabled('u1'), isFalse);
+      expect(
+        await BiometricCredentialStorage(biometricSecure).read('Satu'),
+        isNull,
+      );
       expect(fake.calls, 2);
     },
   );
+}
+
+class _MemoryStorage implements FlutterSecureStorage {
+  final values = <String, String>{};
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final key = invocation.namedArguments[#key] as String;
+    if (invocation.memberName == #read) {
+      return Future<String?>.value(values[key]);
+    }
+    if (invocation.memberName == #write) {
+      values[key] = invocation.namedArguments[#value] as String;
+      return Future<void>.value();
+    }
+    if (invocation.memberName == #delete) {
+      values.remove(key);
+      return Future<void>.value();
+    }
+    return super.noSuchMethod(invocation);
+  }
 }
 
 class _FakePicker extends ImagePicker {

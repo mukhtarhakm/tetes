@@ -1,5 +1,11 @@
 # PROGRESS: Tetes
 
+## 2026-10-25 - Fitur 10-A, login biometrik
+- Sesi valid langsung membuka Beranda tanpa gerbang biometrik. Tombol sidik jari terpisah muncul di Login hanya untuk perangkat yang mendukung dan akun dengan flag serta kredensial tersimpan.
+- Setelah login password dan konfirmasi biometrik, username serta hash, salt, iterasi, dan algoritma server disimpan per username di secure storage. Login sidik jari memakai PostgREST dan perbandingan hash waktu konstan tanpa PBKDF2. Hash berubah atau akun hilang menghapus kredensial dan mematikan flag; logout mempertahankannya, sedangkan saklar Profil yang dimatikan menghapusnya.
+- Test penyimpanan, login berhasil/gagal, penolakan OS, logout, saklar Profil, dan startup sesi valid diperbarui. Uji manual di HP asli masih menunggu, termasuk validasi Keystore setelah perubahan sidik jari perangkat.
+- `flutter analyze --no-pub` bersih dan seluruh 328 test Flutter lulus. Tidak ada paket baru atau commit.
+
 ## 2026-10-24 - Jangkar Sepolia sisi aplikasi (tanpa UI)
 - Migrasi `chain_anchors` dan Edge Function `anchor` sudah diterapkan ke Supabase; secret rantai sudah di-set. Kontrak BrewAnchor ada di Sepolia, alamat `0x8d80e52E86BDc990f6787D7DD5faF46BeC369324`.
 - Flutter: `AnchorClient` (memanggil `anchor` dengan `x-session-token`), `ChainVerifier` (JSON-RPC `eth_call` ke `latest(bytes32)`, selector `0x79feb107`, RPC publik tanpa kunci), `ChainAnchorRepository`, SQLite versi 4 (tabel `chain_anchors` dan `chain_anchor_cooldowns`), dan `chainAnchorStatusProvider` dengan aksi `verifyNow()`. Pemicu: setelah push sinkronisasi dan saat aplikasi dibuka untuk jangkar `pending`. Logout menghapus data jangkar lokal pengguna.

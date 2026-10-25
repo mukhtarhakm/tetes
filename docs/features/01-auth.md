@@ -1,16 +1,14 @@
 # Fitur 01: Autentikasi server dan biometrik
 
 **Sprint:** 1
-**Tujuan:** pengguna dapat mendaftar dan login melalui backend auth buatan sendiri, mempertahankan session, membuka aplikasi dengan biometrik, dan logout dengan pencabutan session server.
+**Tujuan:** pengguna dapat mendaftar dan login melalui auth buatan sendiri, mempertahankan session, masuk dengan sidik jari di layar Login, dan logout dengan pencabutan session server.
 **FR terkait:** FR-AUTH-01 sampai FR-AUTH-07, NAV (aksi logout)
 **Dokumen wajib dibaca:** ARCHITECTURE.md (bagian 4, 7, 9, 10), DATA_MODEL.md (users, sessions, login_attempts, settings)
 
 ## Layar
 **Register:** kolom username, password, konfirmasi password (dengan tombol lihat atau sembunyikan), tombol Daftar, tautan ke Login. Pesan galat per kolom.
 
-**Login:** kolom username dan password, tombol Masuk, tautan ke Register, indikator memuat. Pesan kredensial gagal selalu "Username atau password salah".
-
-**Gerbang biometrik:** muncul saat membuka aplikasi bila biometrik aktif dan session lokal belum kedaluwarsa. Tombol "Pakai password" menuju Login dan memerlukan internet.
+**Login:** kolom username dan password, tombol Masuk, tautan ke Register, indikator memuat. Tombol "Masuk dengan sidik jari" hanya tampil bila perangkat mendukung, kredensial tersimpan, dan flag lokal aktif. Pesan kredensial password gagal selalu "Username atau password salah".
 
 **Tawaran biometrik:** dialog setelah login pertama berhasil: "Aktifkan biometrik?" (Ya, Nanti).
 
@@ -32,6 +30,7 @@ SQLite **tidak menyimpan** `password_hash`, `salt`, `iterations`, `algo`, atau t
 - Session aktif: `session_token`, `user_id`, dan `expires_at`.
 - Token session acak 32 byte berformat base64url dan berlaku 7 hari tanpa perpanjangan otomatis.
 - `pending_revoke_token`: token lama yang gagal dicabut karena offline.
+- Kredensial biometrik per username: username, `password_hash`, `salt`, `iterations`, dan `algo` dengan format yang sama seperti server. Password tidak disimpan. Hash tersimpan memiliki risiko setara keterbatasan kunci anon PostgREST yang telah dicatat.
 
 ### Postgres
 - `users`: kredensial ter-hash dan profil identitas dasar.
@@ -66,7 +65,7 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 
 **Buka aplikasi:**
 1. Baca `expires_at` dari secure storage dan bandingkan dengan jam perangkat.
-2. Session lokal belum kedaluwarsa: aplikasi boleh dibuka offline. Jika biometrik aktif, minta biometrik dahulu.
+2. Session lokal belum kedaluwarsa: langsung ke Beranda, termasuk saat offline, tanpa prompt biometrik.
 3. Session kedaluwarsa: ke Login. Jika offline, tampilkan pesan bahwa internet diperlukan; tidak ada mode baca saja.
 4. Session yang dicabut server baru diketahui saat fungsi terlindungi berikutnya mengembalikan `401`; hapus session lokal dan keluar paksa.
 
@@ -85,13 +84,15 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 - Setelah lima percobaan gagal: permintaan berikutnya menampilkan sisa waktu tunggu dari `details.retry_after_s` pada respons `429`.
 - HP tanpa biometrik atau belum ada sidik jari terdaftar: jangan tawarkan, sembunyikan toggle.
 - Biometrik dibatalkan atau gagal: tawarkan login password; bila offline jelaskan bahwa internet diperlukan.
+- Hash biometrik tidak cocok, user tidak ditemukan, atau kunci Keystore tidak valid: hapus kredensial pengguna itu, matikan flag, dan tampilkan "Masuk dengan password, lalu aktifkan lagi sidik jari".
+- Kegagalan biometrik OS tidak menambah penghitung percobaan lokal; hash tidak cocok dihitung sebagai kegagalan login.
 - Session lokal kedaluwarsa saat offline: tertahan di Login tanpa mode baca saja.
 - `401` dari fungsi terlindungi: hapus session lokal dan keluar paksa dengan pesan singkat.
 - Logout offline: data lokal tetap ada dan token pencabutan tidak dicatat di log.
 
 ## JANGAN
 - Tidak memakai Firebase, Supabase Auth, atau layanan auth siap pakai.
-- Tidak menghitung atau menyimpan hash password di Flutter.
+- Hash password boleh dihitung di Flutter untuk login password sesuai keputusan 2026-10-23. Penyimpanannya hanya di secure storage untuk kredensial biometrik setelah login password berhasil dan pengguna mengaktifkannya; SQLite dan log tetap tidak menyimpan hash.
 - Tidak menyimpan password asli di mana pun atau mencetak password/token di log.
 - Tidak memakai SHA-256 polos untuk password.
 - Tidak menyimpan session token di SharedPreferences atau SQLite.
@@ -108,9 +109,11 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 - [ ] Lima kegagalan pertama dalam jendela 15 menit menghasilkan `401`; permintaan berikutnya menghasilkan `429` dan `details.retry_after_s`
 - [ ] Login berhasil menghapus baris percobaan untuk jendela aktif
 - [ ] Session berlaku 7 hari tanpa perpanjangan otomatis
-- [ ] Dengan session valid, tutup aplikasi lalu buka offline: masuk tanpa password, lewat biometrik bila aktif
+- [ ] Dengan session valid, tutup aplikasi lalu buka offline: langsung masuk Beranda tanpa prompt biometrik
 - [ ] Session kedaluwarsa saat offline tertahan di Login dengan pesan membutuhkan internet
 - [ ] Biometrik gagal atau dibatalkan: bisa menuju login password
+- [ ] Logout mempertahankan kredensial biometrik; mematikan saklar Profil menghapusnya
+- [ ] Login biometrik membandingkan hash server secara waktu konstan tanpa PBKDF2; hash berubah atau user hilang menghapus kredensial dan flag
 - [ ] Logout online mencabut session server dan menghapus session lokal tanpa menghapus data SQLite
 - [ ] Logout offline menyimpan `pending_revoke_token`, lalu mencabutnya saat internet kembali atau sebelum login berikutnya
 - [ ] Logout dengan data pending menampilkan jumlahnya sebelum konfirmasi
@@ -118,7 +121,7 @@ Hash password memakai PBKDF2-HMAC-SHA256 dari Web Crypto bawaan Deno dengan 600.
 - [ ] Tidak ada password, token session, atau hash token di log
 
 ## Cara uji
-Register dua akun, coba username duplikat, pastikan lima login gagal dalam jendela yang sama menghasilkan `401`, lalu pastikan permintaan keenam menghasilkan `429` sebelum mencoba login benar setelah jendela berganti. Aktifkan biometrik, buka ulang aplikasi saat offline dengan session valid, uji session kedaluwarsa saat offline, logout dengan data pending, logout offline lalu sambungkan internet, dan pastikan session lama ditolak server.
+Register dua akun, coba username duplikat dan pembatasan login. Login password, aktifkan biometrik, logout, lalu masuk dengan sidik jari. Buka ulang aplikasi dengan sesi valid saat offline dan pastikan langsung ke Beranda. Matikan saklar Profil lalu pastikan tombol sidik jari hilang. Uji session kedaluwarsa saat offline, logout dengan data pending, dan pencabutan token saat internet kembali.
 
 ## Langkah pengerjaan yang disarankan
 1. Migrasi tabel auth dan helper PBKDF2/session di Edge Function, dengan tes. Berhenti.

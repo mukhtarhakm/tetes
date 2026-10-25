@@ -9,8 +9,6 @@ enum BiometricAuthenticationOutcome {
   error,
 }
 
-enum BiometricGateDecision { notRequired, authenticationRequired, unavailable }
-
 abstract interface class BiometricAuthenticator {
   Future<bool> isAvailable();
 
@@ -48,7 +46,7 @@ class LocalBiometricAuthenticator implements BiometricAuthenticator {
 
     try {
       final authenticated = await _localAuthentication.authenticate(
-        localizedReason: 'Buka aplikasi Tetes dengan biometrik',
+        localizedReason: 'Masuk ke Tetes dengan sidik jari',
         biometricOnly: true,
         persistAcrossBackgrounding: false,
       );
@@ -77,17 +75,4 @@ class LocalBiometricAuthenticator implements BiometricAuthenticator {
       return BiometricAuthenticationOutcome.error;
     }
   }
-}
-
-Future<BiometricGateDecision> decideBiometricGate({
-  required bool enabled,
-  required BiometricAuthenticator authenticator,
-}) async {
-  if (!enabled) {
-    return BiometricGateDecision.notRequired;
-  }
-
-  return await authenticator.isAvailable()
-      ? BiometricGateDecision.authenticationRequired
-      : BiometricGateDecision.unavailable;
 }

@@ -89,7 +89,7 @@ void main() {
     expect(find.text('Masuk ke Tetes'), findsNothing);
   });
 
-  testWidgets('gerbang biometrik tidak membangun shell sebelum berhasil', (
+  testWidgets('sesi valid dengan biometrik aktif langsung membuka Beranda', (
     tester,
   ) async {
     await tester.runAsync(
@@ -104,8 +104,16 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appSyncServiceFactoryProvider.overrideWith((ref) => () async => _WidgetSyncService()),
+          homeDataProvider.overrideWith((ref) async => const HomeData(
+            beans: [], latestBrew: null, nextEvent: null, againPlan: null,
+          )),
+          homeIdentityProvider.overrideWith((ref) async => const HomeIdentity('Barista', null)),
           notificationServiceProvider.overrideWithValue(
             FakeNotificationService(),
+          ),
+          notificationCoordinatorProvider.overrideWith(
+            (ref) async => FakeNotificationCoordinator(),
           ),
           databaseProvider.overrideWithValue(AsyncData(database)),
           sessionStorageProvider.overrideWithValue(
@@ -124,54 +132,8 @@ void main() {
     );
     await _pumpAsyncUi(tester);
 
-    expect(find.text('Buka Tetes'), findsOneWidget);
-    expect(find.text('Coba lagi'), findsOneWidget);
-    expect(find.text('Biji kopi'), findsNothing);
-    expect(authenticator.authenticationAttempts, 1);
-
-    await tester.pump();
-    expect(authenticator.authenticationAttempts, 1);
-  });
-
-  testWidgets('biometrik yang tidak tersedia hanya menawarkan password', (
-    tester,
-  ) async {
-    await tester.runAsync(
-      () => database.insert('settings', {
-        'user_id': 'user-1',
-        'key': 'biometric_enabled',
-        'value': '1',
-      }),
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          notificationServiceProvider.overrideWithValue(
-            FakeNotificationService(),
-          ),
-          databaseProvider.overrideWithValue(AsyncData(database)),
-          sessionStorageProvider.overrideWithValue(
-            _FakeSessionStorage(
-              const StoredSession(
-                token: 'token-rahasia',
-                userId: 'user-1',
-                expiresAt: '2099-01-01T00:00:00Z',
-              ),
-            ),
-          ),
-          biometricAuthenticatorProvider.overrideWithValue(
-            _FakeBiometricAuthenticator(available: false),
-          ),
-        ],
-        child: const MyApp(),
-      ),
-    );
-    await _pumpAsyncUi(tester);
-
-    expect(find.text('Pakai password'), findsOneWidget);
-    expect(find.text('Coba lagi'), findsNothing);
-    expect(find.text('Biji kopi'), findsNothing);
+    expect(find.text('Beranda'), findsOneWidget);
+    expect(authenticator.authenticationAttempts, 0);
   });
 
   testWidgets('session kedaluwarsa dibersihkan dan menampilkan pesan', (

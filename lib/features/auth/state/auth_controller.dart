@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../data/remote/auth_client.dart';
+import '../biometric/biometric_authenticator.dart';
 import 'auth_providers.dart';
 import 'session_controller.dart';
 
@@ -43,7 +44,36 @@ class AuthController extends Notifier<AuthState> {
       return (await ref.read(
         userRepositoryProvider.future,
       )).login(username: username, password: password);
-    });
+    }, offerBiometric: true);
+  }
+
+  Future<bool> loginBiometric(String username) async {
+    if (state.isLoading) return false;
+    state = const AuthState(isLoading: true);
+    final outcome = await ref
+        .read(biometricAuthenticatorProvider)
+        .authenticate();
+    if (outcome != BiometricAuthenticationOutcome.success) {
+      state = AuthState(
+        errorMessage: switch (outcome) {
+          BiometricAuthenticationOutcome.canceled =>
+            'Pemeriksaan sidik jari dibatalkan.',
+          BiometricAuthenticationOutcome.lockedOut =>
+            'Sidik jari sedang dikunci oleh sistem. Coba lagi nanti.',
+          BiometricAuthenticationOutcome.unavailable =>
+            'Sidik jari tidak tersedia. Masuk dengan password.',
+          _ =>
+            'Sidik jari tidak dikenali. Coba lagi atau masuk dengan password.',
+        },
+      );
+      return false;
+    }
+    state = const AuthState();
+    return _submit(
+      () async => (await ref.read(
+        userRepositoryProvider.future,
+      )).loginBiometric(username),
+    );
   }
 
   void clearErrors() {
@@ -53,7 +83,8 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<bool> _submit(Future<String> Function() operation) async {
+  Future<bool> _submit(Future<String> Function() operation,
+      {bool offerBiometric = false}) async {
     if (state.isLoading) {
       return false;
     }
@@ -61,7 +92,8 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthState(isLoading: true);
     try {
       final userId = await operation();
-      ref.read(sessionControllerProvider.notifier).markAuthenticated(userId);
+      ref.read(sessionControllerProvider.notifier)
+          .markAuthenticated(userId, offerBiometric: offerBiometric);
       state = const AuthState();
       return true;
     } on AuthException catch (error) {

@@ -41,7 +41,7 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
 | Hash password | `cryptography` 2.9.0 + `cryptography_flutter` 2.3.4 | PBKDF2 native Android, fallback Dart di isolate; salt acak per pengguna, jumlah iterasi disimpan per pengguna |
 | Hash chain | SHA-256 (`crypto`) | Aturan di `DATA_MODEL.md` |
 | UUID | `uuid` | ID data aplikasi dibuat di Flutter; ID pengguna dan session dibuat server |
-| Biometrik | `local_auth` | Pembuka aplikasi saja |
+| Biometrik | `local_auth` | Konfirmasi penyimpanan kredensial dan login di layar Login |
 | Sensor | `sensors_plus` | Accelerometer (goyang), gyroscope (game) |
 | Umpan balik sesi | `vibration` + `flutter_ringtone_player` | Getar dan nada sistem saat pergantian tahap dan akhir sesi |
 | Notifikasi | `flutter_local_notifications` + `timezone` | Lokal, tanpa server |
@@ -92,7 +92,7 @@ Aturan lapisan:
 
 ## 4. Autentikasi Lokal dengan Data Supabase
 
-Register dan login memerlukan internet. Flutter menghitung PBKDF2-HMAC-SHA256 (600.000 iterasi untuk akun baru, salt 16 byte, hash 32 byte) lewat native Android bila tersedia, dengan fallback Dart di isolate, lalu memakai PostgREST dengan kunci publik. Login akun lama membaca `iterations` dari baris pengguna. Password, salt, dan hash tidak dicatat di log; hanya token sesi asli yang disimpan di secure storage. Tanpa Firebase dan tanpa Supabase Auth.
+Register dan login memerlukan internet. Flutter menghitung PBKDF2-HMAC-SHA256 (600.000 iterasi untuk akun baru, salt 16 byte, hash 32 byte) lewat native Android bila tersedia, dengan fallback Dart di isolate, lalu memakai PostgREST dengan kunci publik. Login akun lama membaca `iterations` dari baris pengguna. Password, salt, dan hash tidak dicatat di log; token sesi asli serta kredensial biometrik yang diaktifkan pengguna disimpan di secure storage. Tanpa Firebase dan tanpa Supabase Auth.
 
 **Register:** validasi input lokal, lalu `POST users?select=id,username,created_at` dengan `Prefer: return=representation` dan header `x-login-username` yang sama dengan username. Setelah user dibuat, Flutter membuat token acak 32 byte base64url tanpa padding, menyimpan SHA-256 hex token melalui `POST sessions`, dan menyimpan token asli di secure storage. Jika POST sesi gagal, akun tetap ada dan layar mengarahkan pengguna ke Login dengan pesan "Akun dibuat. Silakan masuk."
 
@@ -100,7 +100,9 @@ Register dan login memerlukan internet. Flutter menghitung PBKDF2-HMAC-SHA256 (6
 
 **Logout:** token lokal dihapus dan pencabutan offline tetap diantrekan. `PATCH sessions?token_hash=eq.<hash>` dengan `x-token-hash` dan body `{"revoked":true}` mencabut sesi; respons sukses tanpa baris terubah tetap dianggap berhasil.
 
-**Buka aplikasi:** sesi lokal yang belum kedaluwarsa dapat membuka aplikasi offline, melalui biometrik jika aktif. Sesi yang kedaluwarsa memerlukan login online. Edge Function `sync-push`, `sync-pull`, dan `ai` tetap memeriksa token lewat `_shared/session.ts` dan tabel `sessions`.
+**Buka aplikasi:** sesi lokal yang belum kedaluwarsa langsung membuka Beranda, termasuk saat offline. Sesi yang kedaluwarsa memerlukan login online. Edge Function `sync-push`, `sync-pull`, dan `ai` tetap memeriksa token lewat `_shared/session.ts` dan tabel `sessions`.
+
+**Login biometrik:** setelah login password berhasil, pengguna dapat mengaktifkan sidik jari melalui tawaran sekali atau saklar Profil. Setelah konfirmasi `local_auth`, aplikasi membaca hash, salt, iterasi, dan algoritma user dari PostgREST dan menyimpannya per username di `flutter_secure_storage`. Password tidak disimpan. Tombol sidik jari hanya tampil jika perangkat mendukung, kredensial tersedia, dan flag lokal aktif. Login biometrik membaca user dari jalur PostgREST yang sama, membandingkan hash dengan `constantTimeEquals` tanpa PBKDF2, lalu membuat sesi seperti login password. Hash berubah, user hilang, atau kunci penyimpanan tidak valid akan menghapus kredensial dan mematikan flag. Logout mempertahankan kredensial; saklar Profil yang dimatikan menghapusnya. Penyimpanan hash ini memiliki risiko setara keterbatasan kunci anon yang sudah didokumentasikan.
 
 **Keterbatasan keamanan:** siapa pun yang memiliki kunci publik Supabase dan mengetahui username dapat membaca `id` serta `password_hash` pengguna itu melalui header `x-login-username`, lalu membuat sesi atas `user_id` tersebut tanpa password. Ini celah nyata pada desain login lokal. Grant kolom dan RLS membatasi pembacaan tanpa header, tetapi tidak membuktikan identitas pemanggil.
 
