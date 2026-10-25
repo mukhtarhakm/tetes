@@ -183,16 +183,31 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
     }
   }
 
+  /// Kolom timbangan berisi angka kumulatif di timbangan. Yang disimpan tetap
+  /// air per tahap (selisih dengan angka terisi sebelumnya), sehingga format
+  /// data, sinkronisasi, dan diagnosa AI tidak berubah.
   (List<double?>, int?)? _feedbackValues() {
     final actual = <double?>[];
+    var previousCumulative = 0.0;
     for (final input in water) {
       final raw = input.text.trim().replaceAll(',', '.');
       final value = raw.isEmpty ? null : double.tryParse(raw);
       if (raw.isNotEmpty && (value == null || !value.isFinite || value < 0)) {
-        setState(() => error = 'Air aktual harus angka tidak negatif.');
+        setState(() => error = 'Angka timbangan harus angka tidak negatif.');
         return null;
       }
-      actual.add(value);
+      if (value == null) {
+        actual.add(null);
+        continue;
+      }
+      if (value < previousCumulative) {
+        setState(
+          () => error = 'Angka timbangan harus bertambah di tiap tahap.',
+        );
+        return null;
+      }
+      actual.add(double.parse((value - previousCumulative).toStringAsFixed(2)));
+      previousCumulative = value;
     }
     final rawDrawdown = drawdown.text.trim();
     final drawdownS = rawDrawdown.isEmpty
@@ -205,9 +220,295 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
     return (actual, drawdownS);
   }
 
+  String _formatDuration(int seconds) =>
+      '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+
+  String _rupiah(num value) {
+    final digits = value.round().toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write('.');
+      buffer.write(digits[i]);
+    }
+    return 'Rp $buffer';
+  }
+
+  Widget _summaryCard(BuildContext context) {
+    final plan = widget.result.plan;
+    final textTheme = Theme.of(context).textTheme;
+    final cost = brewCost(plan.doseG, bean!.priceIdrPerKg);
+    Widget stat(String label, String value) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+        ),
+        const SizedBox(height: AppSpacing.s4),
+        Text(
+          value,
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(
+                child: Text(
+                  bean!.name,
+                  style: textTheme.titleLarge,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (cost != null) ...[
+                const SizedBox(width: AppSpacing.s12),
+                Text(
+                  'Biaya ${_rupiah(cost)}',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.inkSoft,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s16,
+              vertical: AppSpacing.s12,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(AppRadius.navigation),
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: AppSpacing.s16,
+              runSpacing: AppSpacing.s12,
+              children: [
+                stat('Dosis', '${plan.doseG} g'),
+                stat('Rasio', '1:${plan.ratio}'),
+                stat('Suhu', '${plan.waterTempC}°C'),
+                stat('Waktu', _formatDuration(widget.result.totalTimeS)),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            [
+              'Gilingan ${plan.grind.label}',
+              if (widget.result.drawdownS != null)
+                'drawdown ${widget.result.drawdownS} detik',
+            ].join(' · '),
+            style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _scoreRow(BuildContext context) {
+    return Row(
+      children: List.generate(5, (index) {
+        final value = index + 1;
+        final selected = score == value;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(left: index == 0 ? 0 : AppSpacing.s8),
+            child: Semantics(
+              button: true,
+              selected: selected,
+              label: 'Skor $value',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.navigation),
+                onTap: () => setState(() => score = value),
+                child: AnimatedContainer(
+                  duration: AppDurations.feedback,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.stage1Soft : AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.navigation),
+                    border: Border.all(
+                      color: selected ? AppColors.primary : AppColors.divider,
+                      width: selected ? 2 : 1,
+                    ),
+                  ),
+                  child: ExcludeSemantics(
+                    child: Text(
+                      '$value',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _scaleCard(BuildContext context) {
+    final plan = widget.result.plan;
+    final textTheme = Theme.of(context).textTheme;
+    final last = plan.stages.length - 1;
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text.rich(
+            TextSpan(
+              text: 'Timbangan tiap tahap (g) ',
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              children: [
+                TextSpan(
+                  text: '· opsional',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppColors.inkSoft,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s4),
+          Text(
+            'Isi angka kumulatif di timbangan. Tuangan tiap tahap dihitung otomatis.',
+            style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          ...List.generate(plan.stages.length, (index) {
+            final stage = plan.stages[index];
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index == last ? 0 : AppSpacing.s12,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          index == last && last > 0
+                              ? '${stage.name.label} · total'
+                              : stage.name.label,
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'target ${plan.cumulativeWaterAt(index)} g',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.inkSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  SizedBox(
+                    width: 120,
+                    child: AppTextField(
+                      controller: water[index],
+                      hintText: '${plan.cumulativeWaterAt(index)}',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (widget.result.drawdownS == null) ...[
+            const SizedBox(height: AppSpacing.s16),
+            AppTextField(
+              controller: drawdown,
+              label: 'Waktu drawdown (detik) • opsional',
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _notesTile(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.innerCard),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          shape: const Border(),
+          collapsedShape: const Border(),
+          tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+          childrenPadding: const EdgeInsets.fromLTRB(
+            AppSpacing.s16,
+            0,
+            AppSpacing.s16,
+            AppSpacing.s16,
+          ),
+          title: Text.rich(
+            TextSpan(
+              text: 'Catatan ',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              children: [
+                TextSpan(
+                  text: '· opsional',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.inkSoft,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          children: [AppTextField(controller: notes, maxLines: 3)],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final plan = widget.result.plan;
+    final textTheme = Theme.of(context).textTheme;
+    Widget heading(String title, String hint) => Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+      child: Text.rich(
+        TextSpan(
+          text: '$title ',
+          style: textTheme.titleLarge,
+          children: [
+            TextSpan(
+              text: hint,
+              style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+            ),
+          ],
+        ),
+      ),
+    );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Hasil seduh')),
       body: SafeArea(
@@ -228,178 +529,132 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                   icon: Icons.coffee_outlined,
                 ),
               )
-            : ListView(
-                padding: AppInsets.screen,
+            : Column(
                 children: [
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s20,
+                        AppSpacing.s4,
+                        AppSpacing.s20,
+                        AppSpacing.s16,
+                      ),
                       children: [
+                        _summaryCard(context),
+                        const SizedBox(height: AppSpacing.s20),
+                        heading('Gimana rasanya?', 'pilih skor'),
+                        _scoreRow(context),
+                        const SizedBox(height: AppSpacing.s20),
+                        heading('Rasanya seperti apa?', 'pilih minimal satu'),
+                        Wrap(
+                          spacing: AppSpacing.s8,
+                          runSpacing: AppSpacing.s8,
+                          children: RoasteryNoteTag.values
+                              .map(
+                                (tag) => AppChip(
+                                  label: tag.label,
+                                  selected: tags.contains(tag),
+                                  onSelected: (selected) {
+                                    if (selected) {
+                                      tags.add(tag);
+                                    } else {
+                                      tags.remove(tag);
+                                    }
+                                    setState(() {});
+                                  },
+                                ),
+                              )
+                              .toList(),
+                        ),
+                        const SizedBox(height: AppSpacing.s12),
                         Text(
-                          'Ringkasan',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: AppSpacing.s8),
-                        Text(
-                          '${bean!.name} • ${plan.doseG} g • 1:${plan.ratio}',
-                        ),
-                        Text('${plan.waterTempC} °C • ${plan.grind.label}'),
-                        Text('Waktu total: ${widget.result.totalTimeS} detik'),
-                        if (widget.result.drawdownS != null)
-                          Text('Drawdown: ${widget.result.drawdownS} detik'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                  Text(
-                    'Tahap seduh',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  ...List.generate(plan.stages.length, (index) {
-                    final stage = plan.stages[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                      child: AppCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              stage.name.label,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: AppSpacing.s8),
-                            Text(
-                              'Target ${stage.startSeconds} detik • ${plan.cumulativeWaterAt(index)} g kumulatif • ${stage.targetPourG} g tuang',
-                            ),
-                            const SizedBox(height: AppSpacing.s12),
-                            AppTextField(
-                              controller: water[index],
-                              label: 'Air aktual (g) • opsional',
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                  if (widget.result.drawdownS == null) ...[
-                    AppTextField(
-                      controller: drawdown,
-                      label: 'Waktu drawdown (detik) • opsional',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                  ],
-                  Text(
-                    'Skor rasa',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  Wrap(
-                    spacing: AppSpacing.s8,
-                    runSpacing: AppSpacing.s8,
-                    children: List.generate(
-                      5,
-                      (index) => AppChip(
-                        label: '${index + 1}',
-                        selected: score == index + 1,
-                        onSelected: (_) {
-                          score = index + 1;
-                          setState(() {});
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                  Text(
-                    'Tag rasa',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  Wrap(
-                    spacing: AppSpacing.s8,
-                    runSpacing: AppSpacing.s8,
-                    children: RoasteryNoteTag.values
-                        .map(
-                          (tag) => AppChip(
-                            label: tag.label,
-                            selected: tags.contains(tag),
-                            onSelected: (selected) {
-                              if (selected) {
-                                tags.add(tag);
-                              } else {
-                                tags.remove(tag);
-                              }
-                              setState(() {});
-                            },
+                          [
+                            'Kata roastery: ${bean!.roasteryNotesTags.isEmpty ? '-' : bean!.roasteryNotesTags.join(', ')}',
+                            'Rasamu: ${tags.isEmpty ? '-' : tags.map((tag) => tag.label).join(', ')}',
+                          ].join(' · '),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.inkSoft,
+                            height: 1.4,
                           ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Perbandingan rasa',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: AppSpacing.s8),
-                        Text(
-                          'Roastery: ${bean!.roasteryNotesTags.isEmpty ? '-' : bean!.roasteryNotesTags.join(', ')}',
                         ),
                         if (bean!.roasteryNotesText case final text?)
-                          Text(text),
-                        Text(
-                          'Rasamu: ${tags.isEmpty ? '-' : tags.map((tag) => tag.label).join(', ')}',
-                        ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.s4),
+                            child: Text(
+                              text,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: AppColors.inkSoft,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.s20),
+                        _scaleCard(context),
+                        const SizedBox(height: AppSpacing.s12),
+                        _notesTile(context),
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.s16),
-                  AppTextField(
-                    controller: notes,
-                    label: 'Catatan bebas • opsional',
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                  Text(
-                    'Biaya seduhan: ${brewCost(plan.doseG, bean!.priceIdrPerKg)?.toStringAsFixed(0) ?? '-'} IDR',
-                  ),
-                  if (error != null) Text(error!),
-                  if (bean != null && plan.doseG > bean!.remainingStockG)
-                    Text(
-                      InsufficientStockException(
-                        bean!.name,
-                        bean!.remainingStockG,
-                        plan.doseG,
-                      ).message,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.s20,
+                      AppSpacing.s8,
+                      AppSpacing.s20,
+                      AppSpacing.s16,
                     ),
-                  const SizedBox(height: AppSpacing.s8),
-                  Text(
-                    'Diagnosa AI tersedia setelah menyimpan',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-                  AppButton(
-                    label: 'Simpan',
-                    isLoading: saving,
-                    onPressed:
-                        score != null &&
-                            tags.isNotEmpty &&
-                            !saving &&
-                            !stockRejected &&
-                            plan.doseG <= bean!.remainingStockG
-                        ? save
-                        : null,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.s8,
+                            ),
+                            child: Text(
+                              error!,
+                              textAlign: TextAlign.center,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ),
+                        if (plan.doseG > bean!.remainingStockG)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.s8,
+                            ),
+                            child: Text(
+                              InsufficientStockException(
+                                bean!.name,
+                                bean!.remainingStockG,
+                                plan.doseG,
+                              ).message,
+                              textAlign: TextAlign.center,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
+                          ),
+                        AppButton(
+                          label: 'Simpan',
+                          isLoading: saving,
+                          onPressed:
+                              score != null &&
+                                  tags.isNotEmpty &&
+                                  !saving &&
+                                  !stockRejected &&
+                                  plan.doseG <= bean!.remainingStockG
+                              ? save
+                              : null,
+                        ),
+                        const SizedBox(height: AppSpacing.s8),
+                        Text(
+                          'Diagnosa AI tersedia setelah menyimpan',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.inkSoft,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

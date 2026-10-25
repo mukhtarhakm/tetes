@@ -132,7 +132,7 @@ void main() {
     );
     await tester.tap(find.text('Buka hasil'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(AppChip, '3'));
+    await tester.tap(find.text('3'));
     await tester.pump();
     await tester.tap(find.widgetWithText(AppChip, 'Asam'));
     await tester.pump();

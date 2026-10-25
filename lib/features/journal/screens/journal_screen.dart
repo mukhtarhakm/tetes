@@ -88,7 +88,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                 AppSpacing.s20,
                 AppSpacing.s4,
               ),
-              child: ChainAnchorCard(),
+              child: ChainAnchorCard(compact: true),
             ),
 
             // Pencarian & Tombol Filter

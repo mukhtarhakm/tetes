@@ -20,7 +20,10 @@ enum _Kind {
 
 /// Kartu status jangkar Sepolia di atas daftar Jurnal.
 class ChainAnchorCard extends ConsumerStatefulWidget {
-  const ChainAnchorCard({super.key});
+  const ChainAnchorCard({this.compact = false, super.key});
+
+  /// Satu baris ringkas; diketuk membuka kartu lengkap di bottom sheet.
+  final bool compact;
 
   @override
   ConsumerState<ChainAnchorCard> createState() => _ChainAnchorCardState();
@@ -45,6 +48,97 @@ class _ChainAnchorCardState extends ConsumerState<ChainAnchorCard> {
       _ => null,
     };
     final explorerUrl = status.anchor?.explorerUrl;
+
+    if (widget.compact) {
+      return Semantics(
+        button: true,
+        label: '${view.title}. ${view.subtitle}. Ketuk untuk detail.',
+        child: Material(
+          color: isDark ? AppColors.surfaceDark : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.small),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.small),
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: isDark
+                  ? AppColors.surfaceDark
+                  : AppColors.background,
+              builder: (_) => const SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.s20,
+                    AppSpacing.s16,
+                    AppSpacing.s20,
+                    AppSpacing.s20,
+                  ),
+                  child: SingleChildScrollView(child: ChainAnchorCard()),
+                ),
+              ),
+            ),
+            child: Container(
+              constraints: const BoxConstraints(
+                minHeight: AppSizes.minimumTouchTarget + 4,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s12,
+                vertical: AppSpacing.s8,
+              ),
+              decoration: border == null
+                  ? null
+                  : BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppRadius.small),
+                      border: Border.all(color: border, width: 2),
+                    ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: view.iconBackground,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: ExcludeSemantics(
+                      child: Icon(view.icon, color: view.iconColor, size: 18),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          view.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: view.titleColor,
+                          ),
+                        ),
+                        Text(
+                          view.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.inkSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.inkSoft,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Container(
       width: double.infinity,
