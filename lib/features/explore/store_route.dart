@@ -28,15 +28,17 @@ class StoreRoute {
     if (coordinates is! List ||
         coordinates.isEmpty ||
         distance is! num ||
-        duration is! num)
+        duration is! num) {
       return null;
+    }
     final points = <LatLng>[];
     for (final coordinate in coordinates) {
       if (coordinate is! List ||
           coordinate.length < 2 ||
           coordinate[0] is! num ||
-          coordinate[1] is! num)
+          coordinate[1] is! num) {
         return null;
+      }
       points.add(
         LatLng(
           (coordinate[1] as num).toDouble(),
@@ -52,10 +54,11 @@ class StoreRoute {
         for (final step in leg['steps'] as List) {
           if (step is! Map) continue;
           final maneuver = step['maneuver'];
-          if (maneuver is Map)
+          if (maneuver is Map) {
             steps.add(
               instruction(maneuver['type'], maneuver['modifier'], step['name']),
             );
+          }
         }
       }
     }
@@ -107,8 +110,9 @@ class StoreRouteService {
     final response = await http
         .get(uri, headers: const {'User-Agent': 'com.raismukhtar.tetes'})
         .timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw const FormatException('route unavailable');
+    }
     return StoreRoute.parse(jsonDecode(response.body));
   }
 }

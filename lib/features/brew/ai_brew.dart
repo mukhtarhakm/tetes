@@ -97,7 +97,7 @@ abstract final class AiBrew {
     if (before.pouringCount != after.pouringCount)
       AiPlanChange(
         AiPlanField.pouring,
-        'Jumlah pouring',
+        'Pouring',
         '${before.pouringCount}',
         '${after.pouringCount}',
       ),
@@ -198,7 +198,6 @@ abstract final class AiBrew {
 
   static AiRecommendation recommendationFromResponse({
     required BrewPlan fallback,
-    required int requestedPouringCount,
     required Map<String, dynamic> response,
   }) {
     try {
@@ -207,6 +206,7 @@ abstract final class AiBrew {
         'ratio',
         'water_temp_c',
         'grind',
+        'pouring_count',
         'stages',
         'note',
       ])) {
@@ -219,14 +219,16 @@ abstract final class AiBrew {
           ? Grind.tryFromDatabase(response['grind'] as String)
           : null;
       final note = response['note'];
+      final pouringCount = _integer(response['pouring_count'], 1, 5);
       final rows = response['stages'];
       if (dose == null ||
           ratio == null ||
           temperature == null ||
           grind == null ||
           !_text(note) ||
+          pouringCount == null ||
           rows is! List ||
-          rows.length != requestedPouringCount) {
+          rows.length != pouringCount) {
         throw const FormatException();
       }
       final stages = <BrewStage>[];

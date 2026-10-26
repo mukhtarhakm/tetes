@@ -50,9 +50,12 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 
 ### Sisi server
 - Edge Function `ai` memakai `x-session-token` dan jenis permintaan `recommend` atau `diagnose` sesuai ARCHITECTURE.md bagian 7.6 dan 8.
-- Model dibaca dari environment `AI_MODEL`. Batas 20 panggilan per jam per pengguna, batas waktu 15 detik, validasi skema keluaran, dan satu kali coba ulang.
+- Model dibaca dari environment `AI_MODEL`. Batas 20 panggilan per jam per pengguna, batas waktu 15 detik, validasi skema keluaran, dan satu kali coba ulang. **Ketentuan 15 detik diganti oleh Fitur 10-F:** batas waktu server 28 detik untuk paling banyak dua percobaan bersama, termasuk satu retry setelah 503; klien tetap 35 detik. `recommend` dan `diagnose` memakai `responseSchema` dan `maxOutputTokens` 1024, tanpa `thinkingConfig`.
+
+- **Pembaruan 10-G:** `AI_PROVIDER` memilih `gemini` atau `openai` (default `gemini`). Secret model dan kunci penyedia terpilih wajib tersedia hanya di Edge Function. Prompt, kuota, sesi, batas waktu, normalisasi, validator, dan respons ke Flutter tetap satu kontrak. OpenAI memakai Chat Completions dengan `json_schema` strict untuk recommend/diagnose, `max_completion_tokens` 2048 untuk JSON dan 800 untuk chat; `reasoning_effort` hanya dikirim bila secret opsional diisi. HTTP 429 dan 5xx OpenAI dicoba ulang satu kali selama waktu masih tersedia.
 
 ### Sisi Flutter
+- **Pembaruan 10-F:** `pouring_count` pada payload rekomendasi adalah preferensi. Keluaran AI memuat `pouring_count` 1-5 dan jumlah tahap yang sama; bila berbeda dari preferensi, `note` menjelaskan alasannya. Kartu Saran AI menampilkan perubahan Pouring, menyorot Jumlah pouring, dan Kembalikan memulihkan rencana lama. Aturan lama yang mengikat jumlah tahap ke input diganti oleh aturan keluaran ini.
 - Klien AI di `lib/data/remote/ai_client.dart`.
 - **Atur Seduh:** tombol "Rekomendasikan dengan AI" mengirim profil biji dan riwayat singkat. Hasil mengisi form dan tetap dapat diubah.
 - **Hasil:** tombol "Minta Diagnosa AI" aktif bila skor dan minimal satu tag terisi. Hasil tampil sebagai kartu diagnosa, kemungkinan penyebab, saran, dan catatan.

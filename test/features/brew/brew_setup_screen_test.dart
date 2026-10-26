@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tetes/app/theme/tokens.dart';
 import 'package:tetes/core/ui/app_card.dart';
 import 'package:tetes/features/beans/bean_model.dart';
+import 'package:tetes/features/brew/ai_brew.dart';
 import 'package:tetes/features/brew/brew_calculator.dart';
 import 'package:tetes/features/brew/screens/brew_setup_screen.dart';
 import 'package:tetes/features/brew/state/brew_setup_controller.dart';
@@ -66,6 +67,37 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('kartu AI menampilkan perubahan pouring dan sorotan label', (
+    tester,
+  ) async {
+    final bean = _bean();
+    final before = BrewCalculator.createDefault(beanId: bean.id);
+    final recommended = BrewCalculator.createDefault(
+      beanId: bean.id,
+      pouringCount: 2,
+    );
+    await tester.pumpWidget(
+      _app(
+        () async => BrewSetupState(
+          beans: [bean],
+          selectedBeanId: bean.id,
+          plan: recommended,
+          aiSuggestion: AppliedAiSuggestion(
+            before: before,
+            recommended: recommended,
+            note: 'Profil biji cocok untuk dua tuangan.',
+            hasHistory: false,
+          ),
+        ),
+        initialBeanId: bean.id,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Pouring: 3 ke 2'), findsOneWidget);
+    expect(find.text('Jumlah pouring'), findsOneWidget);
+    expect(find.text('Kembalikan'), findsOneWidget);
   });
 
   testWidgets('dosis melebihi stok menampilkan pesan dan menonaktifkan mulai', (

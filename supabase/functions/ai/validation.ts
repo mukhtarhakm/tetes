@@ -12,6 +12,106 @@ const grinds = ["sangat_halus", "halus", "sedang_halus", "sedang", "sedang_kasar
 const tags = ["asam", "pahit", "hambar", "seimbang", "manis", "cokelat", "buah", "kacang", "floral", "karamel", "rempah"];
 const stageNames = ["bloom", "pouring_2", "pouring_3", "pouring_4", "pouring_5"];
 
+const string = (max = 500) => ({ type: "STRING", maxLength: max });
+const numeric = (type: "INTEGER" | "NUMBER", minimum: number, maximum: number) => ({ type, minimum, maximum });
+const suggestionSchema = (variable: string, value: object) => ({
+  type: "OBJECT", required: ["variable", "from", "to", "reason"],
+  properties: { variable: { type: "STRING", enum: [variable] }, from: value, to: value, reason: string() },
+});
+export const responseSchemas = {
+  recommend: {
+    type: "OBJECT", required: ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages", "note"],
+    properties: {
+      dose_g: numeric("NUMBER", 5, 60), ratio: numeric("NUMBER", 10, 20),
+      water_temp_c: numeric("INTEGER", 80, 100), grind: { type: "STRING", enum: grinds },
+      pouring_count: numeric("INTEGER", 1, 5), note: string(),
+      stages: { type: "ARRAY", minItems: 1, maxItems: 5, items: {
+        type: "OBJECT", required: ["name", "start_s", "duration_s", "water_cum_g"],
+        properties: { name: { type: "STRING", enum: stageNames }, start_s: numeric("NUMBER", 0, 3600),
+          duration_s: numeric("NUMBER", 1, 3600), water_cum_g: numeric("NUMBER", 0, 1200) },
+      } },
+    },
+  },
+  diagnose: {
+    type: "OBJECT", required: ["diagnosis", "likely_causes", "suggestions", "note"],
+    properties: {
+      diagnosis: string(), note: string(),
+      likely_causes: { type: "ARRAY", minItems: 1, maxItems: 5, items: string() },
+      suggestions: { type: "ARRAY", maxItems: 2, items: { anyOf: [
+        suggestionSchema("dose_g", numeric("NUMBER", 5, 60)),
+        suggestionSchema("ratio", numeric("NUMBER", 10, 20)),
+        suggestionSchema("water_temp_c", numeric("INTEGER", 80, 100)),
+        suggestionSchema("grind", { type: "STRING", enum: grinds }),
+      ] } },
+    },
+  },
+} as const;
+
+export function openAiResponseSchema(type: "recommend" | "diagnose"): Record<string, unknown> {
+  const convert = (source: Record<string, unknown>): Record<string, unknown> => {
+    if (Array.isArray(source.anyOf)) return { anyOf: source.anyOf.map((item) => convert(item as Record<string, unknown>)) };
+    const result: Record<string, unknown> = { ...source, type: String(source.type).toLowerCase() };
+    if (source.type === "OBJECT") {
+      const properties = source.properties as Record<string, Record<string, unknown>>;
+      result.properties = Object.fromEntries(Object.entries(properties).map(([key, value]) => [key, convert(value)]));
+      result.required = Object.keys(properties);
+      result.additionalProperties = false;
+    } else if (source.type === "ARRAY") {
+      result.items = convert(source.items as Record<string, unknown>);
+    }
+    return result;
+  };
+  return convert(responseSchemas[type] as unknown as Record<string, unknown>);
+}
+
+export function normalizeOutput(type: AiType, value: unknown): unknown {
+  if (!record(value)) return value;
+  if (type === "recommend") {
+    const output = { ...value };
+    if (!Array.isArray(output.stages)) return output;
+    let end = 0;
+    output.stages = output.stages.map((stage: unknown, index: number) => {
+      if (!record(stage)) return stage;
+      const next = { ...stage };
+      if (typeof next.start_s === "number" && Number.isFinite(next.start_s)) {
+        const rounded = Math.round(next.start_s);
+        next.start_s = index === 0 ? rounded : Math.max(rounded, end);
+      }
+      if (typeof next.duration_s === "number" && Number.isFinite(next.duration_s)) next.duration_s = Math.round(next.duration_s);
+      if (typeof next.start_s === "number" && typeof next.duration_s === "number") end = next.start_s + next.duration_s;
+      return next;
+    });
+    if (typeof output.dose_g === "number" && typeof output.ratio === "number" &&
+      Number.isFinite(output.dose_g) && Number.isFinite(output.ratio) && output.stages.length) {
+      const last = output.stages[output.stages.length - 1];
+      const total = Math.round(output.dose_g * output.ratio * 10) / 10;
+      if (record(last) && (output.stages.length === 1 ||
+        (record(output.stages[output.stages.length - 2]) &&
+          typeof output.stages[output.stages.length - 2].water_cum_g === "number" &&
+          output.stages[output.stages.length - 2].water_cum_g < total))) {
+        output.stages[output.stages.length - 1] = { ...last, water_cum_g: total };
+      }
+    }
+    return output;
+  }
+  if (type !== "diagnose") return value;
+  const output = { ...value };
+  for (const key of ["diagnosis", "note"]) if (typeof output[key] === "string") output[key] = output[key].trim();
+  if (Array.isArray(output.likely_causes)) output.likely_causes = output.likely_causes.slice(0, 5).map((item: unknown) => typeof item === "string" ? item.trim() : item);
+  if (Array.isArray(output.suggestions)) output.suggestions = output.suggestions.slice(0, 2).map((item: unknown) => {
+    if (!record(item)) return item;
+    const next = { ...item };
+    if (typeof next.reason === "string") next.reason = next.reason.trim();
+    for (const key of ["from", "to"]) if (next.variable !== "grind" && typeof next[key] === "string" &&
+      /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(next[key].trim())) {
+      const converted = Number(next[key]);
+      if (Number.isFinite(converted)) next[key] = converted;
+    }
+    return next;
+  });
+  return output;
+}
+
 const record = (value: unknown): value is Row => value !== null && typeof value === "object" && !Array.isArray(value);
 const only = (value: Row, keys: string[]) => Object.keys(value).every((key) => keys.includes(key));
 const number = (value: unknown, min: number, max: number): value is number => typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
@@ -124,12 +224,12 @@ export function validateInput(value: unknown): AiInput | null {
   return { type, payload: clean };
 }
 
-export function validateOutput(type: AiType, value: unknown, pouringCount?: number): Row | null {
+export function validateOutput(type: AiType, value: unknown, _pouringCount?: number): Row | null {
   if (!record(value)) return null;
   if (type === "recommend") {
-    if (!only(value, ["dose_g", "ratio", "water_temp_c", "grind", "stages", "note"]) ||
+    if (!only(value, ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages", "note"]) ||
       !number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) || !integer(value.water_temp_c, 80, 100) || !choice(value.grind, grinds) ||
-      !text(value.note) || !Array.isArray(value.stages) || !integer(pouringCount, 1, 5) || value.stages.length !== pouringCount) return null;
+      !text(value.note) || !Array.isArray(value.stages) || !integer(value.pouring_count, 1, 5) || value.stages.length !== value.pouring_count) return null;
     let end = 0;
     let water = 0;
     for (let i = 0; i < value.stages.length; i++) {

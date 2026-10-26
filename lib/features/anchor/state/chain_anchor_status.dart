@@ -85,8 +85,9 @@ class ChainAnchorController extends AsyncNotifier<ChainAnchorStatus> {
     try {
       final repo = await ref.read(chainAnchorRepositoryProvider.future);
       final retryAfter = await repo.retryAfter(userId);
-      if (retryAfter != null && retryAfter.isAfter(DateTime.now().toUtc()))
+      if (retryAfter != null && retryAfter.isAfter(DateTime.now().toUtc())) {
         return;
+      }
       final result = await ref.read(anchorClientProvider).requestAnchor(userId);
       if (!_currentUser(userId) ||
           (await ref.read(sessionStorageProvider).readSession())?.userId !=

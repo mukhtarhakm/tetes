@@ -17,6 +17,7 @@ import 'package:tetes/data/secure/session_storage.dart';
 import 'package:tetes/features/auth/state/auth_providers.dart';
 import 'package:tetes/features/auth/state/session_controller.dart';
 import 'package:tetes/features/beans/bean_model.dart';
+import 'package:tetes/features/brew/ai_brew.dart';
 import 'package:tetes/features/brew/state/ai_client_provider.dart';
 import 'package:tetes/features/brew/state/brew_setup_controller.dart';
 
@@ -32,6 +33,40 @@ void main() {
     expect(cooldown.active, isTrue);
     expect(seconds, 30);
   });
+
+  test(
+    'jumlah pouring AI diterapkan dan Kembalikan memulihkan rencana',
+    () async {
+      final suggestion = Map<String, dynamic>.of(_recommendation);
+      suggestion['pouring_count'] = 2;
+      suggestion['stages'] = [
+        {'name': 'bloom', 'start_s': 0, 'duration_s': 40, 'water_cum_g': 45},
+        {
+          'name': 'pouring_2',
+          'start_s': 40,
+          'duration_s': 60,
+          'water_cum_g': 240,
+        },
+      ];
+      final harness = await _harness(
+        MockClient((_) async => http.Response(jsonEncode(suggestion), 200)),
+      );
+      addTearDown(harness.dispose);
+      final provider = brewSetupControllerProvider(harness.beanId);
+      final before = harness.container.read(provider).requireValue.plan!;
+
+      await harness.controller.recommend(isScreenCurrent: () => true);
+      final applied = harness.container.read(provider).requireValue;
+      expect(applied.plan!.pouringCount, 2);
+      expect(applied.aiSuggestion!.highlights(AiPlanField.pouring), isTrue);
+      expect(applied.aiSuggestion!.changes.last.label, 'Pouring');
+
+      harness.controller.restoreBeforeAi();
+      final restored = harness.container.read(provider).requireValue;
+      expect(identical(restored.plan, before), isTrue);
+      expect(restored.aiSuggestion, isNull);
+    },
+  );
 
   test('respons AI terlambat tidak menimpa perubahan form', () async {
     final response = Completer<http.Response>();
@@ -158,6 +193,7 @@ const _recommendation = {
   'ratio': 16,
   'water_temp_c': 95,
   'grind': 'sedang',
+  'pouring_count': 3,
   'stages': [
     {'name': 'bloom', 'start_s': 0, 'duration_s': 40, 'water_cum_g': 45},
     {'name': 'pouring_2', 'start_s': 40, 'duration_s': 30, 'water_cum_g': 143},

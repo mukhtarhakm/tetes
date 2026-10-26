@@ -12,7 +12,6 @@ void main() {
   test('rekomendasi valid menjadi rencana lokal', () {
     final advice = AiBrew.recommendationFromResponse(
       fallback: defaultPlan,
-      requestedPouringCount: 3,
       response: _recommendation(),
     );
     expect(advice.usedFallback, isFalse);
@@ -27,7 +26,6 @@ void main() {
       (gap['stages'] as List<Map<String, dynamic>>)[1]['start_s'] = 41;
       final result = AiBrew.recommendationFromResponse(
         fallback: defaultPlan,
-        requestedPouringCount: 3,
         response: gap,
       );
       expect(result.usedFallback, isTrue);
@@ -40,7 +38,6 @@ void main() {
       expect(
         AiBrew.recommendationFromResponse(
           fallback: defaultPlan,
-          requestedPouringCount: 3,
           response: offTotal,
         ).usedFallback,
         isTrue,
@@ -48,24 +45,23 @@ void main() {
     },
   );
 
-  test('jumlah tahap dibandingkan permintaan, bukan rencana fallback', () {
+  test('jumlah tahap mengikuti pouring_count keluaran', () {
     final oneStage = {
       ..._recommendation(),
+      'pouring_count': 1,
       'stages': [
         {'name': 'bloom', 'start_s': 0, 'duration_s': 40, 'water_cum_g': 240},
       ],
     };
     final accepted = AiBrew.recommendationFromResponse(
       fallback: defaultPlan,
-      requestedPouringCount: 1,
       response: oneStage,
     );
     expect(accepted.usedFallback, isFalse);
     expect(accepted.plan.pouringCount, 1);
     final rejected = AiBrew.recommendationFromResponse(
       fallback: defaultPlan,
-      requestedPouringCount: 3,
-      response: oneStage,
+      response: {...oneStage, 'pouring_count': 3},
     );
     expect(rejected.usedFallback, isTrue);
   });
@@ -153,6 +149,7 @@ Map<String, dynamic> _recommendation() => {
   'ratio': 16,
   'water_temp_c': 92,
   'grind': 'sedang',
+  'pouring_count': 3,
   'stages': <Map<String, dynamic>>[
     {'name': 'bloom', 'start_s': 0, 'duration_s': 40, 'water_cum_g': 45},
     {'name': 'pouring_2', 'start_s': 40, 'duration_s': 30, 'water_cum_g': 143},

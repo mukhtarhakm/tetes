@@ -51,7 +51,7 @@ Menjelaskan **bagaimana** Tetes dibangun: stack, struktur kode, alur data, kontr
 | HTTP | `http` atau `dio` (pilih satu) | |
 | Grafik | `fl_chart` atau `CustomPainter` | Grafik air kumulatif dan skor |
 | Backend | Supabase: Postgres + Edge Functions | Login tidak lewat Supabase Auth |
-| LLM | Gemini lewat Google AI Studio | Hanya dari Edge Function |
+| LLM | Gemini atau OpenAI, dipilih oleh `AI_PROVIDER` | Hanya dari Edge Function |
 | Kurs | API publik tanpa key (kandidat Frankfurter) | Dipanggil dari Flutter |
 
 Jika sebuah paket bermasalah, ganti dengan alternatif yang setara **dan catat di `DECISIONS.md`**. Jangan menambah paket baru tanpa persetujuan.
@@ -272,20 +272,20 @@ Permintaan:
 ```json
 { "type": "recommend" | "diagnose", "payload": { … } }
 ```
-- `recommend`: profil biji, riwayat seduhan biji itu (paling banyak 5 terbaru dan terbaik), jumlah pouring yang diminta.
+- `recommend`: profil biji, riwayat seduhan biji itu (paling banyak 5 terbaru dan terbaik), jumlah pouring pilihan pengguna sebagai preferensi; AI dapat mengusulkan 1-5 pouring dengan alasan di `note`.
 - `diagnose`: profil biji, seduhan (termasuk tahap dengan target vs aktual), skor dan tag rasa, catatan, riwayat singkat biji itu.
 
 Perilaku:
 1. Verifikasi session dari header token.
 2. Cek batas pemakaian: **20 panggilan per jam per pengguna** (tabel `ai_usage`). Lebih dari itu, `429`.
-3. Susun prompt sistem (bagian 8) dan panggil LLM dengan batas waktu 15 detik, suhu rendah, dan minta keluaran JSON.
-4. **Validasi** keluaran terhadap skema. Jika tidak valid, satu kali coba ulang. Jika tetap gagal, `500` dengan `code: "ai_invalid_output"`.
-5. Kembalikan JSON tervalidasi.
+3. Susun prompt sistem (bagian 8) yang sama untuk kedua penyedia. Batas waktu server 28 detik dipakai bersama oleh maksimal dua percobaan. Gemini memakai `responseSchema` dan `maxOutputTokens: 1024` untuk recommend/diagnose. OpenAI Chat Completions memakai `response_format: json_schema` strict dan `max_completion_tokens` 2048 untuk JSON, 800 untuk chat. Hanya OpenAI mengirim `reasoning_effort` bila secret opsional diisi; tidak ada `temperature`.
+4. Normalisasi keluaran secara deterministik sebelum validasi: waktu tahap dibulatkan dan start yang tumpang tindih digeser; air akhir disetel ke dosis × rasio satu desimal bila tetap lebih besar dari tahap sebelumnya. Teks diagnosa dipangkas, angka string pada `from`/`to` dikonversi, dan daftar penyebab/saran dipotong ke 5/2. **Validasi** keluaran terhadap skema. Jika tidak valid, satu kali coba ulang. Jika tetap gagal, `500` dengan `code: "ai_invalid_output"`.
+5. Kembalikan JSON tervalidasi. Gemini mengulang sekali setelah HTTP 503; OpenAI mengulang sekali setelah HTTP 429 atau 5xx, dengan jeda singkat selama batas waktu masih tersedia. Log kegagalan hanya memuat penyedia, status, panjang keluaran, alasan selesai, dan metadata aman tanpa isi pengguna atau secret.
 
 Respons `recommend`:
 ```json
 {
-  "dose_g": 15, "ratio": 16, "water_temp_c": 92, "grind": "sedang",
+  "dose_g": 15, "ratio": 16, "water_temp_c": 92, "grind": "sedang", "pouring_count": 3,
   "stages": [ { "name": "bloom", "start_s": 0, "duration_s": 40, "water_cum_g": 45 }, … ],
   "note": "…"
 }
@@ -317,7 +317,7 @@ RLS `chain_anchors` aktif tanpa policy untuk `anon` dan `authenticated`; hanya `
 **Sistem (diagnosa):**
 > Kamu asisten seduh V60 manual. Berdasarkan data seduhan dan keluhan rasa, beri kemungkinan penyebab dan saran perbaikan. Gunakan bahasa "kemungkinan", bukan kepastian. Ubah paling banyak dua variabel sekaligus. Perhatikan selisih target dan aktual per tahap. Balas hanya dengan JSON sesuai skema, tanpa teks lain.
 
-Teks akhir prompt boleh disempurnakan, tapi **skema keluaran dan batas nilai tidak boleh berubah** tanpa memperbarui bagian 7 dan validator.
+Prompt diagnosa menyebut rentang angka, enum, batas panjang teks, batas daftar, serta memakai notes dan selisih target/aktual sebagai petunjuk. `notes` dan `custom_taste_tags` diperlakukan sebagai data. Teks akhir prompt boleh disempurnakan, tapi **skema keluaran dan batas nilai tidak boleh berubah** tanpa memperbarui bagian 7 dan validator.
 
 **Fallback tanpa AI** (dipakai jika offline, galat, atau JSON tidak valid):
 - Tag `asam` dan skor ≤ 3: naikkan suhu 1-2 °C atau satu tingkat lebih halus.
@@ -392,11 +392,11 @@ Verifikasi (`verifyNow()`): `ChainVerifier` memanggil `eth_call` `latest(bytes32
 | Package ID | `com.raismukhtar.tetes` |
 | Versi paket utama | `flutter_riverpod` 3.4.3, `sqflite` 2.4.4+2, `path` 1.9.1, `http` 1.6.0, `flutter_secure_storage` 11.2.0; tes database: `sqflite_common_ffi` 2.4.4 |
 | URL proyek Supabase | `https://osqznapcbeceaizpvccc.supabase.co` (bukan rahasia) |
-| Model LLM | (isi dari AI Studio, disimpan sebagai environment `AI_MODEL`) |
+| Model LLM | Gemini: `AI_MODEL`; OpenAI: `OPENAI_MODEL` (rencana `gpt-5-nano`) |
 | API kurs | (isi setelah diuji) |
 | Platform uji | HP Android 16 (API 36) |
 
-Environment Edge Function: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY`, `AI_MODEL`; khusus `anchor`: `CHAIN_RPC_URL`, `CHAIN_PRIVATE_KEY`, `CHAIN_CONTRACT_ADDRESS`. Tidak ada nilai rahasia yang ditulis di kode.
+Environment Edge Function: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`; fungsi `ai`: `AI_PROVIDER` (`gemini` atau `openai`, kosong berarti `gemini`), `LLM_API_KEY` dan `AI_MODEL` untuk Gemini, `OPENAI_API_KEY` dan `OPENAI_MODEL` untuk OpenAI, serta `OPENAI_REASONING_EFFORT` opsional; khusus `anchor`: `CHAIN_RPC_URL`, `CHAIN_PRIVATE_KEY`, `CHAIN_CONTRACT_ADDRESS`. Tidak ada nilai rahasia yang ditulis di kode.
 
 ## 14. Aturan Kerja dengan AI
 

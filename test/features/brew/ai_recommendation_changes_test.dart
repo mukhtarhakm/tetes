@@ -44,7 +44,7 @@ void main() {
       AiPlanField.pouring,
     ]);
     expect(changes.first.before, isNot(changes.first.after));
-    expect(changes.last.label, 'Jumlah pouring');
+    expect(changes.last.label, 'Pouring');
   });
 
   test('rencana yang sama menghasilkan daftar perubahan kosong', () {

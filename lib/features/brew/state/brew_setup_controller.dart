@@ -314,7 +314,6 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
       }
       final recommendation = AiBrew.recommendationFromResponse(
         fallback: fallback,
-        requestedPouringCount: plan.pouringCount,
         response: response,
       );
       finish(
