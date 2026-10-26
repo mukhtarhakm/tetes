@@ -11,20 +11,24 @@ abstract final class CurrencyCalculator {
       normalized = value;
     } else {
       final parts = value.split(separator);
-      final grouped = parts.length > 2 &&
-          parts.skip(1).every((part) => part.length == 3);
-      if (parts.length > 2 && !grouped &&
+      final grouped =
+          parts.length > 2 && parts.skip(1).every((part) => part.length == 3);
+      if (parts.length > 2 &&
+          !grouped &&
           !value.contains(separator == ',' ? '.' : ',')) {
         return null;
       }
-      final singleThousands = parts.length == 2 &&
+      final singleThousands =
+          parts.length == 2 &&
           parts.last.length == 3 &&
           parts.first != '0' &&
           !value.contains(separator == ',' ? '.' : ',');
       if (grouped || singleThousands) {
         normalized = value.replaceAll(separator, '');
       } else {
-        final whole = value.substring(0, position).replaceAll(RegExp(r'[.,]'), '');
+        final whole = value
+            .substring(0, position)
+            .replaceAll(RegExp(r'[.,]'), '');
         final fraction = value.substring(position + 1);
         if (fraction.isEmpty || fraction.contains(RegExp(r'[.,]'))) return null;
         normalized = '$whole.$fraction';
@@ -39,9 +43,12 @@ abstract final class CurrencyCalculator {
     required double fromIdrRate,
     required double toIdrRate,
   }) {
-    if (!amount.isFinite || amount <= 0 ||
-        !fromIdrRate.isFinite || fromIdrRate <= 0 ||
-        !toIdrRate.isFinite || toIdrRate <= 0) {
+    if (!amount.isFinite ||
+        amount <= 0 ||
+        !fromIdrRate.isFinite ||
+        fromIdrRate <= 0 ||
+        !toIdrRate.isFinite ||
+        toIdrRate <= 0) {
       throw ArgumentError('Nilai kurs atau jumlah tidak valid.');
     }
     return amount * fromIdrRate / toIdrRate;

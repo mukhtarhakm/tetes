@@ -15,10 +15,9 @@ abstract final class StoreDistance {
     final latB = latitudeB * math.pi / 180;
     final latDelta = (latitudeB - latitudeA) * math.pi / 180;
     final lonDelta = (longitudeB - longitudeA) * math.pi / 180;
-    final a = math.pow(math.sin(latDelta / 2), 2) +
-        math.cos(latA) *
-            math.cos(latB) *
-            math.pow(math.sin(lonDelta / 2), 2);
+    final a =
+        math.pow(math.sin(latDelta / 2), 2) +
+        math.cos(latA) * math.cos(latB) * math.pow(math.sin(lonDelta / 2), 2);
     return 2 * earthRadiusMeters * math.asin(math.sqrt(a.clamp(0, 1)));
   }
 
@@ -29,17 +28,12 @@ abstract final class StoreDistance {
   }) {
     final items = stores.toList();
     if (latitude == null || longitude == null) return items;
-    items.sort((a, b) => haversineMeters(
-          latitude,
-          longitude,
-          a.latitude,
-          a.longitude,
-        ).compareTo(haversineMeters(
-          latitude,
-          longitude,
-          b.latitude,
-          b.longitude,
-        )));
+    items.sort(
+      (a, b) => haversineMeters(latitude, longitude, a.latitude, a.longitude)
+          .compareTo(
+            haversineMeters(latitude, longitude, b.latitude, b.longitude),
+          ),
+    );
     return items;
   }
 

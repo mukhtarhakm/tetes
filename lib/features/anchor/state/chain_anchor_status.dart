@@ -19,7 +19,9 @@ class ChainAnchorStatus {
 }
 
 final anchorClientProvider = Provider<AnchorClient>((ref) {
-  final client = AnchorClient(sessionStorage: ref.watch(sessionStorageProvider));
+  final client = AnchorClient(
+    sessionStorage: ref.watch(sessionStorageProvider),
+  );
   ref.onDispose(client.close);
   return client;
 });
@@ -56,9 +58,16 @@ class ChainAnchorController extends AsyncNotifier<ChainAnchorStatus> {
       );
     }
     final database = await ref.watch(databaseProvider.future);
-    final brews = await database.query('brews', columns: ['seq'],
-      where: 'user_id = ?', whereArgs: [userId], limit: 1);
-    return ChainAnchorStatus(brews.isEmpty ? ChainAnchorPhase.noBrews : ChainAnchorPhase.unanchored);
+    final brews = await database.query(
+      'brews',
+      columns: ['seq'],
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    return ChainAnchorStatus(
+      brews.isEmpty ? ChainAnchorPhase.noBrews : ChainAnchorPhase.unanchored,
+    );
   }
 
   Future<void> requestAfterPush(String userId) => _request(userId);
@@ -76,7 +85,8 @@ class ChainAnchorController extends AsyncNotifier<ChainAnchorStatus> {
     try {
       final repo = await ref.read(chainAnchorRepositoryProvider.future);
       final retryAfter = await repo.retryAfter(userId);
-      if (retryAfter != null && retryAfter.isAfter(DateTime.now().toUtc())) return;
+      if (retryAfter != null && retryAfter.isAfter(DateTime.now().toUtc()))
+        return;
       final result = await ref.read(anchorClientProvider).requestAnchor(userId);
       if (!_currentUser(userId) ||
           (await ref.read(sessionStorageProvider).readSession())?.userId !=
@@ -85,31 +95,61 @@ class ChainAnchorController extends AsyncNotifier<ChainAnchorStatus> {
       }
       switch (result) {
         case Confirmed():
-          await repo.save(userId: userId, seq: result.seq, status: 'confirmed',
-            headHash: result.headHash, userKey: result.userKey,
-            txHash: result.txHash, explorerUrl: result.explorerUrl);
-          state = AsyncData(ChainAnchorStatus(ChainAnchorPhase.confirmed,
-            anchor: await repo.latest(userId)));
+          await repo.save(
+            userId: userId,
+            seq: result.seq,
+            status: 'confirmed',
+            headHash: result.headHash,
+            userKey: result.userKey,
+            txHash: result.txHash,
+            explorerUrl: result.explorerUrl,
+          );
+          state = AsyncData(
+            ChainAnchorStatus(
+              ChainAnchorPhase.confirmed,
+              anchor: await repo.latest(userId),
+            ),
+          );
         case Pending():
-          await repo.save(userId: userId, seq: result.seq, status: 'pending',
-            txHash: result.txHash);
-          state = AsyncData(ChainAnchorStatus(ChainAnchorPhase.pending,
-            anchor: await repo.latest(userId)));
+          await repo.save(
+            userId: userId,
+            seq: result.seq,
+            status: 'pending',
+            txHash: result.txHash,
+          );
+          state = AsyncData(
+            ChainAnchorStatus(
+              ChainAnchorPhase.pending,
+              anchor: await repo.latest(userId),
+            ),
+          );
         case NothingToAnchor():
           state = const AsyncData(ChainAnchorStatus(ChainAnchorPhase.noBrews));
         case RateLimited():
-          await repo.setRetryAfter(userId, DateTime.now().toUtc().add(result.retryAfter));
+          await repo.setRetryAfter(
+            userId,
+            DateTime.now().toUtc().add(result.retryAfter),
+          );
         case Unauthorized():
-          state = const AsyncData(ChainAnchorStatus(ChainAnchorPhase.failed,
-            message: 'Sesi tidak sah. Masuk kembali.'));
+          state = const AsyncData(
+            ChainAnchorStatus(
+              ChainAnchorPhase.failed,
+              message: 'Sesi tidak sah. Masuk kembali.',
+            ),
+          );
         case Failed():
-          state = AsyncData(ChainAnchorStatus(ChainAnchorPhase.failed,
-            message: result.message));
+          state = AsyncData(
+            ChainAnchorStatus(ChainAnchorPhase.failed, message: result.message),
+          );
       }
     } catch (_) {
       if (_currentUser(userId)) {
-        state = const AsyncData(ChainAnchorStatus(ChainAnchorPhase.failed,
-          message: 'Pencatatan jangkar gagal. Coba lagi nanti.'));
+        state = const AsyncData(
+          ChainAnchorStatus(
+            ChainAnchorPhase.failed,
+            message: 'Pencatatan jangkar gagal. Coba lagi nanti.',
+          ),
+        );
       }
     } finally {
       _requestRunning = false;
@@ -122,7 +162,9 @@ class ChainAnchorController extends AsyncNotifier<ChainAnchorStatus> {
     final repo = await ref.read(chainAnchorRepositoryProvider.future);
     final anchor = await repo.latest(userId);
     if (anchor?.userKey == null) {
-      return const Unreachable('Kunci jangkar belum tersedia di perangkat ini.');
+      return const Unreachable(
+        'Kunci jangkar belum tersedia di perangkat ini.',
+      );
     }
     final verifier = ref.read(chainVerifierProvider);
     final chain = await verifier.readLatest(anchor!.userKey!);
@@ -146,12 +188,17 @@ class ChainAnchorController extends AsyncNotifier<ChainAnchorStatus> {
     };
     if (value != null) {
       await repo.saveVerification(userId, anchor.seq, value);
-      state = AsyncData(ChainAnchorStatus(ChainAnchorPhase.confirmed,
-        anchor: await repo.latest(userId)));
+      state = AsyncData(
+        ChainAnchorStatus(
+          ChainAnchorPhase.confirmed,
+          anchor: await repo.latest(userId),
+        ),
+      );
     }
     return result;
   }
 
-  bool _currentUser(String userId) => ref.mounted &&
+  bool _currentUser(String userId) =>
+      ref.mounted &&
       ref.read(sessionControllerProvider).asData?.value.userId == userId;
 }

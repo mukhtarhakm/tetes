@@ -35,9 +35,9 @@ class ScoreChart extends StatelessWidget {
         child: Center(
           child: Text(
             'Belum cukup data untuk grafik',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.inkSoft,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
           ),
         ),
       );
@@ -79,16 +79,18 @@ class ScoreChart extends StatelessWidget {
                 interval: ScoreChartTokens.gridIntervalX,
                 getTitlesWidget: (val, meta) {
                   final intVal = val.toInt();
-                  if (val != intVal.toDouble() || intVal < 1 || intVal > scores.length) {
+                  if (val != intVal.toDouble() ||
+                      intVal < 1 ||
+                      intVal > scores.length) {
                     return const SizedBox.shrink();
                   }
                   return Padding(
                     padding: const EdgeInsets.only(top: AppSpacing.s4),
                     child: Text(
                       '#$intVal',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.inkSoft,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
                     ),
                   );
                 },
@@ -106,9 +108,9 @@ class ScoreChart extends StatelessWidget {
                   }
                   return Text(
                     '$intVal',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.inkSoft,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
                   );
                 },
               ),

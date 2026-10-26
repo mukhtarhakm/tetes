@@ -121,12 +121,14 @@ class _BeanDetailContent extends ConsumerWidget {
               const SizedBox(height: AppSpacing.s4),
               Text(
                 'Tren skor rasa dari seduhan aktif biji ini.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.inkSoft,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
               ),
               const SizedBox(height: AppSpacing.s16),
-              ref.watch(beanActiveBrewsProvider(bean.id)).when(
+              ref
+                  .watch(beanActiveBrewsProvider(bean.id))
+                  .when(
                     data: (brews) {
                       final scores = brews.map((b) => b.tasteScore).toList();
                       return ScoreChart(scores: scores);
@@ -213,7 +215,6 @@ class _BeanDetailContent extends ConsumerWidget {
     }
   }
 }
-
 
 bool _hasPrice(Bean bean) =>
     bean.priceOriginal != null || bean.priceIdrPerKg != null;
@@ -769,7 +770,10 @@ class _HistoryRow extends StatelessWidget {
                     color: badgeColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Text('${item.tasteScore}', style: textTheme.titleMedium),
+                  child: Text(
+                    '${item.tasteScore}',
+                    style: textTheme.titleMedium,
+                  ),
                 ),
                 const SizedBox(width: AppSpacing.s16),
                 Expanded(

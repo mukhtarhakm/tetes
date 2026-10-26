@@ -192,8 +192,10 @@ class AuthClient implements SessionRevocationClient {
     }
   }
 
-  Future<AuthSession> loginBiometric(BiometricCredential stored,
-      {String? expectedUserId}) async {
+  Future<AuthSession> loginBiometric(
+    BiometricCredential stored, {
+    String? expectedUserId,
+  }) async {
     _checkConfiguration();
     final row = await _fetchUserRow(stored.username);
     if (row == null) {

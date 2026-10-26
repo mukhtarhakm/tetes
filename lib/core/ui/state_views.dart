@@ -120,9 +120,7 @@ class _StateView extends StatelessWidget {
           const SizedBox(height: AppSpacing.s8),
           Text(
             message,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: isDark ? AppColors.onDark : AppColors.inkSoft,
             ),
             textAlign: TextAlign.center,

@@ -439,7 +439,10 @@ class SyncService {
     }
     final custom = value['custom_taste_tags'] as List;
     if (custom.any((tag) => tag is! String)) {
-      throw const SyncException(SyncFailure.server, 'Data dari server tidak lolos verifikasi.');
+      throw const SyncException(
+        SyncFailure.server,
+        'Data dari server tidak lolos verifikasi.',
+      );
     }
     try {
       if (normalizeCustomTasteTags(custom.cast<String>()).join('\u0000') !=
@@ -447,7 +450,10 @@ class SyncService {
         throw const FormatException();
       }
     } on FormatException {
-      throw const SyncException(SyncFailure.server, 'Data dari server tidak lolos verifikasi.');
+      throw const SyncException(
+        SyncFailure.server,
+        'Data dari server tidak lolos verifikasi.',
+      );
     }
     row['custom_taste_tags'] = jsonEncode(custom);
     return row;

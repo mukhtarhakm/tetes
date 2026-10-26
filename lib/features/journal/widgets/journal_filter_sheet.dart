@@ -117,15 +117,17 @@ class _JournalFilterSheetState extends ConsumerState<JournalFilterSheet> {
                         spacing: AppSpacing.s8,
                         runSpacing: AppSpacing.s8,
                         children: beans.map((bean) {
-                          final selected =
-                              _draft.selectedBeanIds.contains(bean.id);
+                          final selected = _draft.selectedBeanIds.contains(
+                            bean.id,
+                          );
                           return AppChip(
                             label: bean.name,
                             selected: selected,
                             onSelected: (val) {
                               setState(() {
-                                final current =
-                                    Set<String>.of(_draft.selectedBeanIds);
+                                final current = Set<String>.of(
+                                  _draft.selectedBeanIds,
+                                );
                                 if (val) {
                                   current.add(bean.id);
                                 } else {
@@ -178,29 +180,34 @@ class _JournalFilterSheetState extends ConsumerState<JournalFilterSheet> {
                   const SizedBox(height: AppSpacing.s20),
 
                   // Tag Rasa
-                  Text('Tag Rasa (memuat salah satu)',
-                      style: textTheme.labelLarge),
+                  Text(
+                    'Tag Rasa (memuat salah satu)',
+                    style: textTheme.labelLarge,
+                  ),
                   const SizedBox(height: AppSpacing.s8),
                   Wrap(
                     spacing: AppSpacing.s8,
                     runSpacing: AppSpacing.s8,
                     children: RoasteryNoteTag.values.map((tag) {
-                      final selected =
-                          _draft.selectedTasteTags.contains(tag.databaseValue);
+                      final selected = _draft.selectedTasteTags.contains(
+                        tag.databaseValue,
+                      );
                       return AppChip(
                         label: tag.label,
                         selected: selected,
                         onSelected: (val) {
                           setState(() {
-                            final current =
-                                Set<String>.of(_draft.selectedTasteTags);
+                            final current = Set<String>.of(
+                              _draft.selectedTasteTags,
+                            );
                             if (val) {
                               current.add(tag.databaseValue);
                             } else {
                               current.remove(tag.databaseValue);
                             }
-                            _draft =
-                                _draft.copyWith(selectedTasteTags: current);
+                            _draft = _draft.copyWith(
+                              selectedTasteTags: current,
+                            );
                           });
                         },
                       );
@@ -307,8 +314,8 @@ class _JournalFilterSheetState extends ConsumerState<JournalFilterSheet> {
       context: context,
       firstDate: DateTime(2020),
       lastDate: now.add(const Duration(days: 365)),
-      initialDateRange: _draft.customStartDate != null &&
-              _draft.customEndDate != null
+      initialDateRange:
+          _draft.customStartDate != null && _draft.customEndDate != null
           ? DateTimeRange(
               start: _draft.customStartDate!,
               end: _draft.customEndDate!,

@@ -70,7 +70,9 @@ class JournalFilterNotifier extends Notifier<JournalFilter> {
   }
 }
 
-(String? startUtc, String? endUtc) calculateUtcDateBounds(JournalFilter filter) {
+(String? startUtc, String? endUtc) calculateUtcDateBounds(
+  JournalFilter filter,
+) {
   final now = DateTime.now();
   switch (filter.dateRange) {
     case DateRangeOption.all:
@@ -141,7 +143,9 @@ final journalBrewsProvider = FutureProvider<List<BrewJournalItem>>((ref) async {
     searchQuery: filter.searchQuery,
     beanIds: filter.selectedBeanIds.isEmpty ? null : filter.selectedBeanIds,
     minTasteScore: filter.minScore,
-    tasteTags: filter.selectedTasteTags.isEmpty ? null : filter.selectedTasteTags,
+    tasteTags: filter.selectedTasteTags.isEmpty
+        ? null
+        : filter.selectedTasteTags,
     startBrewedAtUtc: startUtc,
     endBrewedAtUtc: endUtc,
     sortOption: filter.sortOption,
@@ -149,16 +153,18 @@ final journalBrewsProvider = FutureProvider<List<BrewJournalItem>>((ref) async {
   );
 });
 
-final brewDetailProvider =
-    FutureProvider.family<BrewDetailData?, String>((ref, brewId) async {
-      final session = await ref.watch(sessionControllerProvider.future);
-      final userId = session.userId;
-      if (session.status != SessionStatus.authenticated || userId == null) {
-        return null;
-      }
-      final repo = await ref.watch(brewRepositoryProvider.future);
-      return repo.findBrewDetail(userId: userId, brewId: brewId);
-    });
+final brewDetailProvider = FutureProvider.family<BrewDetailData?, String>((
+  ref,
+  brewId,
+) async {
+  final session = await ref.watch(sessionControllerProvider.future);
+  final userId = session.userId;
+  if (session.status != SessionStatus.authenticated || userId == null) {
+    return null;
+  }
+  final repo = await ref.watch(brewRepositoryProvider.future);
+  return repo.findBrewDetail(userId: userId, brewId: brewId);
+});
 
 class JournalSelectionState {
   const JournalSelectionState({
@@ -206,5 +212,5 @@ class JournalSelectionNotifier extends Notifier<JournalSelectionState> {
 
 final journalSelectionProvider =
     NotifierProvider<JournalSelectionNotifier, JournalSelectionState>(
-  JournalSelectionNotifier.new,
-);
+      JournalSelectionNotifier.new,
+    );

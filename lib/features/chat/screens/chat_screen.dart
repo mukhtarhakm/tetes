@@ -137,7 +137,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: [
           IconButton(
             tooltip: 'Mulai percakapan baru',
-            onPressed: chat.asData?.value.isSending == false &&
+            onPressed:
+                chat.asData?.value.isSending == false &&
                     chat.asData!.value.messages.isNotEmpty
                 ? _confirmNewConversation
                 : null,
@@ -200,8 +201,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               ActionChip(
                                 label: Text(text),
                                 onPressed:
-                                    state.isSending ||
-                                        state.remainingToday == 0
+                                    state.isSending || state.remainingToday == 0
                                     ? null
                                     : () => _send(text),
                               ),

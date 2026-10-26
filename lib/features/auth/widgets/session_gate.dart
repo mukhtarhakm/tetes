@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/navigation/app_shell.dart';
 import '../../../app/theme/tokens.dart';
 import '../../../core/ui/state_views.dart';
+import '../../../core/ui/tetes_splash.dart';
 import '../screens/login_screen.dart';
 import '../state/session_controller.dart';
 import 'post_auth_biometric_offer.dart';
@@ -16,8 +17,7 @@ class SessionGate extends ConsumerWidget {
     final session = ref.watch(sessionControllerProvider);
 
     return session.when(
-      loading: () =>
-          const Scaffold(body: LoadingView(message: 'Memeriksa sesi...')),
+      loading: () => const TetesSplash(),
       error: (_, _) => Scaffold(
         body: SafeArea(
           child: Padding(

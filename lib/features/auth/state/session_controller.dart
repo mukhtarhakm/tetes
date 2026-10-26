@@ -80,8 +80,11 @@ class SessionController extends AsyncNotifier<SessionState> {
 
   void markAuthenticated(String userId, {bool offerBiometric = false}) {
     state = AsyncData(
-      SessionState.authenticated(userId,
-          isFreshAuthentication: true, offerBiometric: offerBiometric),
+      SessionState.authenticated(
+        userId,
+        isFreshAuthentication: true,
+        offerBiometric: offerBiometric,
+      ),
     );
   }
 

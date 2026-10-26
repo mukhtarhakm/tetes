@@ -297,7 +297,9 @@ class _ChainAnchorCardState extends ConsumerState<ChainAnchorCard> {
           ..hideCurrentSnackBar()
           ..showSnackBar(
             const SnackBar(
-              content: Text('Jaringan Sepolia tidak terjangkau. Coba lagi nanti.'),
+              content: Text(
+                'Jaringan Sepolia tidak terjangkau. Coba lagi nanti.',
+              ),
             ),
           );
       }
@@ -317,7 +319,9 @@ class _ChainAnchorCardState extends ConsumerState<ChainAnchorCard> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Tautan Etherscan disalin. Tempel di browser untuk membukanya.'),
+          content: Text(
+            'Tautan Etherscan disalin. Tempel di browser untuk membukanya.',
+          ),
         ),
       );
   }

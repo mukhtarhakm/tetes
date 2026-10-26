@@ -194,9 +194,11 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
       builder: (_) => _CustomTasteTagDialog(existing: List.of(customTags)),
     );
     if (result != null && mounted) {
-      setState(() => customTags
-        ..clear()
-        ..addAll(result));
+      setState(
+        () => customTags
+          ..clear()
+          ..addAll(result),
+      );
     }
   }
 
@@ -365,7 +367,9 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                     child: Text(
                       '$value',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                       ),
                     ),
                   ),
@@ -570,26 +574,27 @@ class _ResultState extends ConsumerState<BrewResultScreen> {
                           spacing: AppSpacing.s8,
                           runSpacing: AppSpacing.s8,
                           children: [
-                            ...RoasteryNoteTag.values
-                              .map(
-                                (tag) => AppChip(
-                                  label: tag.label,
-                                  selected: tags.contains(tag),
-                                  onSelected: (selected) {
-                                    if (selected) {
-                                      tags.add(tag);
-                                    } else {
-                                      tags.remove(tag);
-                                    }
-                                    setState(() {});
-                                  },
-                                ),
-                              )
-                              ,
-                            ...customTags.map((tag) => CustomTasteChip(
-                              label: tag,
-                              onRemove: () => setState(() => customTags.remove(tag)),
-                            )),
+                            ...RoasteryNoteTag.values.map(
+                              (tag) => AppChip(
+                                label: tag.label,
+                                selected: tags.contains(tag),
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    tags.add(tag);
+                                  } else {
+                                    tags.remove(tag);
+                                  }
+                                  setState(() {});
+                                },
+                              ),
+                            ),
+                            ...customTags.map(
+                              (tag) => CustomTasteChip(
+                                label: tag,
+                                onRemove: () =>
+                                    setState(() => customTags.remove(tag)),
+                              ),
+                            ),
                             if (customTags.length < 3)
                               AddCustomTasteChip(onPressed: _addCustomTasteTag),
                           ],

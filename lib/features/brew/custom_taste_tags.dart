@@ -12,7 +12,9 @@ List<String> normalizeCustomTasteTags(Iterable<String> values) {
       throw const FormatException('Rasa lain maksimal 20 karakter.');
     }
     if (!RegExp(r'^[\p{L}\p{N} -]+$', unicode: true).hasMatch(tag)) {
-      throw const FormatException('Rasa lain hanya boleh berisi huruf, angka, spasi, dan tanda hubung.');
+      throw const FormatException(
+        'Rasa lain hanya boleh berisi huruf, angka, spasi, dan tanda hubung.',
+      );
     }
     if (RoasteryNoteTag.isBuiltIn(tag)) {
       throw const FormatException('Rasa ini sudah ada di pilihan bawaan.');

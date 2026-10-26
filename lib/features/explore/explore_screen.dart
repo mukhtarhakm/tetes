@@ -48,9 +48,9 @@ class ExploreScreen extends StatelessWidget {
           title: 'Toko Terdekat',
           description: 'Temukan roastery, toko biji, dan alat seduh.',
           icon: Icons.store_outlined,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const StoreScreen()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const StoreScreen())),
         ),
         const SizedBox(height: AppSpacing.s12),
         _MenuCard(

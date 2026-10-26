@@ -83,8 +83,10 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<bool> _submit(Future<String> Function() operation,
-      {bool offerBiometric = false}) async {
+  Future<bool> _submit(
+    Future<String> Function() operation, {
+    bool offerBiometric = false,
+  }) async {
     if (state.isLoading) {
       return false;
     }
@@ -92,7 +94,8 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthState(isLoading: true);
     try {
       final userId = await operation();
-      ref.read(sessionControllerProvider.notifier)
+      ref
+          .read(sessionControllerProvider.notifier)
           .markAuthenticated(userId, offerBiometric: offerBiometric);
       state = const AuthState();
       return true;

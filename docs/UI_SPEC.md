@@ -114,10 +114,10 @@ Deskripsi bentuk. Isi dan alur ada di spec fitur.
 
 | Layar | Pola |
 |---|---|
-| **Splash** | Latar `background`, nama "Tetes" besar di tengah |
+| **Splash** | Native: latar `background` dengan logo di tengah (Android 12+: ikon aplikasi di latar `background`). Flutter: `TetesSplash` dengan logo 104, nama, tagline, dan tiga titik berdenyut selama memeriksa sesi |
 | **Login / Register** | `TetesBrand` di atas, judul, isian bertumpuk, satu `AppButton` primary penuh lebar, tautan teks di bawah. Login menambah pembatas "atau" dan tombol sekunder "Masuk dengan sidik jari" bila perangkat dan akun mendukung |
 | **Beranda (tab)** | Tanggal kecil di atas sapaan dua baris dan status sinkron di sisi kanan; kartu putih berisi tombol Mulai seduh dan baris Seduh lagi hanya bila ada pengaturan; ringkasan Seduhan terakhir selebar layar di atas pasangan Stok menipis dan Event berikutnya; satu bagian Pintasan dengan enam kartu dua kolom. Layar fitur dibuka penuh tanpa bottom navigation |
-| **Daftar biji** | `AppCard` per biji, chip kecil untuk spesies dan sangrai, `StatusPill` untuk stok |
+| **Daftar biji** | Kolom cari pil (nama, roastery, asal), chip filter Semua/Stok menipis/Roasting sendiri, jumlah hasil, lalu `AppCard` per biji dengan chip spesies dan sangrai serta `StatusPill` stok |
 | **Form biji** | Isian bertumpuk; setiap kelompok `AppChip` memakai `Wrap` dengan jarak horizontal dan vertikal dari token `AppSpacing`, sehingga chip berpindah baris tanpa memotong teks; slider untuk persen arabika |
 | **Atur Seduh** | Isian angka besar, chip grind, daftar tahap sebagai kartu, `ScoreChart` atau grafik air di atas atau bawah kartu tahap, tombol "Mulai Sesi" di dasar layar |
 | **Sesi (layar gelap)** | `SegmentProgress` di atas, nama tahap dan target air, **timer `display`**, tombol putih besar "Tahap berikutnya" di bawah, tombol batal berupa teks |
@@ -126,6 +126,7 @@ Deskripsi bentuk. Isi dan alur ada di spec fitur.
 | **Detail seduhan** | Seperti Hasil, ditambah `StatusPill` integritas dan chip rasa buatan di samping tag bawaan |
 | **Bandingkan** | Dua kolom dalam satu kartu, baris yang berbeda memakai latar `primaryContainer` lembut |
 | **Pintasan fitur** | Agenda, Toko, Kurs, dan Game dibuka dari Beranda sebagai layar penuh, masing-masing mempertahankan isi fiturnya |
+| **Cek Harga Biji** | Kartu hitam (`FocusDarkTheme`): angka harga besar, chip mata uang dan isi kemasan, hasil rupiah besar warna `accent`, harga per gram dan per seduhan. Kartu putih "Dibanding biji kamu" dengan kalimat selisih persen dan batang per biji. Baris kecil kurs dan tanggal di bawah |
 | **Agenda event** | Kartu event dengan empat jam (WIB, WITA, WIT, London) sebagai baris kecil |
 | **Peta toko** | Peta penuh lebar, daftar di bottom sheet yang bisa ditarik, chip filter jenis toko |
 | **Game (layar gelap)** | Zona hijau `accent`, titik aliran putih, bar air `primary`, angka waktu `display` |

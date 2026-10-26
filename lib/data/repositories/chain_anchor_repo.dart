@@ -3,11 +3,16 @@ import 'package:sqflite/sqflite.dart';
 
 import '../db/database_provider.dart';
 
-final chainAnchorRepositoryProvider = FutureProvider<ChainAnchorRepository>((ref) async =>
-    ChainAnchorRepository(await ref.watch(databaseProvider.future)));
+final chainAnchorRepositoryProvider = FutureProvider<ChainAnchorRepository>(
+  (ref) async =>
+      ChainAnchorRepository(await ref.watch(databaseProvider.future)),
+);
 
-final clearChainAnchorsProvider = Provider<Future<void> Function(String)>((ref) =>
-    (userId) async => (await ref.read(chainAnchorRepositoryProvider.future)).clear(userId));
+final clearChainAnchorsProvider = Provider<Future<void> Function(String)>(
+  (ref) =>
+      (userId) async =>
+          (await ref.read(chainAnchorRepositoryProvider.future)).clear(userId),
+);
 
 class ChainAnchorRecord {
   const ChainAnchorRecord({
@@ -80,7 +85,9 @@ class ChainAnchorRepository {
       whereArgs: [userId, seq],
       limit: 1,
     );
-    final previous = existing.isEmpty ? null : ChainAnchorRecord.fromRow(existing.single);
+    final previous = existing.isEmpty
+        ? null
+        : ChainAnchorRecord.fromRow(existing.single);
     await _database.insert('chain_anchors', {
       'user_id': userId,
       'seq': seq,
@@ -127,13 +134,21 @@ class ChainAnchorRepository {
 
   Future<void> clear(String userId) async {
     await _database.transaction((txn) async {
-      await txn.delete('chain_anchors', where: 'user_id = ?', whereArgs: [userId]);
-      await txn.delete('chain_anchor_cooldowns', where: 'user_id = ?', whereArgs: [userId]);
+      await txn.delete(
+        'chain_anchors',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
+      await txn.delete(
+        'chain_anchor_cooldowns',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
     });
   }
 
   static String _now() => _format(DateTime.now());
 
-  static String _format(DateTime time) => time.toUtc().toIso8601String()
-      .replaceFirst(RegExp(r'\.\d+Z$'), 'Z');
+  static String _format(DateTime time) =>
+      time.toUtc().toIso8601String().replaceFirst(RegExp(r'\.\d+Z$'), 'Z');
 }

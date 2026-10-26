@@ -56,10 +56,7 @@ class SyncProfileCard extends StatelessWidget {
         variant: StatusPillVariant.pending,
       );
     } else if (error != null) {
-      pill = const StatusPill(
-        label: 'Galat',
-        variant: StatusPillVariant.error,
-      );
+      pill = const StatusPill(label: 'Galat', variant: StatusPillVariant.error);
     } else if (current == null) {
       pill = const StatusPill(
         label: 'Belum tersedia',

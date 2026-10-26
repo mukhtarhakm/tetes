@@ -69,7 +69,10 @@ class SettingsRow extends StatelessWidget {
           Container(
             width: AppSizes.settingsIconCircle,
             height: AppSizes.settingsIconCircle,
-            decoration: BoxDecoration(color: _tintColor, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: _tintColor,
+              shape: BoxShape.circle,
+            ),
             child: Icon(icon, color: AppColors.ink),
           ),
           const SizedBox(width: AppSpacing.s12),

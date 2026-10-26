@@ -58,7 +58,10 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<JournalSelectionState>(journalSelectionProvider, (previous, next) {
+    ref.listen<JournalSelectionState>(journalSelectionProvider, (
+      previous,
+      next,
+    ) {
       if (!next.isActive && (previous?.isActive ?? false)) {
         if (_bottomBarHeight != 0.0) {
           setState(() => _bottomBarHeight = 0.0);
@@ -72,10 +75,7 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
     final selectionState = ref.watch(journalSelectionProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Jurnal'),
-        centerTitle: false,
-      ),
+      appBar: AppBar(title: const Text('Jurnal'), centerTitle: false),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -182,8 +182,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                 children: [
                   Positioned.fill(
                     child: brewsAsync.when(
-                      loading: () =>
-                          const LoadingView(message: 'Memuat jurnal seduhan...'),
+                      loading: () => const LoadingView(
+                        message: 'Memuat jurnal seduhan...',
+                      ),
                       error: (_, _) => Padding(
                         padding: AppInsets.screen,
                         child: ErrorView(
@@ -202,11 +203,12 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                                     'Mulai seduh V60 pertamamu dan catat hasilnya di sini.',
                                 icon: Icons.coffee_rounded,
                                 actionLabel: 'Mulai seduh',
-                                onActionPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const BrewSetupScreen(),
-                                  ),
-                                ),
+                                onActionPressed: () =>
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const BrewSetupScreen(),
+                                      ),
+                                    ),
                               ),
                             );
                           }
@@ -220,7 +222,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                               actionLabel: 'Reset filter',
                               onActionPressed: () {
                                 _searchController.clear();
-                                ref.read(journalFilterProvider.notifier).reset();
+                                ref
+                                    .read(journalFilterProvider.notifier)
+                                    .reset();
                               },
                             ),
                           );
@@ -241,8 +245,9 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                               const SizedBox(height: AppSpacing.s12),
                           itemBuilder: (context, index) {
                             final item = brews[index];
-                            final isSelected =
-                                selectionState.isSelected(item.id);
+                            final isSelected = selectionState.isSelected(
+                              item.id,
+                            );
 
                             return JournalBrewCard(
                               item: item,
@@ -282,13 +287,11 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                       bottom: 0,
                       child: _BottomActionBar(
                         selectionCount: selectionState.selectedIds.length,
-                        onCancel: () => ref
-                            .read(journalSelectionProvider.notifier)
-                            .reset(),
+                        onCancel: () =>
+                            ref.read(journalSelectionProvider.notifier).reset(),
                         onCompare: selectionState.selectedIds.length == 2
                             ? () {
-                                final ids =
-                                    selectionState.selectedIds.toList();
+                                final ids = selectionState.selectedIds.toList();
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => BrewCompareScreen(
@@ -369,9 +372,7 @@ class _BottomActionBarState extends State<_BottomActionBar> {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(
-          top: BorderSide(color: AppColors.divider),
-        ),
+        border: Border(top: BorderSide(color: AppColors.divider)),
         boxShadow: [
           BoxShadow(
             color: AppColors.shadow,

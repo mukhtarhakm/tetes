@@ -432,8 +432,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
     }
     await Navigator.of(context).pushReplacement<void, void>(
       MaterialPageRoute(
-        builder: (_) =>
-            BrewResultScreen(result: _controller!.result!),
+        builder: (_) => BrewResultScreen(result: _controller!.result!),
       ),
     );
   }

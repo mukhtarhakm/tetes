@@ -8,7 +8,10 @@ class StoreRepository {
   final Database _database;
 
   Future<List<StoreItem>> list() async {
-    final rows = await _database.query('stores', orderBy: 'name COLLATE NOCASE');
+    final rows = await _database.query(
+      'stores',
+      orderBy: 'name COLLATE NOCASE',
+    );
     return rows.map(StoreItem.fromMap).toList(growable: false);
   }
 }

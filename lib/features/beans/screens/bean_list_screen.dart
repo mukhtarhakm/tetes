@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_chip.dart';
+import '../../../core/ui/app_text_field.dart';
 import '../../../core/ui/rating_stars.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
@@ -13,11 +14,90 @@ import '../state/bean_providers.dart';
 import 'bean_detail_screen.dart';
 import 'bean_form_screen.dart';
 
-class BeanListScreen extends ConsumerWidget {
+enum _BeanFilter { all, lowStock, selfRoasted }
+
+class BeanListScreen extends ConsumerStatefulWidget {
   const BeanListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BeanListScreen> createState() => _BeanListScreenState();
+}
+
+class _BeanListScreenState extends ConsumerState<BeanListScreen> {
+  final _search = TextEditingController();
+  String _query = '';
+  _BeanFilter _filter = _BeanFilter.all;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<Bean> _visible(List<Bean> items) {
+    final query = _query.trim().toLowerCase();
+    return items.where((bean) {
+      final matchesFilter = switch (_filter) {
+        _BeanFilter.all => true,
+        _BeanFilter.lowStock => bean.isLowStock || bean.remainingStockG <= 0,
+        _BeanFilter.selfRoasted => bean.isSelfRoasted,
+      };
+      if (!matchesFilter) return false;
+      if (query.isEmpty) return true;
+      return [
+        bean.name,
+        bean.roastery,
+        bean.origin,
+      ].whereType<String>().any((text) => text.toLowerCase().contains(query));
+    }).toList();
+  }
+
+  Widget _header(BuildContext context, int count) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppTextField(
+          controller: _search,
+          isSearch: true,
+          hintText: 'Cari nama, roastery, asal...',
+          textInputAction: TextInputAction.search,
+          onChanged: (value) => setState(() => _query = value),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final (filter, label) in const [
+                (_BeanFilter.all, 'Semua'),
+                (_BeanFilter.lowStock, 'Stok menipis'),
+                (_BeanFilter.selfRoasted, 'Roasting sendiri'),
+              ]) ...[
+                AppChip(
+                  label: label,
+                  selected: _filter == filter,
+                  onSelected: (_) => setState(() => _filter = filter),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        Text(
+          count == 0 ? 'Tidak ada biji yang cocok.' : '$count biji',
+          style: textTheme.bodyMedium?.copyWith(
+            color: AppColors.inkSoft,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final beans = ref.watch(beanListProvider);
     final archived = ref.watch(archivedBeanListProvider);
 
@@ -51,84 +131,78 @@ class BeanListScreen extends ConsumerWidget {
                     actionLabel: 'Tambah biji',
                     onActionPressed: () => _openForm(context),
                   )
-                : RefreshIndicator(
-                    onRefresh: () async {
-                      ref.invalidate(beanListProvider);
-                      ref.invalidate(archivedBeanListProvider);
-                      await ref.read(beanListProvider.future);
-                      await ref.read(archivedBeanListProvider.future);
-                    },
-                    child: ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.s20,
-                        AppSpacing.s16,
-                        AppSpacing.s20,
-                        AppSizes.floatingButtonClearance,
-                      ),
-                      itemCount:
-                          items.length + 1 + (archivedItems.isEmpty ? 0 : 1),
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: AppSpacing.s16),
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return Text(
-                            'Kelola profil dan stok biji untuk seduhanmu.',
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(color: AppColors.inkSoft),
-                          );
-                        }
-                        if (index == items.length + 1) {
-                          return ExpansionTile(
-                            key: const Key('archived-beans-section'),
-                            title: Text(
-                              'Biji diarsipkan (${archivedItems.length})',
-                            ),
-                            children: archivedItems
-                                .map(
-                                  (bean) => AppCard(
-                                    child: ListTile(
-                                      title: Text(bean.name),
-                                      subtitle: Text(
-                                        bean.roastery ?? 'Roastery belum diisi',
-                                      ),
-                                      trailing: TextButton(
-                                        onPressed: () async {
-                                          final restored = await ref
-                                              .read(
-                                                beanMutationProvider.notifier,
-                                              )
-                                              .restore(bean.id);
-                                          if (restored && context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                              ..hideCurrentSnackBar()
-                                              ..showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Biji dipulihkan.',
-                                                  ),
-                                                ),
-                                              );
-                                          }
-                                        },
-                                        child: const Text('Pulihkan'),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          );
-                        }
-                        final bean = items[index - 1];
-                        return BeanCard(
-                          bean: bean,
-                          onTap: () => _openDetail(context, bean.id),
-                        );
-                      },
-                    ),
-                  ),
+                : _buildList(context, _visible(items), archivedItems),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildList(
+    BuildContext context,
+    List<Bean> items,
+    List<Bean> archivedItems,
+  ) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(beanListProvider);
+        ref.invalidate(archivedBeanListProvider);
+        await ref.read(beanListProvider.future);
+        await ref.read(archivedBeanListProvider.future);
+      },
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s20,
+          AppSpacing.s16,
+          AppSpacing.s20,
+          AppSizes.floatingButtonClearance,
+        ),
+        itemCount: items.length + 1 + (archivedItems.isEmpty ? 0 : 1),
+        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.s16),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return _header(context, items.length);
+          }
+          if (index == items.length + 1) {
+            return ExpansionTile(
+              key: const Key('archived-beans-section'),
+              title: Text('Biji diarsipkan (${archivedItems.length})'),
+              children: archivedItems
+                  .map(
+                    (bean) => AppCard(
+                      child: ListTile(
+                        title: Text(bean.name),
+                        subtitle: Text(bean.roastery ?? 'Roastery belum diisi'),
+                        trailing: TextButton(
+                          onPressed: () async {
+                            final restored = await ref
+                                .read(beanMutationProvider.notifier)
+                                .restore(bean.id);
+                            if (restored && context.mounted) {
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Biji dipulihkan.'),
+                                  ),
+                                );
+                            }
+                          },
+                          child: const Text('Pulihkan'),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            );
+          }
+          final bean = items[index - 1];
+          return BeanCard(
+            bean: bean,
+            onTap: () => _openDetail(context, bean.id),
+          );
+        },
       ),
     );
   }

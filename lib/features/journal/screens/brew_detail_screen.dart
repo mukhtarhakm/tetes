@@ -463,7 +463,9 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
                   runSpacing: AppSpacing.s4,
                   children: [
                     ...item.tasteTags.map((tag) => AppChip(label: tag)),
-                    ...item.customTasteTags.map((tag) => CustomTasteChip(label: tag)),
+                    ...item.customTasteTags.map(
+                      (tag) => CustomTasteChip(label: tag),
+                    ),
                   ],
                 ),
               const SizedBox(height: AppSpacing.s16),

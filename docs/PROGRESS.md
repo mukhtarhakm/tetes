@@ -1,5 +1,12 @@
 # PROGRESS: Tetes
 
+## 2026-10-26 - Fitur 10-E, Cek Harga Biji, pencarian biji, ikon, layar pembuka
+- Kalkulator Kurs menjadi "Cek Harga Biji": harga toko luar negeri (USD, EUR, JPY) dan isi kemasan dikonversi langsung ke rupiah, harga per gram, dan per seduhan 15 g; kartu "Dibanding biji kamu" membandingkan harga per gram dengan biji tersimpan yang memiliki harga. Kurs diambil sekali per mata uang dan memakai cache saat offline. Konversi antar dua mata uang asing dan tombol Tukar dihapus.
+- Daftar Biji kopi mendapat kolom cari (nama, roastery, asal) dan chip Semua, Stok menipis, Roasting sendiri.
+- Ikon launcher Android memakai logo Tetes (PNG per densitas dan ikon adaptif), label aplikasi menjadi "Tetes". Layar pembuka native berlatar `background` dengan logo; Android 12+ memakai `windowSplashScreenBackground`. Saat memeriksa sesi tampil `TetesSplash` (logo, nama, tagline, tiga titik berdenyut). Tanpa paket baru.
+- Percobaan merombak Atur Seduh dibatalkan atas keputusan pemilik; layar kembali ke versi sebelumnya.
+- Uji HP lolos.
+
 ## 2026-10-25 - Fitur 10-B dan 10-C, perombakan UI
 - 10-B: logo Tetes (`TetesLogo`/`TetesBrand`) di Login dan Register, pembatas "atau" dan tombol sidik jari bergaya pil di Login, serta kartu status jangkar Sepolia (`ChainAnchorCard`) di Jurnal dengan tombol Verifikasi dan salin tautan Etherscan.
 - 10-C: kartu jangkar di Jurnal menjadi satu baris ringkas yang membuka bottom sheet, sehingga daftar seduhan lebih luas. Hasil seduh dirombak menjadi satu layar: skor lima tombol, kolom timbangan kumulatif per tahap (disimpan sebagai selisih per tahap, format data tidak berubah), Catatan dilipat, Simpan menempel di bawah.

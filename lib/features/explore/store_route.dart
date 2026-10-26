@@ -4,7 +4,12 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 class StoreRoute {
-  const StoreRoute(this.points, this.distanceMeters, this.durationSeconds, this.steps);
+  const StoreRoute(
+    this.points,
+    this.distanceMeters,
+    this.durationSeconds,
+    this.steps,
+  );
 
   final List<LatLng> points;
   final double distanceMeters;
@@ -20,11 +25,24 @@ class StoreRoute {
     final coordinates = geometry is Map ? geometry['coordinates'] : null;
     final distance = route['distance'];
     final duration = route['duration'];
-    if (coordinates is! List || coordinates.isEmpty || distance is! num || duration is! num) return null;
+    if (coordinates is! List ||
+        coordinates.isEmpty ||
+        distance is! num ||
+        duration is! num)
+      return null;
     final points = <LatLng>[];
     for (final coordinate in coordinates) {
-      if (coordinate is! List || coordinate.length < 2 || coordinate[0] is! num || coordinate[1] is! num) return null;
-      points.add(LatLng((coordinate[1] as num).toDouble(), (coordinate[0] as num).toDouble()));
+      if (coordinate is! List ||
+          coordinate.length < 2 ||
+          coordinate[0] is! num ||
+          coordinate[1] is! num)
+        return null;
+      points.add(
+        LatLng(
+          (coordinate[1] as num).toDouble(),
+          (coordinate[0] as num).toDouble(),
+        ),
+      );
     }
     final steps = <String>[];
     final legs = route['legs'];
@@ -34,7 +52,10 @@ class StoreRoute {
         for (final step in leg['steps'] as List) {
           if (step is! Map) continue;
           final maneuver = step['maneuver'];
-          if (maneuver is Map) steps.add(instruction(maneuver['type'], maneuver['modifier'], step['name']));
+          if (maneuver is Map)
+            steps.add(
+              instruction(maneuver['type'], maneuver['modifier'], step['name']),
+            );
         }
       }
     }
@@ -43,9 +64,14 @@ class StoreRoute {
 
   static String instruction(Object? type, Object? modifier, Object? road) {
     final direction = switch (modifier) {
-      'left' => 'kiri', 'slight left' => 'sedikit ke kiri', 'sharp left' => 'tajam ke kiri',
-      'right' => 'kanan', 'slight right' => 'sedikit ke kanan', 'sharp right' => 'tajam ke kanan',
-      'uturn' => 'putar balik', _ => 'lurus',
+      'left' => 'kiri',
+      'slight left' => 'sedikit ke kiri',
+      'sharp left' => 'tajam ke kiri',
+      'right' => 'kanan',
+      'slight right' => 'sedikit ke kanan',
+      'sharp right' => 'tajam ke kanan',
+      'uturn' => 'putar balik',
+      _ => 'lurus',
     };
     final action = switch (type) {
       'depart' => 'Mulai perjalanan',
@@ -65,16 +91,24 @@ class StoreRoute {
 class StoreRouteService {
   const StoreRouteService();
 
-  Future<StoreRoute?> fetch({required double latitude, required double longitude,
-      required double destinationLatitude, required double destinationLongitude,
-      required bool walking}) async {
+  Future<StoreRoute?> fetch({
+    required double latitude,
+    required double longitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+    required bool walking,
+  }) async {
     final profile = walking ? 'foot' : 'driving';
-    final uri = Uri.parse('https://router.project-osrm.org/route/v1/$profile/'
-        '$longitude,$latitude;$destinationLongitude,$destinationLatitude'
-        '?overview=full&geometries=geojson&steps=true');
-    final response = await http.get(uri, headers: const {'User-Agent': 'com.raismukhtar.tetes'})
+    final uri = Uri.parse(
+      'https://router.project-osrm.org/route/v1/$profile/'
+      '$longitude,$latitude;$destinationLongitude,$destinationLatitude'
+      '?overview=full&geometries=geojson&steps=true',
+    );
+    final response = await http
+        .get(uri, headers: const {'User-Agent': 'com.raismukhtar.tetes'})
         .timeout(const Duration(seconds: 10));
-    if (response.statusCode != 200) throw const FormatException('route unavailable');
+    if (response.statusCode != 200)
+      throw const FormatException('route unavailable');
     return StoreRoute.parse(jsonDecode(response.body));
   }
 }

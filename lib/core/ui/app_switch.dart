@@ -29,9 +29,7 @@ class AppSwitch extends StatelessWidget {
                   ? AppColors.primary
                   : AppColors.divider,
             ),
-            trackOutlineColor: const WidgetStatePropertyAll(
-              Colors.transparent,
-            ),
+            trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
           ),
         ),
         child: Switch(value: value, onChanged: onChanged),

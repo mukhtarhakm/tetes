@@ -73,8 +73,10 @@ class UserRepository {
       );
     }
     try {
-      final session = await _authClient.loginBiometric(credential,
-          expectedUserId: userId);
+      final session = await _authClient.loginBiometric(
+        credential,
+        expectedUserId: userId,
+      );
       await _persistAuthentication(session);
       return userId;
     } on AuthException catch (error) {

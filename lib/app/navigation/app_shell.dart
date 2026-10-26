@@ -42,7 +42,9 @@ final appSyncServiceFactoryProvider = Provider<Future<SyncService> Function()>((
       )).rescheduleEvent(userId, oldBaseId),
       (userId) async {
         await ref.read(chainAnchorStatusProvider.future);
-        await ref.read(chainAnchorStatusProvider.notifier).requestAfterPush(userId);
+        await ref
+            .read(chainAnchorStatusProvider.notifier)
+            .requestAfterPush(userId);
       },
     );
   };
@@ -193,7 +195,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (userId != null) {
         unawaited(() async {
           await ref.read(chainAnchorStatusProvider.future);
-          await ref.read(chainAnchorStatusProvider.notifier).resumePending(userId);
+          await ref
+              .read(chainAnchorStatusProvider.notifier)
+              .resumePending(userId);
         }());
       }
       await _automaticSync();
@@ -228,7 +232,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       await service.run(userId: userId);
       unawaited(() async {
         await ref.read(chainAnchorStatusProvider.future);
-        await ref.read(chainAnchorStatusProvider.notifier).resumePending(userId);
+        await ref
+            .read(chainAnchorStatusProvider.notifier)
+            .resumePending(userId);
       }());
     } catch (_) {
       // Sinkronisasi otomatis tetap senyap; baris gagal tidak berubah.
@@ -382,10 +388,10 @@ class _AppShellState extends ConsumerState<AppShell> {
               syncStatus: _syncStatus,
               syncError: _syncError,
               syncLoading: _syncLoading,
-            onOpenSync: () => setState(() {
-              _currentIndex = 1;
-              _profileVisited = true;
-            }),
+              onOpenSync: () => setState(() {
+                _currentIndex = 1;
+                _profileVisited = true;
+              }),
             ),
             _profileVisited
                 ? ProfileScreen(

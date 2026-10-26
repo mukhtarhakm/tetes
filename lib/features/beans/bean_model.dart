@@ -236,7 +236,8 @@ class Bean {
       bestBrewRatio: (map['best_brew_ratio'] as num?)?.toDouble(),
       bestBrewWaterTempC: (map['best_brew_water_temp_c'] as num?)?.toInt(),
       bestBrewTasteScore: (map['best_brew_taste_score'] as num?)?.toInt(),
-      lowStockThresholdG: (map['low_stock_threshold_g'] as num?)?.toDouble() ??
+      lowStockThresholdG:
+          (map['low_stock_threshold_g'] as num?)?.toDouble() ??
           BeanDefaults.lowStockThresholdG,
       archived: map['archived'] == 1,
       createdAt: map['created_at']! as String,
