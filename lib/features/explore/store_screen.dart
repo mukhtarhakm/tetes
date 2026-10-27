@@ -67,6 +67,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
   bool _routeLoading = false;
   bool _routeConsent = false;
   bool _walking = false;
+  bool _showSteps = false;
   double _rotation = 0;
   bool _foreground = true;
 
@@ -229,6 +230,8 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
                 onPressed: () => setState(() {
                   _selectedStore = null;
                   _route = null;
+                  _routeError = null;
+                  _showSteps = false;
                 }),
                 icon: const Icon(Icons.close_rounded),
               ),
@@ -252,7 +255,10 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
               DropdownMenuItem(value: true, child: Text('Jalan kaki')),
             ],
             onChanged: (value) {
-              if (value != null) setState(() => _walking = value);
+              if (value == null || value == _walking) return;
+              setState(() => _walking = value);
+              // Satu pilihan moda: bila rute sudah tampil, muat ulang.
+              if (_route != null) _fetchRoute(store);
             },
           ),
           const SizedBox(height: AppSpacing.s20),
@@ -277,6 +283,15 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
           ),
           if (location?.hasPosition != true)
             const Text('Aktifkan izin lokasi untuk melihat rute.'),
+          if (_routeLoading) ...[
+            const SizedBox(height: AppSpacing.s12),
+            const LinearProgressIndicator(),
+          ],
+          if (_routeError != null) ...[
+            const SizedBox(height: AppSpacing.s12),
+            Text(_routeError!),
+          ],
+          if (_route != null) ..._routeSummary(_route!),
         ],
       ),
     );
@@ -551,9 +566,6 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
                           _storeDetail(_selectedStore!),
                           const SizedBox(height: AppSpacing.s12),
                         ],
-                        if (_routeLoading) const LinearProgressIndicator(),
-                        if (_routeError != null) Text(_routeError!),
-                        if (_route != null) _routePanel(),
                         _locationPrompt(location.status),
                         if (stores.isEmpty)
                           const EmptyView(
@@ -664,49 +676,67 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
     );
   }
 
-  Widget _routePanel() {
-    final route = _route!;
-    return SizedBox(
-      height: AppSizes.routePanelHeight,
-      child: AppCard(
-        child: ListView(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Rute ${StoreDistance.label(route.distanceMeters)} · '
-                    '${(route.durationSeconds / 60).ceil()} menit',
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _route = null),
-                  child: const Text('Hapus rute'),
-                ),
-              ],
+  // Ringkasan rute menempel di kartu toko; langkah disembunyikan agar
+  // sheet tidak menutupi peta dan tidak ada scroll di dalam scroll.
+  List<Widget> _routeSummary(StoreRoute route) {
+    final textTheme = Theme.of(context).textTheme;
+    return [
+      const SizedBox(height: AppSpacing.s16),
+      const Divider(color: AppColors.divider),
+      const SizedBox(height: AppSpacing.s8),
+      Row(
+        children: [
+          const Icon(Icons.route_outlined),
+          const SizedBox(width: AppSpacing.s8),
+          Expanded(
+            child: Text(
+              '${StoreDistance.label(route.distanceMeters)} · '
+              '±${(route.durationSeconds / 60).ceil()} menit',
+              style: textTheme.titleMedium,
             ),
-            Row(
-              children: [
-                const Text('Moda: '),
-                DropdownButton<bool>(
-                  value: _walking,
-                  items: const [
-                    DropdownMenuItem(value: false, child: Text('Motor/Mobil')),
-                    DropdownMenuItem(value: true, child: Text('Jalan kaki')),
-                  ],
-                  onChanged: (value) {
-                    if (value == null || _selectedStore == null) return;
-                    setState(() => _walking = value);
-                    _fetchRoute(_selectedStore!);
-                  },
-                ),
-              ],
-            ),
-            for (final step in route.steps) Text('• $step'),
-          ],
-        ),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              _route = null;
+              _showSteps = false;
+            }),
+            child: const Text('Hapus rute'),
+          ),
+        ],
       ),
-    );
+      if (route.steps.isNotEmpty)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => setState(() => _showSteps = !_showSteps),
+            icon: Icon(
+              _showSteps
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
+            ),
+            label: Text(
+              _showSteps
+                  ? 'Sembunyikan langkah'
+                  : 'Lihat ${route.steps.length} langkah',
+            ),
+          ),
+        ),
+      if (_showSteps)
+        for (final (index, step) in route.steps.indexed)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: AppSpacing.s24,
+                  child: Text('${index + 1}.', style: textTheme.bodyMedium),
+                ),
+                Expanded(child: Text(step, style: textTheme.bodyMedium)),
+              ],
+            ),
+          ),
+    ];
   }
 
   Future<void> _fetchRoute(StoreItem store) async {
@@ -716,6 +746,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
       _routeLoading = true;
       _routeError = null;
       _route = null;
+      _showSteps = false;
     });
     try {
       final route = await ref
@@ -733,9 +764,14 @@ class _StoreScreenState extends ConsumerState<StoreScreen>
         _routeError = route == null ? 'Rute tidak ditemukan.' : null;
       });
       if (route != null) {
+        // Turunkan sheet agar garis rute di peta terlihat, dan tampilkan
+        // kartu toko dari atas supaya judulnya tidak terpotong.
+        if (_sheetScrollController?.hasClients == true) {
+          _sheetScrollController!.jumpTo(0);
+        }
         if (_sheetController.isAttached) {
           await _sheetController.animateTo(
-            AppSizes.mapSheetDetail,
+            AppSizes.mapSheetInitial,
             duration: AppDurations.feedback,
             curve: Curves.easeOut,
           );
