@@ -36,8 +36,11 @@ void main() {
   });
 
   test('rencana awal dari layar lain dipakai, bukan pengaturan terbaik', () async {
+    // Seperti di aplikasi: controller belum hidup di root saat layar
+    // Atur Seduh dibuka di dalam ProviderScope yang meng-override rencana.
     final harness = await _harness(
       MockClient((_) async => http.Response('{}', 500)),
+      warmUp: false,
     );
     addTearDown(harness.dispose);
     final custom = BrewCalculator.createDefault(
@@ -226,7 +229,10 @@ const _recommendation = {
   'note': 'Titik awal uji.',
 };
 
-Future<_Harness> _harness(MockClient httpClient) async {
+Future<_Harness> _harness(
+  MockClient httpClient, {
+  bool warmUp = true,
+}) async {
   final database = await databaseFactoryFfi.openDatabase(
     inMemoryDatabasePath,
     options: OpenDatabaseOptions(
@@ -255,9 +261,12 @@ Future<_Harness> _harness(MockClient httpClient) async {
       aiClientProvider.overrideWithValue(client),
     ],
   );
-  final provider = brewSetupControllerProvider(beanId);
-  final subscription = container.listen(provider, (_, _) {});
-  await container.read(provider.future);
+  ProviderSubscription<AsyncValue<BrewSetupState>>? subscription;
+  if (warmUp) {
+    final provider = brewSetupControllerProvider(beanId);
+    subscription = container.listen(provider, (_, _) {});
+    await container.read(provider.future);
+  }
   return _Harness(database, container, beanId, subscription, storage, client);
 }
 
@@ -274,7 +283,7 @@ class _Harness {
   final Database database;
   final ProviderContainer container;
   final String beanId;
-  final ProviderSubscription<AsyncValue<BrewSetupState>> subscription;
+  final ProviderSubscription<AsyncValue<BrewSetupState>>? subscription;
   final _SessionStorage storage;
   final AiClient client;
 
@@ -282,7 +291,7 @@ class _Harness {
       container.read(brewSetupControllerProvider(beanId).notifier);
 
   Future<void> dispose() async {
-    subscription.close();
+    subscription?.close();
     container.dispose();
     client.close();
     await database.close();
