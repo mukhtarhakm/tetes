@@ -445,7 +445,7 @@ class EventDetailScreen extends ConsumerWidget {
                   'Pengingat',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                Text('${event.reminderMinutes} menit sebelum mulai'),
+                Text(EventDisplay.reminders(event.reminderMinutes)),
               ],
             ),
           ),

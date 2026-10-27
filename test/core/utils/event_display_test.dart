@@ -71,4 +71,17 @@ void main() {
     expect(label(DateTime(2026, 10, 23, 12)), '2 hari lagi');
     expect(label(DateTime(2026, 10, 31, 12)), '10 hari lagi');
   });
+
+  test('pengingat ditulis sebagai beberapa waktu terpisah', () {
+    expect(
+      EventDisplay.reminders('1440,30'),
+      '1 hari dan 30 menit sebelum mulai',
+    );
+    expect(
+      EventDisplay.reminders('30,1440,180'),
+      '1 hari, 3 jam dan 30 menit sebelum mulai',
+    );
+    expect(EventDisplay.reminders('180'), '3 jam sebelum mulai');
+    expect(EventDisplay.reminders(''), 'Tanpa pengingat');
+  });
 }

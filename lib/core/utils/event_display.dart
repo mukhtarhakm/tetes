@@ -43,6 +43,30 @@ abstract final class EventDisplay {
     return '${days > 0 ? '+' : ''}$days hari';
   }
 
+  /// Daftar menit pengingat (mis. `1440,30`) menjadi
+  /// `1 hari dan 30 menit sebelum mulai`. Tiap angka adalah pengingat
+  /// terpisah, jadi diurutkan dari yang paling awal.
+  static String reminders(String minutesCsv) {
+    final labels = minutesCsv
+        .split(',')
+        .map((part) => int.tryParse(part.trim()))
+        .whereType<int>()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+    final parts = labels.map(_reminderLabel).toList();
+    if (parts.isEmpty) return 'Tanpa pengingat';
+    final joined = parts.length == 1
+        ? parts.single
+        : '${parts.sublist(0, parts.length - 1).join(', ')} dan ${parts.last}';
+    return '$joined sebelum mulai';
+  }
+
+  static String _reminderLabel(int minutes) {
+    if (minutes % 1440 == 0) return '${minutes ~/ 1440} hari';
+    if (minutes % 60 == 0) return '${minutes ~/ 60} jam';
+    return '$minutes menit';
+  }
+
   static String countdown(DateTime startUtc, DateTime now) {
     final remaining = startUtc.toUtc().difference(now.toUtc());
     if (remaining <= Duration.zero) return 'Selesai';
