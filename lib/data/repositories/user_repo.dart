@@ -22,6 +22,7 @@ class UserRepository {
 
   static const _biometricEnabledKey = 'biometric_enabled';
   static const _biometricPromptedKey = 'biometric_prompted';
+  static const _biometricOfferHiddenKey = 'biometric_offer_hidden';
 
   Future<String> register({
     required String username,
@@ -220,6 +221,21 @@ class UserRepository {
         value: '1',
       );
     });
+  }
+
+  /// True bila pengguna memilih "Jangan tampilkan lagi" pada tawaran
+  /// biometrik setelah login.
+  Future<bool> isBiometricOfferHidden(String userId) {
+    return _isSettingEnabled(userId, _biometricOfferHiddenKey);
+  }
+
+  Future<void> hideBiometricOffer(String userId) {
+    return _upsertSetting(
+      _database,
+      userId: userId,
+      key: _biometricOfferHiddenKey,
+      value: '1',
+    );
   }
 
   Future<void> markBiometricPrompted(String userId) {
