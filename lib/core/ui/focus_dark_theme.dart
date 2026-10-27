@@ -28,6 +28,11 @@ class FocusDarkTheme extends StatelessWidget {
         appBarTheme: current.appBarTheme.copyWith(
           backgroundColor: AppColors.surfaceDark,
           foregroundColor: AppColors.onDark,
+          // Tema terang memberi warna tinta pada judul; tanpa ini judul
+          // tetap hitam di atas latar gelap.
+          titleTextStyle: current.appBarTheme.titleTextStyle?.copyWith(
+            color: AppColors.onDark,
+          ),
         ),
       ),
       child: child,

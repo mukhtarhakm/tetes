@@ -14,6 +14,7 @@ import '../../../core/ui/status_pill.dart';
 import '../../../data/remote/ai_client.dart';
 import '../../../data/repositories/brew_repo.dart';
 import '../../../data/secure/session_storage.dart';
+import '../../../core/utils/currency_format.dart';
 import '../../../core/utils/display_format.dart';
 import '../../auth/session/force_logout.dart';
 import '../../auth/state/auth_providers.dart';
@@ -375,7 +376,7 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
               _DetailRow(
                 label: 'Biaya seduhan',
                 value: item.costIdr != null
-                    ? 'Rp ${item.costIdr!.toStringAsFixed(0)}'
+                    ? formatIdr(item.costIdr!, spaced: true)
                     : 'Tidak tersedia',
               ),
               const Divider(color: AppColors.divider),

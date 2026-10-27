@@ -275,10 +275,12 @@ class _EventCard extends StatelessWidget {
               EventDisplay.eventTime(event.startUtc, event.sourceZone),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
-            Text(
-              '${EventDisplay.clock(wib)} WIB${dayOffset.isEmpty ? '' : ' · $dayOffset'}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            // Baris WIB hanya berguna bila event memakai zona lain.
+            if (event.sourceZone != EventTime.zones['WIB'])
+              Text(
+                '${EventDisplay.clock(wib)} WIB${dayOffset.isEmpty ? '' : ' · $dayOffset'}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             if (event.location != null && event.location!.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.s8),
               Row(

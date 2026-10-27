@@ -5,6 +5,7 @@ import '../../../app/theme/tokens.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../../core/utils/currency_format.dart';
 import '../../../core/utils/format_ratio.dart';
 import '../../../core/utils/display_format.dart';
 import '../brew_comparison_service.dart';
@@ -312,10 +313,10 @@ class _CompareContent extends StatelessWidget {
               _CompareRow(
                 label: 'Biaya',
                 val1: older.item.costIdr != null
-                    ? 'Rp ${older.item.costIdr!.toStringAsFixed(0)}'
+                    ? formatIdr(older.item.costIdr!, spaced: true)
                     : '—',
                 val2: newer.item.costIdr != null
-                    ? 'Rp ${newer.item.costIdr!.toStringAsFixed(0)}'
+                    ? formatIdr(newer.item.costIdr!, spaced: true)
                     : '—',
                 isDifferent: older.item.costIdr != newer.item.costIdr,
                 isLast: true,

@@ -43,6 +43,18 @@ class StoreLocationService {
         longitude: position.longitude,
       );
     } catch (_) {
+      // getCurrentPosition bisa habis waktu (mis. saat aplikasi baru kembali
+      // ke depan). Pakai posisi terakhir agar jarak dan rute tidak hilang.
+      try {
+        final last = await Geolocator.getLastKnownPosition();
+        if (last != null) {
+          return StoreLocationResult(
+            StoreLocationStatus.available,
+            latitude: last.latitude,
+            longitude: last.longitude,
+          );
+        }
+      } catch (_) {}
       return const StoreLocationResult(StoreLocationStatus.gpsOff);
     }
   }
