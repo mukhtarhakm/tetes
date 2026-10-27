@@ -1,6 +1,6 @@
 import { requireValidSession, SessionUnauthorizedError } from "../_shared/session.ts";
 import { userFacingTextRule } from "./prompt_rules.ts";
-import { normalizeOutput, openAiResponseSchema, responseSchemas, validateInput, validateOutput, type AiInput } from "./validation.ts";
+import { finishUserText, normalizeOutput, openAiResponseSchema, responseSchemas, validateInput, validateOutput, type AiInput } from "./validation.ts";
 
 const jsonHeaders = { "Content-Type": "application/json; charset=utf-8" };
 const hourMs = 60 * 60 * 1000;
@@ -202,7 +202,7 @@ async function handle(request: Request, setType: (type: string) => void, setProv
       continue;
     }
     if (input.type === "chat") {
-      const reply = generation.text.trim().slice(0, 1200).trim();
+      const reply = finishUserText(generation.text, 1200);
       if (!reply) { logFailure(provider, input.type, attempt + 1, "empty_text", metadata); continue; }
       return { reply, remaining_today: chatRemaining };
     }
@@ -267,7 +267,7 @@ async function generate(input: AiInput, provider: AiProvider, model: string, api
       "Balas dengan satu objek JSON. Key tingkat atas harus tepat dose_g, ratio, water_temp_c, grind, pouring_count, stages, note; tanpa key tambahan.",
       "dose_g harus angka 5 sampai 60; ratio angka 10 sampai 20; water_temp_c bilangan bulat 80 sampai 100.",
       "grind harus salah satu dari sangat_halus, halus, sedang_halus, sedang, sedang_kasar, kasar. note harus teks tidak kosong, maksimal 500 karakter.",
-      `pouring_count input ${count} adalah preferensi pengguna. Pertahankan kecuali ada alasan jelas dari profil biji atau riwayat. Bila berubah, jelaskan alasannya di note. pouring_count output harus bilangan bulat 1 sampai 5. stages harus berisi tepat pouring_count output tahap. Nama tahap harus berurutan dari bloom, pouring_2, pouring_3, pouring_4, pouring_5 sesuai jumlah itu. Preferensi saat ini: ${stageNames}.`,
+      `pouring_count input ${count} di DATA hanyalah isian layar saat ini, bukan batas bila pengguna tidak mengunci jumlah pouring. Pilih 1 sampai 5 pouring sesuai profil biji dan riwayat; bila berbeda dari isian layar, jelaskan alasannya di note. pouring_count output harus bilangan bulat 1 sampai 5. stages harus berisi tepat pouring_count output tahap. Nama tahap harus berurutan dari bloom, pouring_2, pouring_3, pouring_4, pouring_5 sesuai jumlah itu. Tahap pada isian layar saat ini: ${stageNames}.`,
       "Setiap tahap hanya memiliki key name, start_s, duration_s, water_cum_g; tanpa key tambahan.",
       "start_s dan duration_s harus bilangan bulat dalam detik. start_s tahap pertama 0 sampai 3600; setiap start_s berikutnya minimal akhir tahap sebelumnya (start_s sebelumnya + duration_s sebelumnya) dan maksimal 3600, sehingga tahap tidak tumpang tindih. duration_s setiap tahap 1 sampai 3600.",
       "water_cum_g harus angka yang meningkat secara ketat pada setiap tahap, lebih dari 0 dan maksimal 1200 gram. water_cum_g tahap terakhir harus sama dengan dose_g * ratio dengan selisih maksimal 1 gram.",

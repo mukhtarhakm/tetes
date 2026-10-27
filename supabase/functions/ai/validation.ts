@@ -64,10 +64,21 @@ export function openAiResponseSchema(type: "recommend" | "diagnose"): Record<str
   return convert(responseSchemas[type] as unknown as Record<string, unknown>);
 }
 
+export function finishUserText(value: string, max: number): string {
+  const text = value.trim();
+  if (text.length <= max && (text.length < max - 10 || /[.?!]$/.test(text))) return text;
+  const fit = text.slice(0, max);
+  const sentence = [...fit.matchAll(/[.?!](?=\s|$)/g)].at(-1);
+  if (sentence?.index !== undefined) return fit.slice(0, sentence.index + 1);
+  const space = fit.slice(0, max - 1).lastIndexOf(" ");
+  return space < 0 ? "…" : `${fit.slice(0, space).trimEnd()}…`;
+}
+
 export function normalizeOutput(type: AiType, value: unknown): unknown {
   if (!record(value)) return value;
   if (type === "recommend") {
     const output = { ...value };
+    if (typeof output.note === "string") output.note = finishUserText(output.note, 500);
     if (!Array.isArray(output.stages)) return output;
     let end = 0;
     output.stages = output.stages.map((stage: unknown, index: number) => {
@@ -96,12 +107,12 @@ export function normalizeOutput(type: AiType, value: unknown): unknown {
   }
   if (type !== "diagnose") return value;
   const output = { ...value };
-  for (const key of ["diagnosis", "note"]) if (typeof output[key] === "string") output[key] = output[key].trim();
-  if (Array.isArray(output.likely_causes)) output.likely_causes = output.likely_causes.slice(0, 5).map((item: unknown) => typeof item === "string" ? item.trim() : item);
+  for (const key of ["diagnosis", "note"]) if (typeof output[key] === "string") output[key] = finishUserText(output[key], 500);
+  if (Array.isArray(output.likely_causes)) output.likely_causes = output.likely_causes.slice(0, 5).map((item: unknown) => typeof item === "string" ? finishUserText(item, 500) : item);
   if (Array.isArray(output.suggestions)) output.suggestions = output.suggestions.slice(0, 2).map((item: unknown) => {
     if (!record(item)) return item;
     const next = { ...item };
-    if (typeof next.reason === "string") next.reason = next.reason.trim();
+    if (typeof next.reason === "string") next.reason = finishUserText(next.reason, 500);
     for (const key of ["from", "to"]) if (next.variable !== "grind" && typeof next[key] === "string" &&
       /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(next[key].trim())) {
       const converted = Number(next[key]);

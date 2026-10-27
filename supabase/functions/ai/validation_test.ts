@@ -1,4 +1,4 @@
-import { normalizeOutput, openAiResponseSchema, parseOutput, responseSchemas, validateInput, validateOutput } from "./validation.ts";
+import { finishUserText, normalizeOutput, openAiResponseSchema, parseOutput, responseSchemas, validateInput, validateOutput } from "./validation.ts";
 import { userFacingTextRule } from "./prompt_rules.ts";
 
 const validRecommend = {
@@ -56,6 +56,24 @@ Deno.test("jumlah tahap recommend mengikuti pouring_count keluaran", () => {
   if (!parseOutput("recommend", output)) throw new Error("valid output rejected");
   if (parseOutput("recommend", JSON.stringify({ ...validRecommend, pouring_count: 2 }))) throw new Error("mismatched stage count accepted");
   if (parseOutput("recommend", JSON.stringify({ ...validRecommend, pouring_count: 6 }))) throw new Error("out of range count accepted");
+});
+
+Deno.test("teks panjang selesai pada batas kalimat atau kata", () => {
+  const long = "Ini saran awal. " + "Lanjutkan dengan hati-hati ".repeat(25);
+  const recommend = normalizeOutput("recommend", { ...validRecommend, note: long }) as Record<string, unknown>;
+  if (recommend.note !== "Ini saran awal." || !validateOutput("recommend", recommend)) throw new Error("recommend note was not finished at sentence");
+  const withoutSentence = "Coba ubah dosis sedikit ".repeat(25).trim();
+  const diagnosis = normalizeOutput("diagnose", { ...validDiagnose, diagnosis: withoutSentence,
+    likely_causes: [withoutSentence], note: "Singkat tanpa titik", suggestions: [{ ...validDiagnose.suggestions[0], reason: withoutSentence }] }) as Record<string, unknown>;
+  if (!validateOutput("diagnose", diagnosis) || diagnosis.note !== "Singkat tanpa titik" ||
+    ![diagnosis.diagnosis, (diagnosis.likely_causes as string[])[0], (diagnosis.suggestions as Record<string, unknown>[])[0].reason]
+      .every((value) => typeof value === "string" && value.endsWith("…") && value.length <= 500 && !value.endsWith(" …"))) {
+    throw new Error("diagnose text was not finished at word");
+  }
+  if (finishUserText("Kopi ini enak", 1200) !== "Kopi ini enak" ||
+    finishUserText("kata ".repeat(98).trim(), 500) !== "kata ".repeat(98).trim() ||
+    !finishUserText("kata ".repeat(99).trim(), 500).endsWith("…") ||
+    finishUserText("Saran pertama. " + "ulang ".repeat(250), 1200) !== "Saran pertama.") throw new Error("chat text boundary failed");
 });
 
 Deno.test("normalisasi recommend membulatkan waktu dan air akhir tanpa menerima air sebelumnya yang berlebih", () => {
@@ -130,7 +148,7 @@ Deno.test("jumlah tahap salah memicu retry tanpa menambah ai_usage", async () =>
     if (response.status !== 200 || usageCalls !== 1 || modelCalls !== 2 || !parseOutput("recommend", JSON.stringify(result))) {
       throw new Error(`retry flow failed: status=${response.status}, usage=${usageCalls}, model=${modelCalls}`);
     }
-    if (prompts.length !== 2 || prompts.some((prompt) => !prompt.includes("preferensi pengguna") || !prompt.includes("alasan") || !prompt.includes("pouring_count output") || !prompt.includes(userFacingTextRule)) ||
+    if (prompts.length !== 2 || prompts.some((prompt) => !prompt.includes("hanyalah isian layar saat ini, bukan batas") || !prompt.includes("alasan") || !prompt.includes("pouring_count output") || !prompt.includes(userFacingTextRule)) ||
       prompts.some((prompt) => prompt.includes("DATA.preferences")) ||
       mimeTypes.some((mimeType) => mimeType !== "application/json") ||
       configs.some((config) => JSON.stringify(config.responseSchema) !== JSON.stringify(responseSchemas.recommend) || config.maxOutputTokens !== 1024 || Object.hasOwn(config, "thinkingConfig"))) {
