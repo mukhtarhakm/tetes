@@ -18,6 +18,7 @@ import 'package:tetes/features/auth/state/auth_providers.dart';
 import 'package:tetes/features/auth/state/session_controller.dart';
 import 'package:tetes/features/beans/bean_model.dart';
 import 'package:tetes/features/brew/ai_brew.dart';
+import 'package:tetes/features/brew/brew_calculator.dart';
 import 'package:tetes/features/brew/state/ai_client_provider.dart';
 import 'package:tetes/features/brew/state/brew_setup_controller.dart';
 
@@ -32,6 +33,29 @@ void main() {
     cooldown.start((value) => seconds = value);
     expect(cooldown.active, isTrue);
     expect(seconds, 30);
+  });
+
+  test('rencana awal dari layar lain dipakai, bukan pengaturan terbaik', () async {
+    final harness = await _harness(
+      MockClient((_) async => http.Response('{}', 500)),
+    );
+    addTearDown(harness.dispose);
+    final custom = BrewCalculator.createDefault(
+      beanId: harness.beanId,
+      waterTempC: 95,
+      pouringCount: 4,
+    );
+    final scoped = ProviderContainer(
+      parent: harness.container,
+      overrides: [initialBrewPlanProvider.overrideWithValue(custom)],
+    );
+    addTearDown(scoped.dispose);
+    final provider = brewSetupControllerProvider(harness.beanId);
+    final subscription = scoped.listen(provider, (_, _) {});
+    addTearDown(subscription.close);
+    final state = await scoped.read(provider.future);
+    expect(state.plan!.waterTempC, 95);
+    expect(state.plan!.pouringCount, 4);
   });
 
   test(

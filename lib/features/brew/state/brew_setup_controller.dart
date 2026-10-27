@@ -21,7 +21,13 @@ final brewRepositoryProvider = FutureProvider<BrewRepository>((ref) async {
   return BrewRepository(database);
 });
 
-final initialBrewPlanProvider = Provider<BrewPlan?>((ref) => null);
+// Rencana awal dari Seduh lagi atau Terapkan diagnosa. Di-override per layar
+// lewat ProviderScope, jadi controller wajib mendaftarkannya di dependencies;
+// tanpa itu controller membaca nilai root (null) dan memuat pengaturan terbaik.
+final initialBrewPlanProvider = Provider<BrewPlan?>(
+  (ref) => null,
+  dependencies: const [],
+);
 
 class AiRequestCooldown {
   Timer? _timer;
@@ -52,6 +58,7 @@ class AiRequestCooldown {
 final brewSetupControllerProvider = AsyncNotifierProvider.autoDispose
     .family<BrewSetupController, BrewSetupState, String?>(
       BrewSetupController.new,
+      dependencies: [initialBrewPlanProvider],
     );
 
 class BrewSetupState {
@@ -231,7 +238,13 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     );
   }
 
-  Future<void> recommend({required bool Function() isScreenCurrent}) async {
+  Future<void> recommend({
+    required bool Function() isScreenCurrent,
+    AiRecommendPreferences? preferences,
+  }) async {
+    final prefs = preferences == null || preferences.isEmpty
+        ? null
+        : preferences;
     final current = _current;
     final bean = current.beans
         .where((item) => item.id == current.selectedBeanId)
@@ -306,6 +319,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
               bean: bean,
               history: history,
               pouringCount: plan.pouringCount,
+              preferences: prefs,
             ),
           );
       if (!isLatest() || !isScreenCurrent()) {
@@ -315,6 +329,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
       final recommendation = AiBrew.recommendationFromResponse(
         fallback: fallback,
         response: response,
+        preferences: prefs,
       );
       finish(
         nextPlan: recommendation.plan,
@@ -328,6 +343,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
                 recommended: recommendation.plan,
                 note: recommendation.note,
                 hasHistory: history.isNotEmpty,
+                preferences: prefs,
               ),
       );
     } on AiException catch (error) {
