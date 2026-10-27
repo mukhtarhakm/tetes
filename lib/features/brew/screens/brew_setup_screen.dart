@@ -15,6 +15,7 @@ import '../../beans/screens/bean_form_screen.dart';
 import '../ai_brew.dart';
 import '../brew_plan.dart';
 import '../state/brew_setup_controller.dart';
+import '../widgets/ai_preferences_sheet.dart';
 import '../widgets/brew_stage_colors.dart';
 import '../widgets/brew_timeline.dart';
 import '../widgets/brew_water_chart.dart';
@@ -134,7 +135,10 @@ class _BrewSetupContent extends ConsumerWidget {
                   controller: controller,
                   selectedBean: selectedBean,
                   onRecommend: () async {
+                    final preferences = await showAiPreferencesSheet(context);
+                    if (preferences == null || !context.mounted) return;
                     await controller.recommend(
+                      preferences: preferences,
                       isScreenCurrent: () =>
                           context.mounted &&
                           ModalRoute.of(context)?.isCurrent == true,
@@ -524,6 +528,15 @@ class _AiSuggestionCardState extends State<_AiSuggestionCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Saran AI', style: Theme.of(context).textTheme.titleLarge),
+          if (suggestion.preferences case final prefs? when !prefs.isEmpty) ...[
+            const SizedBox(height: AppSpacing.s4),
+            Text(
+              prefs.summary,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+            ),
+          ],
           if (suggestion.note.trim().isNotEmpty) ...[
             const SizedBox(height: AppSpacing.s8),
             Text(suggestion.note),

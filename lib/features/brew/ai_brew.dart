@@ -17,6 +17,64 @@ class AiRecommendation {
   final bool usedFallback;
 }
 
+/// Preferensi opsional yang diisi pengguna sebelum meminta rekomendasi AI.
+/// Semua kolom boleh kosong; preferensi kosong tidak dikirim ke server.
+class AiRecommendPreferences {
+  const AiRecommendPreferences({this.doseG, this.pouringCount, this.wish});
+
+  static const maxWishLength = 200;
+
+  final double? doseG;
+  final int? pouringCount;
+  final String? wish;
+
+  String? get _cleanWish {
+    final value = wish?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  bool get isEmpty =>
+      doseG == null && pouringCount == null && _cleanWish == null;
+
+  Map<String, Object?> toJson() => {
+    'dose_g': ?doseG,
+    'pouring_count': ?pouringCount,
+    'wish': ?_cleanWish,
+  };
+
+  /// Ringkasan satu baris untuk kartu saran, misalnya
+  /// "Dosis 17 g · 4 pouring · Keinginan: lebih manis".
+  String get summary => [
+    if (doseG != null) 'Dosis ${AiBrew._aiNumber(doseG!)} g',
+    if (pouringCount != null) '$pouringCount pouring',
+    if (_cleanWish != null) 'Keinginan: $_cleanWish',
+  ].join(' · ');
+
+  /// Pesan galat dosis untuk lembar preferensi, atau null bila valid/kosong.
+  static String? doseError(String input) {
+    final text = input.trim().replaceAll(',', '.');
+    if (text.isEmpty) return null;
+    final value = double.tryParse(text);
+    if (value == null || !value.isFinite) return 'Dosis harus berupa angka.';
+    if (value < 5 || value > 60) return 'Dosis harus antara 5 dan 60 gram.';
+    final tenths = value * 10;
+    if ((tenths - tenths.round()).abs() > 0.0000001) {
+      return 'Dosis hanya boleh memakai satu angka desimal.';
+    }
+    return null;
+  }
+
+  static double? parseDose(String input) {
+    final text = input.trim().replaceAll(',', '.');
+    if (text.isEmpty || doseError(text) != null) return null;
+    return double.parse(text);
+  }
+
+  bool respectedBy(BrewPlan plan) =>
+      (doseG == null || (plan.doseG - doseG!).abs() <= 0.05) &&
+      (pouringCount == null || plan.pouringCount == pouringCount);
+}
+
 enum AiPlanField { dose, ratio, temperature, grind, pouring }
 
 class AiPlanChange {
@@ -35,6 +93,7 @@ class AppliedAiSuggestion {
     required this.note,
     required this.hasHistory,
     this.editedFields = const {},
+    this.preferences,
   });
 
   final BrewPlan before;
@@ -42,6 +101,7 @@ class AppliedAiSuggestion {
   final String note;
   final bool hasHistory;
   final Set<AiPlanField> editedFields;
+  final AiRecommendPreferences? preferences;
 
   List<AiPlanChange> get changes =>
       AiBrew.recommendationChanges(before, recommended);
@@ -56,6 +116,7 @@ class AppliedAiSuggestion {
     note: note,
     hasHistory: hasHistory,
     editedFields: {...editedFields, field},
+    preferences: preferences,
   );
 
   BrewPlan restore() => before;
@@ -110,10 +171,14 @@ abstract final class AiBrew {
     required Bean bean,
     required List<BrewDetailData> history,
     required int pouringCount,
+    AiRecommendPreferences? preferences,
   }) => {
     'bean': _bean(bean),
     'history': history.take(5).map(_historyBrew).toList(),
-    'pouring_count': pouringCount,
+    // Server mewajibkan pouring_count sama dengan preferensi bila dikunci.
+    'pouring_count': preferences?.pouringCount ?? pouringCount,
+    if (preferences != null && !preferences.isEmpty)
+      'preferences': preferences.toJson(),
   };
 
   static Map<String, Object?> diagnosePayload({
@@ -199,6 +264,7 @@ abstract final class AiBrew {
   static AiRecommendation recommendationFromResponse({
     required BrewPlan fallback,
     required Map<String, dynamic> response,
+    AiRecommendPreferences? preferences,
   }) {
     try {
       if (!_only(response, const [
@@ -280,6 +346,10 @@ abstract final class AiBrew {
         stages: List.unmodifiable(stages),
       );
       BrewCalculator.validatePlan(plan);
+      // Dosis atau jumlah pouring yang dikunci pengguna wajib dipatuhi.
+      if (preferences != null && !preferences.respectedBy(plan)) {
+        throw const FormatException();
+      }
       return AiRecommendation(
         plan: plan,
         note: note as String,

@@ -1,5 +1,8 @@
 # PROGRESS: Tetes
 
+## 2026-10-27 - Fitur 10-H server
+- Edge Function `ai` menerima preferensi rekomendasi opsional, membersihkan wish, dan menolak keluaran yang melanggar kunci dosis atau jumlah pouring dalam alur retry yang ada. Prompt lama dipertahankan untuk payload tanpa preferensi. Seluruh 21 tes AI lulus lewat shim Node karena Deno tidak tersedia. Flutter dikerjakan terpisah; deploy dan uji layanan langsung menunggu pemilik.
+
 ## 2026-10-26 - Fitur 10-E, Cek Harga Biji, pencarian biji, ikon, layar pembuka
 - Kalkulator Kurs menjadi "Cek Harga Biji": harga toko luar negeri (USD, EUR, JPY) dan isi kemasan dikonversi langsung ke rupiah, harga per gram, dan per seduhan 15 g; kartu "Dibanding biji kamu" membandingkan harga per gram dengan biji tersimpan yang memiliki harga. Kurs diambil sekali per mata uang dan memakai cache saat offline. Konversi antar dua mata uang asing dan tombol Tukar dihapus.
 - Daftar Biji kopi mendapat kolom cari (nama, roastery, asal) dan chip Semua, Stok menipis, Roasting sendiri.

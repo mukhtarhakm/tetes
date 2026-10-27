@@ -66,6 +66,77 @@ void main() {
     expect(rejected.usedFallback, isTrue);
   });
 
+  test('preferensi terkunci dipatuhi atau rekomendasi memakai fallback', () {
+    const dose = AiRecommendPreferences(doseG: 15);
+    expect(
+      AiBrew.recommendationFromResponse(
+        fallback: defaultPlan,
+        response: _recommendation(),
+        preferences: dose,
+      ).usedFallback,
+      isFalse,
+    );
+    expect(
+      AiBrew.recommendationFromResponse(
+        fallback: defaultPlan,
+        response: _recommendation(),
+        preferences: const AiRecommendPreferences(doseG: 17),
+      ).usedFallback,
+      isTrue,
+    );
+    expect(
+      AiBrew.recommendationFromResponse(
+        fallback: defaultPlan,
+        response: _recommendation(),
+        preferences: const AiRecommendPreferences(pouringCount: 4),
+      ).usedFallback,
+      isTrue,
+    );
+  });
+
+  test('payload recommend hanya membawa preferensi yang diisi', () {
+    final plain = AiBrew.recommendPayload(
+      bean: _bean(),
+      history: const [],
+      pouringCount: 3,
+      preferences: const AiRecommendPreferences(wish: '   '),
+    );
+    expect(plain.containsKey('preferences'), isFalse);
+    expect(plain['pouring_count'], 3);
+
+    final full = AiBrew.recommendPayload(
+      bean: _bean(),
+      history: const [],
+      pouringCount: 3,
+      preferences: const AiRecommendPreferences(
+        doseG: 17,
+        pouringCount: 4,
+        wish: '  lebih manis  ',
+      ),
+    );
+    expect(full['pouring_count'], 4);
+    expect(full['preferences'], {
+      'dose_g': 17.0,
+      'pouring_count': 4,
+      'wish': 'lebih manis',
+    });
+  });
+
+  test('validasi dosis preferensi mengikuti batas Atur Seduh', () {
+    expect(AiRecommendPreferences.doseError(''), isNull);
+    expect(AiRecommendPreferences.doseError('17,5'), isNull);
+    expect(AiRecommendPreferences.parseDose('17,5'), 17.5);
+    expect(AiRecommendPreferences.doseError('4'), isNotNull);
+    expect(AiRecommendPreferences.doseError('61'), isNotNull);
+    expect(AiRecommendPreferences.doseError('15.25'), isNotNull);
+    expect(AiRecommendPreferences.doseError('abc'), isNotNull);
+    expect(
+      const AiRecommendPreferences(doseG: 17, pouringCount: 4, wish: 'manis')
+          .summary,
+      'Dosis 17 g · 4 pouring · Keinginan: manis',
+    );
+  });
+
   test('payload diagnosis mengirim target dan aktual sebagai angka', () {
     final result = BrewSessionResult(
       plan: defaultPlan,

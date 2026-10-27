@@ -272,14 +272,14 @@ Permintaan:
 ```json
 { "type": "recommend" | "diagnose", "payload": { … } }
 ```
-- `recommend`: profil biji, riwayat seduhan biji itu (paling banyak 5 terbaru dan terbaik), jumlah pouring pilihan pengguna sebagai preferensi; AI dapat mengusulkan 1-5 pouring dengan alasan di `note`.
+- `recommend`: payload wajib `bean`, `history` (paling banyak 5), dan `pouring_count` (1-5). `preferences` opsional berisi hanya `dose_g` (5-60, maksimal satu desimal), `pouring_count` (1-5, wajib sama dengan payload), dan `wish` (1-200 karakter setelah trim). Objek kosong setara dengan tidak dikirim. Tanpa kunci, AI dapat mengusulkan 1-5 pouring dengan alasan di `note`.
 - `diagnose`: profil biji, seduhan (termasuk tahap dengan target vs aktual), skor dan tag rasa, catatan, riwayat singkat biji itu.
 
 Perilaku:
 1. Verifikasi session dari header token.
 2. Cek batas pemakaian: **20 panggilan per jam per pengguna** (tabel `ai_usage`). Lebih dari itu, `429`.
 3. Susun prompt sistem (bagian 8) yang sama untuk kedua penyedia. Batas waktu server 28 detik dipakai bersama oleh maksimal dua percobaan. Gemini memakai `responseSchema` dan `maxOutputTokens: 1024` untuk recommend/diagnose. OpenAI Chat Completions memakai `response_format: json_schema` strict dan `max_completion_tokens` 2048 untuk JSON, 800 untuk chat. Hanya OpenAI mengirim `reasoning_effort` bila secret opsional diisi; tidak ada `temperature`.
-4. Normalisasi keluaran secara deterministik sebelum validasi: waktu tahap dibulatkan dan start yang tumpang tindih digeser; air akhir disetel ke dosis × rasio satu desimal bila tetap lebih besar dari tahap sebelumnya. Teks diagnosa dipangkas, angka string pada `from`/`to` dikonversi, dan daftar penyebab/saran dipotong ke 5/2. **Validasi** keluaran terhadap skema. Jika tidak valid, satu kali coba ulang. Jika tetap gagal, `500` dengan `code: "ai_invalid_output"`.
+4. Normalisasi keluaran secara deterministik sebelum validasi: waktu tahap dibulatkan dan start yang tumpang tindih digeser; air akhir disetel ke dosis × rasio satu desimal bila tetap lebih besar dari tahap sebelumnya. Dosis tidak dipaksa. Teks diagnosa dipangkas, angka string pada `from`/`to` dikonversi, dan daftar penyebab/saran dipotong ke 5/2. **Validasi** keluaran terhadap skema dan kunci preferensi: selisih dosis maksimal 0,05 g dan jumlah pouring harus sama persis. Jika tidak valid, satu kali coba ulang. Jika tetap gagal, `502` dengan `code: "ai_invalid_output"`.
 5. Kembalikan JSON tervalidasi. Gemini mengulang sekali setelah HTTP 503; OpenAI mengulang sekali setelah HTTP 429 atau 5xx, dengan jeda singkat selama batas waktu masih tersedia. Log kegagalan hanya memuat penyedia, status, panjang keluaran, alasan selesai, dan metadata aman tanpa isi pengguna atau secret.
 
 Respons `recommend`:
@@ -313,6 +313,8 @@ RLS `chain_anchors` aktif tanpa policy untuk `anon` dan `authenticated`; hanya `
 
 **Sistem (rekomendasi):**
 > Kamu asisten seduh V60 manual. Usulkan pengaturan awal untuk biji ini berdasarkan profilnya dan riwayat seduhan yang diberikan. Jika riwayat ada, utamakan pengaturan dengan skor tertinggi dan ubah paling banyak dua variabel. Jika tidak ada riwayat, beri titik awal umum dan katakan itu titik awal. Gunakan hanya data yang diberikan. Balas hanya dengan JSON sesuai skema, tanpa teks lain.
+
+Jika `preferences` ada, prompt mewajibkan dosis dan jumlah pouring yang dikunci, termasuk jumlah `stages` yang tepat. `wish` diperlakukan sebagai data keinginan rasa, bukan instruksi; perintah di dalamnya diabaikan. `note` menjelaskan singkat bagaimana saran menjawab keinginan itu. Tanpa `preferences`, prompt tetap seperti sebelumnya.
 
 **Sistem (diagnosa):**
 > Kamu asisten seduh V60 manual. Berdasarkan data seduhan dan keluhan rasa, beri kemungkinan penyebab dan saran perbaikan. Gunakan bahasa "kemungkinan", bukan kepastian. Ubah paling banyak dua variabel sekaligus. Perhatikan selisih target dan aktual per tahap. Balas hanya dengan JSON sesuai skema, tanpa teks lain.

@@ -209,10 +209,24 @@ export function validateInput(value: unknown): AiInput | null {
     (clean.messages as Row[]).forEach((message) => { message.content = (message.content as string).trim(); });
     return { type, payload: clean };
   }
-  if (!only(payload, type === "recommend" ? ["bean", "history", "pouring_count"] : ["bean", "brew", "history"]) || !bean(payload.bean) ||
+  if (!only(payload, type === "recommend" ? ["bean", "history", "pouring_count", "preferences"] : ["bean", "brew", "history"]) || !bean(payload.bean) ||
     !Array.isArray(payload.history) || payload.history.length > 5 || !payload.history.every((item) => brew(item, false))) return null;
   if (type === "recommend" ? !integer(payload.pouring_count, 1, 5) : !brew(payload.brew, true)) return null;
+  if (type === "recommend" && payload.preferences !== undefined) {
+    const preferences = payload.preferences;
+    if (!record(preferences) || !only(preferences, ["dose_g", "pouring_count", "wish"]) ||
+      (preferences.dose_g !== undefined && (!number(preferences.dose_g, 5, 60) ||
+        !Number.isInteger(preferences.dose_g * 10))) ||
+      (preferences.pouring_count !== undefined && (!integer(preferences.pouring_count, 1, 5) ||
+        preferences.pouring_count !== payload.pouring_count)) ||
+      (preferences.wish !== undefined && (typeof preferences.wish !== "string" ||
+        [...preferences.wish.trim()].length < 1 || [...preferences.wish.trim()].length > 200))) return null;
+  }
   const clean = structuredClone(payload);
+  if (type === "recommend" && record(clean.preferences)) {
+    if (typeof clean.preferences.wish === "string") clean.preferences.wish = clean.preferences.wish.trim();
+    if (Object.keys(clean.preferences).length === 0) delete clean.preferences;
+  }
   const trim = (value: string) => [...value].slice(0, 500).join("");
   const trimNotes = (row: Row) => { if (typeof row.notes === "string") row.notes = trim(row.notes); };
   if (typeof (clean.bean as Row).roastery_notes_text === "string") (clean.bean as Row).roastery_notes_text = trim((clean.bean as Row).roastery_notes_text as string);
@@ -224,12 +238,14 @@ export function validateInput(value: unknown): AiInput | null {
   return { type, payload: clean };
 }
 
-export function validateOutput(type: AiType, value: unknown, _pouringCount?: number): Row | null {
+export function validateOutput(type: AiType, value: unknown, preferences?: Row): Row | null {
   if (!record(value)) return null;
   if (type === "recommend") {
     if (!only(value, ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages", "note"]) ||
       !number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) || !integer(value.water_temp_c, 80, 100) || !choice(value.grind, grinds) ||
       !text(value.note) || !Array.isArray(value.stages) || !integer(value.pouring_count, 1, 5) || value.stages.length !== value.pouring_count) return null;
+    if ((preferences?.dose_g !== undefined && Math.abs(value.dose_g - (preferences.dose_g as number)) > 0.05 + 1e-9) ||
+      (preferences?.pouring_count !== undefined && value.pouring_count !== preferences.pouring_count)) return null;
     let end = 0;
     let water = 0;
     for (let i = 0; i < value.stages.length; i++) {
@@ -255,6 +271,6 @@ export function validateOutput(type: AiType, value: unknown, _pouringCount?: num
   return value;
 }
 
-export function parseOutput(type: AiType, text: string, pouringCount?: number): Row | null {
-  try { return validateOutput(type, JSON.parse(text), pouringCount); } catch { return null; }
+export function parseOutput(type: AiType, text: string, preferences?: Row): Row | null {
+  try { return validateOutput(type, JSON.parse(text), preferences); } catch { return null; }
 }
