@@ -1,7 +1,13 @@
 # PROGRESS: Tetes
 
-## 2026-10-27 - Fitur 10-H server
-- Edge Function `ai` menerima preferensi rekomendasi opsional, membersihkan wish, dan menolak keluaran yang melanggar kunci dosis atau jumlah pouring dalam alur retry yang ada. Prompt lama dipertahankan untuk payload tanpa preferensi. Seluruh 21 tes AI lulus lewat shim Node karena Deno tidak tersedia. Flutter dikerjakan terpisah; deploy dan uji layanan langsung menunggu pemilik.
+## 2026-10-27 - Fitur 10-H, preferensi opsional sebelum rekomendasi AI
+- Server: Edge Function `ai` menerima preferensi rekomendasi opsional, membersihkan wish, dan menolak keluaran yang melanggar kunci dosis atau jumlah pouring dalam alur retry yang ada. Prompt lama dipertahankan untuk payload tanpa preferensi. Seluruh 21 tes AI lulus lewat shim Node karena Deno tidak tersedia.
+- Flutter: tombol "Rekomendasikan dengan AI" membuka lembar bawah "Sebelum AI menyarankan" (`ai_preferences_sheet.dart`) berisi kolom Dosis kopi, chip Jumlah pouring ("Biar AI pilih" atau 1-5), dan kolom Keinginanmu maksimal 200 karakter. Semua opsional; Lewati meminta saran tanpa preferensi, menutup lembar membatalkan. `AiRecommendPreferences` dikirim hanya bila berisi, dan aplikasi ikut menolak saran yang melanggar kunci. Kartu Saran AI menampilkan ringkasan preferensi.
+- Perbaikan: "Seduh lagi dengan pengaturan ini" dan "Terapkan ke seduhan berikutnya" sebelumnya selalu memuat pengaturan terbaik karena `brewSetupControllerProvider` tidak mendaftarkan `initialBrewPlanProvider` di `dependencies`, sehingga override `ProviderScope` diabaikan. Ditambah tes regresi.
+- `flutter analyze` bersih dan seluruh tes Flutter lulus. Uji HP lolos untuk Terapkan diagnosa. Deploy fungsi `ai` dan uji HP lembar preferensi (Lewati, dosis saja, preferensi lengkap) dicatat terpisah setelah dicoba.
+
+## 2026-10-27 - Audit dan perapian kode
+- Fungsi format yang tersalin di delapan layar (`_formatNumber`, `mm:ss`, waktu seduh lokal) dipusatkan di `lib/core/utils/display_format.dart`. Dihapus: `formatFxRate`, paket `cupertino_icons`, dan layar `FoundationPreviewScreen` beserta rutenya. `functionsBaseUrl` diturunkan dari `SUPABASE_URL`. `.gitignore` dan `functions/.env.example` dilengkapi. `flutter analyze` bersih dan 334 tes lulus.
 
 ## 2026-10-26 - Fitur 10-E, Cek Harga Biji, pencarian biji, ikon, layar pembuka
 - Kalkulator Kurs menjadi "Cek Harga Biji": harga toko luar negeri (USD, EUR, JPY) dan isi kemasan dikonversi langsung ke rupiah, harga per gram, dan per seduhan 15 g; kartu "Dibanding biji kamu" membandingkan harga per gram dengan biji tersimpan yang memiliki harga. Kurs diambil sekali per mata uang dan memakai cache saat offline. Konversi antar dua mata uang asing dan tombol Tukar dihapus.

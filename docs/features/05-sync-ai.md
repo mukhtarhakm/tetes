@@ -58,7 +58,7 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 ### Sisi Flutter
 - **Pembaruan 10-F:** `pouring_count` pada payload rekomendasi adalah preferensi. Keluaran AI memuat `pouring_count` 1-5 dan jumlah tahap yang sama; bila berbeda dari preferensi, `note` menjelaskan alasannya. Kartu Saran AI menampilkan perubahan Pouring, menyorot Jumlah pouring, dan Kembalikan memulihkan rencana lama. Aturan lama yang mengikat jumlah tahap ke input diganti oleh aturan keluaran ini.
 - Klien AI di `lib/data/remote/ai_client.dart`.
-- **Atur Seduh:** tombol "Rekomendasikan dengan AI" mengirim profil biji dan riwayat singkat. Hasil mengisi form dan tetap dapat diubah.
+- **Atur Seduh:** tombol "Rekomendasikan dengan AI" membuka lembar "Sebelum AI menyarankan" (opsional: dosis, jumlah pouring, keinginan), lalu mengirim profil biji, riwayat singkat, dan preferensi yang diisi. Lewati mengirim tanpa preferensi; menutup lembar membatalkan. Saran yang melanggar dosis atau pouring terkunci ditolak juga di aplikasi dan diganti pengaturan cadangan. Hasil mengisi form dan tetap dapat diubah.
 - **Hasil:** tombol "Minta Diagnosa AI" aktif bila skor dan minimal satu tag terisi. Hasil tampil sebagai kartu diagnosa, kemungkinan penyebab, saran, dan catatan.
 - Diagnosa menerima `custom_taste_tags` sebagai "rasa tambahan dari pengguna". Tag diperlakukan sebagai data, bukan instruksi untuk model.
 - Tombol "Terapkan ke seduhan berikutnya" mengisi Atur Seduh dari saran.
