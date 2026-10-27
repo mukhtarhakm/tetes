@@ -14,6 +14,7 @@ import '../../../core/ui/status_pill.dart';
 import '../../../data/remote/ai_client.dart';
 import '../../../data/repositories/brew_repo.dart';
 import '../../../data/secure/session_storage.dart';
+import '../../../core/utils/display_format.dart';
 import '../../auth/session/force_logout.dart';
 import '../../auth/state/auth_providers.dart';
 import '../../auth/state/session_controller.dart';
@@ -330,7 +331,7 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
                   ),
                   const SizedBox(width: AppSpacing.s4),
                   Text(
-                    _formatLocalBrewedAt(item.brewedAtUtc),
+                    formatBrewedAt(item.brewedAtUtc),
                     style: textTheme.bodySmall?.copyWith(
                       color: AppColors.inkSoft,
                     ),
@@ -361,7 +362,7 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
               const Divider(color: AppColors.divider),
               _DetailRow(
                 label: 'Total waktu aktif',
-                value: _formatSeconds(item.totalTimeS),
+                value: formatClock(item.totalTimeS),
               ),
               if (data.finalDrawdownS != null) ...[
                 const Divider(color: AppColors.divider),
@@ -419,8 +420,8 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
                 ],
               ),
               ...data.stages.map((stage) {
-                final start = _formatSeconds(stage.targetStartS);
-                final end = _formatSeconds(
+                final start = formatClock(stage.targetStartS);
+                final end = formatClock(
                   stage.targetStartS + stage.targetDurationS,
                 );
                 return TableRow(
@@ -735,38 +736,6 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
         );
       }
     }
-  }
-
-  static String _formatLocalBrewedAt(String utcString) {
-    try {
-      final dt = DateTime.parse(utcString).toLocal();
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'Mei',
-        'Jun',
-        'Jul',
-        'Agu',
-        'Sep',
-        'Okt',
-        'Nov',
-        'Des',
-      ];
-      final month = months[dt.month - 1];
-      final hour = dt.hour.toString().padLeft(2, '0');
-      final minute = dt.minute.toString().padLeft(2, '0');
-      return '${dt.day} $month ${dt.year}, $hour:$minute';
-    } catch (_) {
-      return utcString;
-    }
-  }
-
-  static String _formatSeconds(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
 

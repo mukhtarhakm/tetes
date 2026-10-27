@@ -9,6 +9,7 @@ import '../../../core/ui/rating_stars.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
 import '../../../core/utils/format_ratio.dart';
+import '../../../core/utils/display_format.dart';
 import '../bean_model.dart';
 import '../state/bean_providers.dart';
 import 'bean_detail_screen.dart';
@@ -304,7 +305,7 @@ class BeanCard extends StatelessWidget {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
-                    '${_formatNumber(stock)} g',
+                    '${formatNumber(stock)} g',
                     style: textTheme.headlineMedium,
                   ),
                   const SizedBox(width: AppSpacing.s8),
@@ -366,12 +367,6 @@ class BeanCard extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatNumber(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
 }
 
 String? _roastAgeLabel(String? roastDate) {

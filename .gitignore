@@ -57,6 +57,10 @@ key.properties
 *.jks
 *.keystore
 
+# Berkas kerja lokal alat bantu
+.codex-remote-attachments/
+docs/stores-candidates.md
+
 # Hardhat lokal
 /blockchain/node_modules/
 /blockchain/.env

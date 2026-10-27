@@ -7,6 +7,7 @@ import '../../../core/ui/app_button.dart';
 import '../../../core/ui/app_card.dart';
 import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/state_views.dart';
+import '../../../core/utils/display_format.dart';
 import '../brew_calculator.dart';
 import '../brew_plan.dart';
 import '../services/brew_session_hardware.dart';
@@ -159,10 +160,14 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
               const SizedBox(height: AppSpacing.s16),
               Text(
                 drawdown
-                    ? _formatTime(controller.drawdownElapsedSeconds)
+                    ? formatClock(controller.drawdownElapsedSeconds)
                     : ready
-                    ? _formatTime(activeStage.durationSeconds)
-                    : _formatCountdown(controller.countdownSeconds),
+                    ? formatClock(activeStage.durationSeconds)
+                    : formatClock(
+                        controller.countdownSeconds < 0
+                            ? 0
+                            : controller.countdownSeconds,
+                      ),
                 style: Theme.of(context).textTheme.displayLarge,
                 textAlign: TextAlign.center,
               ),
@@ -170,7 +175,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
               Text(
                 drawdown
                     ? 'Tekan Air habis saat air selesai menetes.'
-                    : 'Tuang ${_formatNumber(activeStage.targetPourG)} g • Kumulatif ${_formatNumber(plan.cumulativeWaterAt(controller.activeStageIndex))} g',
+                    : 'Tuang ${formatNumber(activeStage.targetPourG)} g • Kumulatif ${formatNumber(plan.cumulativeWaterAt(controller.activeStageIndex))} g',
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
@@ -191,7 +196,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
                 ),
               ),
               Text(
-                _formatTime(controller.elapsedSeconds),
+                formatClock(controller.elapsedSeconds),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ],
@@ -236,7 +241,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
                     ),
                     const SizedBox(width: AppSpacing.s12),
                     Text(
-                      '${_formatNumber(stage.targetPourG)} g',
+                      '${formatNumber(stage.targetPourG)} g',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     const SizedBox(width: AppSpacing.s12),
@@ -516,20 +521,4 @@ String _stageStatus(BrewSessionController controller, int index) {
         : 'Aktif';
   }
   return 'Berikutnya';
-}
-
-String _formatNumber(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
-}
-
-String _formatCountdown(int seconds) {
-  return _formatTime(seconds < 0 ? 0 : seconds);
-}
-
-String _formatTime(int totalSeconds) {
-  final minutes = totalSeconds ~/ 60;
-  final seconds = totalSeconds % 60;
-  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }

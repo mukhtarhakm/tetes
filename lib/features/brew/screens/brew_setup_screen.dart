@@ -9,6 +9,7 @@ import '../../../core/ui/app_dropdown_field.dart';
 import '../../../core/ui/app_text_field.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../../core/utils/display_format.dart';
 import '../../beans/bean_model.dart';
 import '../../beans/screens/bean_form_screen.dart';
 import '../ai_brew.dart';
@@ -242,7 +243,7 @@ class _BrewForm extends StatelessWidget {
               const Spacer(),
               if (remaining != null)
                 Text(
-                  'Sisa ${_formatNumber(remaining)} g',
+                  'Sisa ${formatNumber(remaining)} g',
                   style: textTheme.bodyMedium?.copyWith(
                     color: AppColors.inkSoft,
                   ),
@@ -263,7 +264,7 @@ class _BrewForm extends StatelessWidget {
                     child: _BrewNumberField(
                       key: ValueKey('dose-${plan.beanId}'),
                       label: 'Dosis (g)',
-                      value: _formatNumber(plan.doseG),
+                      value: formatNumber(plan.doseG),
                       errorText: state.fieldErrors['dose'],
                       decimal: true,
                       fromAi:
@@ -277,7 +278,7 @@ class _BrewForm extends StatelessWidget {
                     child: _BrewNumberField(
                       key: ValueKey('ratio-${plan.beanId}'),
                       label: 'Rasio (1:x)',
-                      value: _formatNumber(plan.ratio),
+                      value: formatNumber(plan.ratio),
                       errorText: state.fieldErrors['ratio'],
                       decimal: true,
                       fromAi:
@@ -428,7 +429,7 @@ class _TotalWater extends StatelessWidget {
               const SizedBox(width: AppSpacing.s8),
               Expanded(
                 child: Text(
-                  '${_formatNumber(plan.totalWaterG)} g',
+                  '${formatNumber(plan.totalWaterG)} g',
                   style: textTheme.titleLarge,
                 ),
               ),
@@ -622,7 +623,7 @@ class _StageCard extends StatelessWidget {
                 child: Text(stage.name.label, style: textTheme.titleLarge),
               ),
               Text(
-                'Mulai ${_formatTime(stage.startSeconds)}',
+                'Mulai ${formatClock(stage.startSeconds)}',
                 style: textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
               ),
             ],
@@ -646,7 +647,7 @@ class _StageCard extends StatelessWidget {
                 child: _BrewNumberField(
                   key: ValueKey('target-${plan.beanId}-$stageIndex'),
                   label: isLast ? 'Target air (sisa)' : 'Target air (g)',
-                  value: _formatNumber(stage.targetPourG),
+                  value: formatNumber(stage.targetPourG),
                   errorText: errors['target_$stageIndex'],
                   decimal: true,
                   enabled: !isLast,
@@ -658,7 +659,7 @@ class _StageCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s8),
           Text(
-            'Kumulatif ${_formatNumber(plan.cumulativeWaterAt(stageIndex))} g',
+            'Kumulatif ${formatNumber(plan.cumulativeWaterAt(stageIndex))} g',
             style: textTheme.bodySmall,
           ),
         ],
@@ -752,19 +753,7 @@ Bean? _findBean(List<Bean> beans, String? id) {
   return null;
 }
 
-String _formatNumber(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
-}
-
 String _normalized(String value) {
   final parsed = double.tryParse(value.replaceAll(',', '.'));
   return parsed?.toString() ?? value;
-}
-
-String _formatTime(int totalSeconds) {
-  final minutes = totalSeconds ~/ 60;
-  final seconds = totalSeconds % 60;
-  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }

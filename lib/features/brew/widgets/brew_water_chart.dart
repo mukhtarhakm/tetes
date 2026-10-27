@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/tokens.dart';
+import '../../../core/utils/display_format.dart';
 import '../brew_plan.dart';
 import 'brew_stage_colors.dart';
 
@@ -26,7 +27,7 @@ class BrewWaterChart extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s4),
         Text(
-          '${_formatNumber(plan.totalWaterG)} g dalam ${plan.totalTimeSeconds} detik',
+          '${formatNumber(plan.totalWaterG)} g dalam ${plan.totalTimeSeconds} detik',
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
@@ -99,10 +100,4 @@ class BrewWaterChart extends StatelessWidget {
     }
     return lines;
   }
-}
-
-String _formatNumber(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
 }

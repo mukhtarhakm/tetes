@@ -6,9 +6,3 @@ String formatIdr(double value) {
   );
   return 'Rp$grouped';
 }
-
-String formatFxRate(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
-}

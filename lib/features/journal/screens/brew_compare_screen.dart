@@ -6,6 +6,7 @@ import '../../../core/ui/app_card.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
 import '../../../core/utils/format_ratio.dart';
+import '../../../core/utils/display_format.dart';
 import '../brew_comparison_service.dart';
 import '../journal_model.dart';
 import '../state/journal_controller.dart';
@@ -275,8 +276,8 @@ class _CompareContent extends StatelessWidget {
               ),
               _CompareRow(
                 label: 'Total waktu',
-                val1: _formatSeconds(older.item.totalTimeS),
-                val2: _formatSeconds(newer.item.totalTimeS),
+                val1: formatClock(older.item.totalTimeS),
+                val2: formatClock(newer.item.totalTimeS),
                 isDifferent: older.item.totalTimeS != newer.item.totalTimeS,
               ),
               _CompareRow(
@@ -332,12 +333,6 @@ class _CompareContent extends StatelessWidget {
     final set1 = tags1.toSet();
     final set2 = tags2.toSet();
     return set1.length != set2.length || !set1.containsAll(set2);
-  }
-
-  static String _formatSeconds(int s) {
-    final m = s ~/ 60;
-    final sec = s % 60;
-    return '${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
   }
 
   static String _formatDate(String utcString) {

@@ -11,6 +11,7 @@ import '../../../core/ui/app_dialog.dart';
 import '../../../core/ui/score_chart.dart';
 import '../../../core/ui/state_views.dart';
 import '../../../core/ui/status_pill.dart';
+import '../../../core/utils/display_format.dart';
 import '../../journal/journal_model.dart';
 import '../../journal/screens/brew_detail_screen.dart';
 import '../bean_model.dart';
@@ -261,7 +262,7 @@ class _BeanSummaryCard extends StatelessWidget {
       if (bean.roastDate != null && bean.roastDate!.isNotEmpty)
         ('Tanggal roasting', _formatDate(bean.roastDate!)),
       if (bean.packSizeG != null)
-        ('Ukuran kemasan', '${_formatNumber(bean.packSizeG!)} g'),
+        ('Ukuran kemasan', '${formatNumber(bean.packSizeG!)} g'),
     ];
 
     return AppCard(
@@ -318,7 +319,7 @@ class _BeanSummaryCard extends StatelessWidget {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      '${_formatNumber(remaining)} g',
+                      '${formatNumber(remaining)} g',
                       style: textTheme.headlineMedium,
                     ),
                     const SizedBox(width: AppSpacing.s8),
@@ -331,7 +332,7 @@ class _BeanSummaryCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'dari ${_formatNumber(bean.initialStockG)} g',
+                      'dari ${formatNumber(bean.initialStockG)} g',
                       style: textTheme.bodyMedium?.copyWith(
                         color: AppColors.inkSoft,
                       ),
@@ -413,11 +414,11 @@ class _PriceCardState extends State<_PriceCard> {
     final packageIdr = _packagePriceIdr(bean);
     final original = bean.priceOriginal == null
         ? null
-        : '${_formatNumber(bean.priceOriginal!)} ${bean.currency ?? ''}'.trim();
+        : '${formatNumber(bean.priceOriginal!)} ${bean.currency ?? ''}'.trim();
     final headline = packageIdr ?? original ?? formatIdr(bean.priceIdrPerKg!);
     final subtitleParts = [
       if (bean.packSizeG != null && (packageIdr ?? original) != null)
-        'per kemasan ${_formatNumber(bean.packSizeG!)} g',
+        'per kemasan ${formatNumber(bean.packSizeG!)} g',
       if (bean.priceIdrPerKg != null)
         '${formatIdr(bean.priceIdrPerKg!)} per kg',
     ];
@@ -805,7 +806,7 @@ class _HistoryRow extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.s4),
                       Text(
-                        '${_formatNumber(item.doseG)} g · '
+                        '${formatNumber(item.doseG)} g · '
                         '${formatRatio(item.ratio)} · ${item.waterTempC}°C',
                         style: textTheme.bodySmall?.copyWith(
                           color: AppColors.inkSoft,
@@ -822,12 +823,6 @@ class _HistoryRow extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatNumber(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(1);
 }
 
 String? _processLabel(Bean bean) {

@@ -118,7 +118,7 @@ class UserRepository {
     try {
       await disableBiometric(userId);
     } catch (_) {
-      // The flag is disabled even if the invalid Keystore entry cannot be deleted.
+      // Flag tetap dimatikan walau entri Keystore yang rusak tidak bisa dihapus.
     }
   }
 

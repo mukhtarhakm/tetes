@@ -38,7 +38,7 @@ Future<List<int>> derivePasswordHash(
       result = bytes;
       path = algorithm is FlutterPbkdf2 ? 'native' : 'package';
     } catch (_) {
-      // Platform crypto may be unavailable; use the existing isolate fallback.
+      // Kripto platform bisa tidak tersedia; pakai cadangan isolate.
     }
   }
   final List<int> output;

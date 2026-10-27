@@ -7,6 +7,7 @@ import '../../../core/ui/custom_taste_chip.dart';
 import '../../../core/ui/status_pill.dart';
 import '../../../core/ui/rating_stars.dart';
 import '../../../core/utils/format_ratio.dart';
+import '../../../core/utils/display_format.dart';
 import '../journal_model.dart';
 
 class JournalBrewCard extends StatelessWidget {
@@ -33,7 +34,7 @@ class JournalBrewCard extends StatelessWidget {
     final textTheme = theme.textTheme;
 
     final ratioText = formatRatio(item.ratio);
-    final durationText = _formatSeconds(item.totalTimeS);
+    final durationText = formatClock(item.totalTimeS);
     final (syncLabel, syncVariant) = switch (item.syncStatus) {
       'synced' => ('Tersinkron', StatusPillVariant.synced),
       'error' => ('Galat sync', StatusPillVariant.error),
@@ -85,7 +86,7 @@ class JournalBrewCard extends StatelessWidget {
             const SizedBox(width: AppSpacing.s4),
             Expanded(
               child: Text(
-                _formatLocalBrewedAt(item.brewedAtUtc),
+                formatBrewedAt(item.brewedAtUtc),
                 style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
               ),
             ),
@@ -164,38 +165,6 @@ class JournalBrewCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static String _formatLocalBrewedAt(String utcString) {
-    try {
-      final dt = DateTime.parse(utcString).toLocal();
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'Mei',
-        'Jun',
-        'Jul',
-        'Agu',
-        'Sep',
-        'Okt',
-        'Nov',
-        'Des',
-      ];
-      final month = months[dt.month - 1];
-      final hour = dt.hour.toString().padLeft(2, '0');
-      final minute = dt.minute.toString().padLeft(2, '0');
-      return '${dt.day} $month ${dt.year}, $hour:$minute';
-    } catch (_) {
-      return utcString;
-    }
-  }
-
-  static String _formatSeconds(int seconds) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
 
