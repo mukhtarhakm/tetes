@@ -48,11 +48,18 @@ class HomeData {
     required this.latestBrew,
     required this.nextEvent,
     required this.againPlan,
+    this.againScore,
+    this.againIsBest = true,
   });
   final List<Bean> beans;
   final BrewJournalItem? latestBrew;
   final EventItem? nextEvent;
   final BrewPlan? againPlan;
+  // Skor dari seduhan yang menjadi sumber againPlan.
+  final int? againScore;
+  // False bila againPlan diambil dari seduhan terakhir karena biji itu
+  // belum punya seduhan terbaik.
+  final bool againIsBest;
   int get lowStockCount => beans.where((bean) => bean.isLowStock).length;
 }
 
@@ -100,15 +107,38 @@ final homeDataProvider = FutureProvider<HomeData>((ref) async {
       break;
     }
   }
+  // Pintasan "Seduh lagi" memakai pengaturan terbaik dari biji yang terakhir
+  // diseduh, bukan seduhan terakhir itu sendiri (yang bisa saja berskor 1).
   BrewPlan? plan;
-  if (brews.isNotEmpty && beans.any((bean) => bean.id == brews.first.beanId)) {
-    final detail = await (await ref.read(
-      brewRepositoryProvider.future,
-    )).findBrewDetail(userId: userId, brewId: brews.first.id);
+  int? againScore;
+  var againIsBest = true;
+  final repo = await ref.read(brewRepositoryProvider.future);
+  Bean? latestBean;
+  if (brews.isNotEmpty) {
+    for (final bean in beans) {
+      if (bean.id == brews.first.beanId) latestBean = bean;
+    }
+  }
+  final latestBest = latestBean?.bestBrewId;
+  if (latestBean != null && latestBest != null) {
+    plan = await repo.findBestPlan(
+      userId: userId,
+      beanId: latestBean.id,
+      bestBrewId: latestBest,
+    );
+    againScore = latestBean.bestBrewTasteScore;
+  }
+  if (plan == null && latestBean != null) {
+    final detail = await repo.findBrewDetail(
+      userId: userId,
+      brewId: brews.first.id,
+    );
     plan = detail?.toBrewPlan();
+    againScore = brews.first.tasteScore;
+    againIsBest = false;
   }
   if (plan == null) {
-    final repo = await ref.read(brewRepositoryProvider.future);
+    againIsBest = true;
     for (final bean in beans) {
       if (bean.bestBrewId == null) continue;
       plan = await repo.findBestPlan(
@@ -116,7 +146,10 @@ final homeDataProvider = FutureProvider<HomeData>((ref) async {
         beanId: bean.id,
         bestBrewId: bean.bestBrewId!,
       );
-      if (plan != null) break;
+      if (plan != null) {
+        againScore = bean.bestBrewTasteScore;
+        break;
+      }
     }
   }
   return HomeData(
@@ -124,6 +157,8 @@ final homeDataProvider = FutureProvider<HomeData>((ref) async {
     latestBrew: brews.isEmpty ? null : brews.first,
     nextEvent: nextEvent,
     againPlan: plan,
+    againScore: againScore,
+    againIsBest: againIsBest,
   );
 });
 
@@ -253,12 +288,15 @@ class HomeScreen extends ConsumerWidget {
                         beanName: _beanName(home.beans, plan.beanId),
                         ratio: formatRatio(plan.ratio),
                         waterTempC: plan.waterTempC,
-                        score: home.latestBrew?.beanId == plan.beanId
-                            ? home.latestBrew?.tasteScore
-                            : home.beans
-                                  .where((bean) => bean.id == plan.beanId)
-                                  .first
-                                  .bestBrewTasteScore,
+                        isBest: home.againIsBest,
+                        score:
+                            home.againScore ??
+                            (home.latestBrew?.beanId == plan.beanId
+                                ? home.latestBrew?.tasteScore
+                                : home.beans
+                                      .where((bean) => bean.id == plan.beanId)
+                                      .first
+                                      .bestBrewTasteScore),
                         onTap: () =>
                             _open(context, BrewSetupScreen(initialPlan: plan)),
                       ),
@@ -414,8 +452,8 @@ class HomeScreen extends ConsumerWidget {
                       _openAndRefresh(context, ref, const EventAgendaScreen()),
                 ),
                 _Shortcut(
-                  'Kalkulator Kurs',
-                  'IDR, USD, EUR, JPY',
+                  'Cek Harga Biji',
+                  'USD, EUR, JPY ke rupiah',
                   const Icon(
                     Icons.currency_exchange_outlined,
                     color: AppColors.ink,
@@ -568,7 +606,9 @@ class _BrewAgainRow extends StatelessWidget {
     required this.waterTempC,
     required this.score,
     required this.onTap,
+    this.isBest = true,
   });
+  final bool isBest;
   final String beanName;
   final String ratio;
   final int waterTempC;
@@ -597,7 +637,9 @@ class _BrewAgainRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Seduh lagi, pengaturan terbaik',
+                    isBest
+                        ? 'Seduh lagi, pengaturan terbaik'
+                        : 'Seduh lagi, seduhan terakhir',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(
