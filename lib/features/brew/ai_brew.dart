@@ -545,12 +545,66 @@ abstract final class AiBrew {
     final suggestions = (value['suggestions'] as List)
         .cast<Map<String, dynamic>>();
     return [
-      value['diagnosis'] as String,
-      'Kemungkinan penyebab: ${causes.join('; ')}',
-      if (suggestions.isNotEmpty)
-        'Saran: ${suggestions.map((item) => '${_variableLabel(item['variable'] as String)}: ${item['from']} → ${item['to']} (${item['reason']})').join('; ')}',
-      value['note'] as String,
+      readable(value['diagnosis'] as String),
+      'Kemungkinan penyebab:',
+      for (final cause in causes) '• ${readable(cause)}',
+      if (suggestions.isNotEmpty) 'Yang bisa dicoba:',
+      for (final item in suggestions)
+        '• ${suggestionLabel(item['variable'] as String)}: '
+            '${suggestionValue(item['variable'] as String, item['from'])} → '
+            '${suggestionValue(item['variable'] as String, item['to'])} '
+            '(${readable(item['reason'] as String)})',
+      readable(value['note'] as String),
     ].join('\n');
+  }
+
+  /// Nama variabel saran dalam bahasa pengguna.
+  static String suggestionLabel(String variable) => _variableLabel(variable);
+
+  /// Nilai saran untuk ditampilkan, lengkap dengan satuan.
+  static String suggestionValue(String variable, Object? value) =>
+      switch (variable) {
+        'dose_g' => '${_plainNumber(value)} g',
+        'ratio' => '1:${_plainNumber(value)}',
+        'water_temp_c' => '${_plainNumber(value)}°C',
+        _ => Grind.tryFromDatabase('$value')?.label ?? '$value',
+      };
+
+  /// Mengganti nama kolom mentah yang kadang ikut tertulis dalam teks AI.
+  static String readable(String text) {
+    var result = text;
+    const fields = {
+      'water_temp_c': 'suhu air',
+      'water_temp': 'suhu air',
+      'dose_g': 'dosis',
+      'pouring_count': 'jumlah tuangan',
+      'taste_score': 'skor rasa',
+      'taste_tags': 'tag rasa',
+      'drawdown_seconds': 'waktu drawdown',
+      'total_time_seconds': 'waktu total',
+    };
+    for (final entry in fields.entries) {
+      result = result.replaceAll(
+        RegExp('\\b${entry.key}\\b', caseSensitive: false),
+        entry.value,
+      );
+    }
+    for (final grind in Grind.values) {
+      if (grind.databaseValue.contains('_')) {
+        result = result.replaceAll(
+          grind.databaseValue,
+          grind.label.toLowerCase(),
+        );
+      }
+    }
+    return result.trim();
+  }
+
+  static String _plainNumber(Object? value) {
+    if (value is num) {
+      return value % 1 == 0 ? value.toInt().toString() : value.toString();
+    }
+    return '$value';
   }
 
   static Map<String, Object?> _bean(Bean bean) {

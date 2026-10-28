@@ -273,7 +273,8 @@ void main() {
       400,
     );
     expect(find.textContaining('Ekstraksi kurang merata.'), findsOneWidget);
-    expect(find.textContaining('Suhu air: 93 → 94'), findsOneWidget);
+    expect(find.text('Kemungkinan penyebab'), findsOneWidget);
+    expect(find.text('93°C → 94°C'), findsOneWidget);
     expect(find.textContaining('"likely_causes"'), findsNothing);
   });
 

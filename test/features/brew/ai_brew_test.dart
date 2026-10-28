@@ -198,6 +198,21 @@ void main() {
     expect(() => BrewCalculator.validatePlan(next!), returnsNormally);
   });
 
+  test('diagnosa ditampilkan dengan satuan dan tanpa nama kolom mentah', () {
+    expect(AiBrew.suggestionValue('water_temp_c', 92), '92°C');
+    expect(AiBrew.suggestionValue('dose_g', 15.0), '15 g');
+    expect(AiBrew.suggestionValue('ratio', 16.5), '1:16.5');
+    expect(AiBrew.suggestionValue('grind', 'sedang_halus'), 'Sedang halus');
+    expect(
+      AiBrew.readable('Berdasarkan data: dose_g 15, water_temp 92°C.'),
+      'Berdasarkan data: dosis 15, suhu air 92°C.',
+    );
+    expect(
+      AiBrew.readable('Gilingan sedang_halus lebih merata.'),
+      'Gilingan sedang halus lebih merata.',
+    );
+  });
+
   test('diagnosis dengan variabel asing ditolak', () {
     final invalid = {
       'diagnosis': 'Perlu perubahan.',

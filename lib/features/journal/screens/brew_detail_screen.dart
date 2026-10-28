@@ -261,9 +261,10 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
     final shortHash = item.hash.length >= 8
         ? item.hash.substring(0, 8)
         : item.hash;
-    final adviceText = _fallback == null
+    final adviceMap = _fallback ?? _parseAdvice(data.aiAdvice);
+    final adviceText = adviceMap == null
         ? _formatAdvice(data.aiAdvice)
-        : AiBrew.diagnosisSummary(_fallback!);
+        : AiBrew.diagnosisSummary(adviceMap);
     final savedPlan = _planFromSavedAdvice(data);
     final nextPlan = _fallbackPlan ?? savedPlan;
 
@@ -534,16 +535,19 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
                   variant: StatusPillVariant.warning,
                 ),
               if (_diagnosisNotice != null) Text(_diagnosisNotice!),
-              Text(
-                adviceText,
-                style: textTheme.bodyMedium?.copyWith(
-                  color:
-                      _fallback != null ||
-                          data.aiAdvice != null && data.aiAdvice!.isNotEmpty
-                      ? AppColors.ink
-                      : AppColors.inkSoft,
+              if (adviceMap != null)
+                _DiagnosisView(value: adviceMap)
+              else
+                Text(
+                  adviceText,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color:
+                        _fallback != null ||
+                            data.aiAdvice != null && data.aiAdvice!.isNotEmpty
+                        ? AppColors.ink
+                        : AppColors.inkSoft,
+                  ),
                 ),
-              ),
               if (_fallback != null ||
                   data.aiAdvice != null && data.aiAdvice!.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.s8),
@@ -651,6 +655,19 @@ class _BrewDetailContentState extends ConsumerState<_BrewDetailContent> {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => BrewSetupScreen(initialPlan: plan)),
     );
+  }
+
+  static Map<String, dynamic>? _parseAdvice(String? advice) {
+    if (advice == null || advice.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(advice);
+      if (decoded is Map<String, dynamic> && AiBrew.validDiagnosis(decoded)) {
+        return decoded;
+      }
+    } catch (_) {
+      // Saran lama dapat tersimpan sebagai teks biasa.
+    }
+    return null;
   }
 
   static String _formatAdvice(String? advice) {
@@ -809,6 +826,113 @@ class _TableCell extends StatelessWidget {
         vertical: AppSpacing.s12,
       ),
       child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+    );
+  }
+}
+
+/// Diagnosa AI dalam bagian-bagian pendek: ringkasan, penyebab, lalu saran.
+class _DiagnosisView extends StatelessWidget {
+  const _DiagnosisView({required this.value});
+
+  final Map<String, dynamic> value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final causes = (value['likely_causes'] as List).cast<String>();
+    final suggestions = (value['suggestions'] as List)
+        .cast<Map<String, dynamic>>();
+    final note = AiBrew.readable(value['note'] as String);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          AiBrew.readable(value['diagnosis'] as String),
+          style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: AppSpacing.s16),
+        Text('Kemungkinan penyebab', style: textTheme.labelLarge),
+        const SizedBox(height: AppSpacing.s8),
+        for (final cause in causes)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: AppSpacing.s6,
+                  height: AppSpacing.s6,
+                  margin: const EdgeInsets.only(
+                    top: AppSpacing.s8,
+                    right: AppSpacing.s10,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    AiBrew.readable(cause),
+                    style: textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (suggestions.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s8),
+          Text('Yang bisa dicoba', style: textTheme.labelLarge),
+          const SizedBox(height: AppSpacing.s8),
+          for (final item in suggestions)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: AppSpacing.s8),
+              padding: const EdgeInsets.all(AppSpacing.s12),
+              decoration: BoxDecoration(
+                color: AppColors.stage1Soft,
+                borderRadius: BorderRadius.circular(AppRadius.small),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          AiBrew.suggestionLabel(item['variable'] as String),
+                          style: textTheme.titleSmall,
+                        ),
+                      ),
+                      Text(
+                        '${AiBrew.suggestionValue(item['variable'] as String, item['from'])}'
+                        ' → '
+                        '${AiBrew.suggestionValue(item['variable'] as String, item['to'])}',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s4),
+                  Text(
+                    AiBrew.readable(item['reason'] as String),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.inkSoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        if (note.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s4),
+          Text(
+            note,
+            style: textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+          ),
+        ],
+      ],
     );
   }
 }
