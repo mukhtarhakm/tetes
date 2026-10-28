@@ -50,11 +50,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _send(String text) async {
     final controller = ref.read(chatControllerProvider.notifier);
     final before = ref.read(chatControllerProvider).asData?.value;
-    if (before == null || before.isSending) return;
+    if (before == null || before.isSending || text.trim().isEmpty) return;
+    // Kolom dikosongkan saat itu juga agar terasa terkirim, tidak menunggu
+    // jawaban AI selesai.
+    _textController.clear();
     await controller.send(text);
+    if (!mounted) return;
     final after = ref.read(chatControllerProvider).asData?.value;
-    if (after != null && after.errorMessage == null) {
-      _textController.clear();
+    // Jika gagal, kembalikan teksnya supaya bisa dikirim ulang tanpa mengetik.
+    if (after?.errorMessage != null && _textController.text.isEmpty) {
+      _textController.text = text;
+      _textController.selection = TextSelection.collapsed(offset: text.length);
     }
   }
 
@@ -439,12 +445,24 @@ class _TypingBubble extends StatelessWidget {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(AppRadius.innerCard),
           ),
-          child: const SizedBox(
-            width: AppSizes.buttonProgress,
-            height: AppSizes.buttonProgress,
-            child: CircularProgressIndicator(
-              strokeWidth: AppSizes.progressStroke,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: AppSizes.buttonProgress,
+                height: AppSizes.buttonProgress,
+                child: CircularProgressIndicator(
+                  strokeWidth: AppSizes.progressStroke,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s12),
+              Text(
+                'Barista sedang mengetik...',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+              ),
+            ],
           ),
         ),
       ],
