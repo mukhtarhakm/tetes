@@ -175,7 +175,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
               Text(
                 drawdown
                     ? 'Tekan Air habis saat air selesai menetes.'
-                    : 'Tuang ${formatNumber(activeStage.targetPourG)} g • Kumulatif ${formatNumber(plan.cumulativeWaterAt(controller.activeStageIndex))} g',
+                    : _pourInstruction(plan, controller.activeStageIndex),
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
@@ -204,6 +204,13 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
         ),
         const SizedBox(height: AppSpacing.s20),
         Text('Urutan tahap', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: AppSpacing.s4),
+        Text(
+          'Angka gram adalah target total di timbangan.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+        ),
         const SizedBox(height: AppSpacing.s12),
         AppCard(
           child: Column(
@@ -241,7 +248,7 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
                     ),
                     const SizedBox(width: AppSpacing.s12),
                     Text(
-                      '${formatNumber(stage.targetPourG)} g',
+                      '${formatNumber(plan.cumulativeWaterAt(index))} g',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     const SizedBox(width: AppSpacing.s12),
@@ -504,6 +511,18 @@ class _BrewSessionScreenState extends State<BrewSessionScreen>
       setState(() => _hardwareWarning = message);
     }
   }
+}
+
+/// Saat menyeduh, timbangan tidak di-tare di antara tahap. Karena itu target
+/// ditulis sebagai angka total di timbangan, dengan jumlah tuangan tahap ini
+/// sebagai keterangan.
+String _pourInstruction(BrewPlan plan, int stageIndex) {
+  final total = formatNumber(plan.cumulativeWaterAt(stageIndex));
+  if (stageIndex == 0) {
+    return 'Tuang sampai $total g';
+  }
+  final pour = formatNumber(plan.stages[stageIndex].targetPourG);
+  return 'Tuang sampai $total g (+$pour g)';
 }
 
 String _stageStatus(BrewSessionController controller, int index) {

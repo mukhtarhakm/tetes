@@ -57,6 +57,11 @@ void main() {
     expect(find.text('Siap memulai'), findsOneWidget);
     expect(find.text('Waktu total'), findsOneWidget);
     expect(find.text('Urutan tahap'), findsOneWidget);
+    expect(find.textContaining('Tuang sampai'), findsOneWidget);
+    expect(
+      find.text('Angka gram adalah target total di timbangan.'),
+      findsOneWidget,
+    );
     expect(
       find.byWidgetPredicate(
         (widget) =>
