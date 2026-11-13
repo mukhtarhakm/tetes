@@ -100,6 +100,73 @@ void main() {
     expect(find.text('Kembalikan'), findsOneWidget);
   });
 
+  testWidgets('kartu AI merinci perubahan tahap walau parameter utama sama', (
+    tester,
+  ) async {
+    final bean = _bean();
+    final before = BrewCalculator.createDefault(beanId: bean.id);
+    final recommended = BrewCalculator.updateDuration(
+      BrewCalculator.updateTargetPour(before, stageIndex: 0, targetPourG: 35),
+      stageIndex: 0,
+      durationSeconds: 45,
+    );
+    await tester.pumpWidget(
+      _app(
+        () async => BrewSetupState(
+          beans: [bean],
+          selectedBeanId: bean.id,
+          plan: recommended,
+          aiSuggestion: AppliedAiSuggestion(
+            before: before,
+            recommended: recommended,
+            note: 'Coba bloom sedikit lebih lama.',
+            hasHistory: true,
+          ),
+        ),
+        initialBeanId: bean.id,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Tahap seduh: 3 tahap berubah'), findsOneWidget);
+    expect(
+      find.text('AI menyarankan pengaturan yang sama dengan isian saat ini'),
+      findsNothing,
+    );
+    await tester.ensureVisible(find.text('Lihat detail'));
+    await tester.tap(find.text('Lihat detail'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Bloom: 45 g, 40 dtk, mulai 00:00 → 35 g, 45 dtk'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('kartu AI menyebut tahap tetap sama bila tidak berubah', (
+    tester,
+  ) async {
+    final bean = _bean();
+    final plan = BrewCalculator.createDefault(beanId: bean.id);
+    await tester.pumpWidget(
+      _app(
+        () async => BrewSetupState(
+          beans: [bean],
+          selectedBeanId: bean.id,
+          plan: plan,
+          aiSuggestion: AppliedAiSuggestion(
+            before: plan,
+            recommended: plan,
+            note: 'Rencana saat ini sudah cocok sebagai titik awal.',
+            hasHistory: false,
+          ),
+        ),
+        initialBeanId: bean.id,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Tahap seduh tetap sama'), findsOneWidget);
+    expect(find.text('Lihat detail'), findsNothing);
+  });
+
   testWidgets('dosis melebihi stok menampilkan pesan dan menonaktifkan mulai', (
     tester,
   ) async {

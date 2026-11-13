@@ -95,19 +95,34 @@ void main() {
   });
 
   test('payload recommend hanya membawa preferensi yang diisi', () {
+    final currentPlan = BrewCalculator.updateTargetPour(
+      defaultPlan,
+      stageIndex: 0,
+      targetPourG: 35,
+    );
     final plain = AiBrew.recommendPayload(
       bean: _bean(),
       history: const [],
-      pouringCount: 3,
+      currentPlan: currentPlan,
       preferences: const AiRecommendPreferences(wish: '   '),
     );
     expect(plain.containsKey('preferences'), isFalse);
     expect(plain['pouring_count'], 3);
+    final sentPlan = plain['current_plan'] as Map<String, Object?>;
+    final sentStages = sentPlan['stages'] as List<Map<String, Object?>>;
+    expect(sentPlan['dose_g'], 15);
+    expect(sentStages.first, {
+      'name': 'bloom',
+      'start_s': 0,
+      'duration_s': 40,
+      'water_cum_g': 35,
+    });
+    expect(sentStages.last['water_cum_g'], 240);
 
     final full = AiBrew.recommendPayload(
       bean: _bean(),
       history: const [],
-      pouringCount: 3,
+      currentPlan: currentPlan,
       preferences: const AiRecommendPreferences(
         doseG: 17,
         pouringCount: 4,
@@ -131,8 +146,11 @@ void main() {
     expect(AiRecommendPreferences.doseError('15.25'), isNotNull);
     expect(AiRecommendPreferences.doseError('abc'), isNotNull);
     expect(
-      const AiRecommendPreferences(doseG: 17, pouringCount: 4, wish: 'manis')
-          .summary,
+      const AiRecommendPreferences(
+        doseG: 17,
+        pouringCount: 4,
+        wish: 'manis',
+      ).summary,
       'Dosis 17 g · 4 pouring · Keinginan: manis',
     );
   });
@@ -167,7 +185,7 @@ void main() {
     final payload = AiBrew.recommendPayload(
       bean: _bean(),
       history: List.generate(6, _history),
-      pouringCount: 3,
+      currentPlan: defaultPlan,
     );
     final history = payload['history'] as List<Map<String, Object?>>;
     expect(history, hasLength(5));

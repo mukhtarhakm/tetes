@@ -522,6 +522,28 @@ class _AiSuggestionCardState extends State<_AiSuggestionCard> {
   Widget build(BuildContext context) {
     final suggestion = widget.suggestion;
     final changes = suggestion.changes;
+    final stageChanges = <String>[];
+    final beforeStages = suggestion.before.stages;
+    final afterStages = suggestion.recommended.stages;
+    for (
+      var index = 0;
+      index < beforeStages.length || index < afterStages.length;
+      index++
+    ) {
+      final before = index < beforeStages.length ? beforeStages[index] : null;
+      final after = index < afterStages.length ? afterStages[index] : null;
+      if (before?.startSeconds == after?.startSeconds &&
+          before?.durationSeconds == after?.durationSeconds &&
+          (before == null ||
+              after == null ||
+              formatNumber(before.targetPourG) ==
+                  formatNumber(after.targetPourG))) {
+        continue;
+      }
+      stageChanges.add(
+        '${(after ?? before)!.name.label}: ${_stageText(before)} → ${_stageText(after)}',
+      );
+    }
     return AppCard(
       variant: AppCardVariant.tinted,
       child: Column(
@@ -542,7 +564,7 @@ class _AiSuggestionCardState extends State<_AiSuggestionCard> {
             Text(suggestion.note),
           ],
           const SizedBox(height: AppSpacing.s12),
-          if (changes.isEmpty) ...[
+          if (changes.isEmpty && stageChanges.isEmpty) ...[
             const Text(
               'AI menyarankan pengaturan yang sama dengan isian saat ini',
             ),
@@ -561,17 +583,23 @@ class _AiSuggestionCardState extends State<_AiSuggestionCard> {
                 ),
               ),
             ),
-          AppButton(
-            label: showDetails ? 'Tutup detail' : 'Lihat detail',
-            variant: AppButtonVariant.text,
-            expand: false,
-            onPressed: () => setState(() => showDetails = !showDetails),
-          ),
-          if (showDetails) ...[
+          if (stageChanges.isEmpty) ...[
             const SizedBox(height: AppSpacing.s8),
-            Text(
-              'Tahap dibuat ulang: ${suggestion.recommended.pouringCount} pouring',
+            const Text('Tahap seduh tetap sama'),
+          ] else ...[
+            Text('Tahap seduh: ${stageChanges.length} tahap berubah'),
+            AppButton(
+              label: showDetails ? 'Tutup detail' : 'Lihat detail',
+              variant: AppButtonVariant.text,
+              expand: false,
+              onPressed: () => setState(() => showDetails = !showDetails),
             ),
+            if (showDetails)
+              for (final change in stageChanges)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                  child: Text(change),
+                ),
           ],
           const SizedBox(height: AppSpacing.s8),
           AppButton(
@@ -583,6 +611,10 @@ class _AiSuggestionCardState extends State<_AiSuggestionCard> {
       ),
     );
   }
+
+  String _stageText(BrewStage? stage) => stage == null
+      ? 'tidak ada'
+      : '${formatNumber(stage.targetPourG)} g, ${stage.durationSeconds} dtk, mulai ${formatClock(stage.startSeconds)}';
 }
 
 class _FormLabel extends StatelessWidget {

@@ -318,7 +318,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
             payload: AiBrew.recommendPayload(
               bean: bean,
               history: history,
-              pouringCount: plan.pouringCount,
+              currentPlan: plan,
               preferences: prefs,
             ),
           );

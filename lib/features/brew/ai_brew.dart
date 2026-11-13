@@ -170,13 +170,29 @@ abstract final class AiBrew {
   static Map<String, Object?> recommendPayload({
     required Bean bean,
     required List<BrewDetailData> history,
-    required int pouringCount,
+    required BrewPlan currentPlan,
     AiRecommendPreferences? preferences,
   }) => {
     'bean': _bean(bean),
     'history': history.take(5).map(_historyBrew).toList(),
+    'current_plan': {
+      'dose_g': currentPlan.doseG,
+      'ratio': currentPlan.ratio,
+      'water_temp_c': currentPlan.waterTempC,
+      'grind': currentPlan.grind.databaseValue,
+      'pouring_count': currentPlan.pouringCount,
+      'stages': [
+        for (var index = 0; index < currentPlan.stages.length; index++)
+          {
+            'name': currentPlan.stages[index].name.databaseValue,
+            'start_s': currentPlan.stages[index].startSeconds,
+            'duration_s': currentPlan.stages[index].durationSeconds,
+            'water_cum_g': currentPlan.cumulativeWaterAt(index),
+          },
+      ],
+    },
     // Server mewajibkan pouring_count sama dengan preferensi bila dikunci.
-    'pouring_count': preferences?.pouringCount ?? pouringCount,
+    'pouring_count': preferences?.pouringCount ?? currentPlan.pouringCount,
     if (preferences != null && !preferences.isEmpty)
       'preferences': preferences.toJson(),
   };

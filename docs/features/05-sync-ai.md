@@ -54,9 +54,11 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 
 - **Pembaruan 10-G:** `AI_PROVIDER` memilih `gemini` atau `openai` (default `gemini`). Secret model dan kunci penyedia terpilih wajib tersedia hanya di Edge Function. Prompt, kuota, sesi, batas waktu, normalisasi, validator, dan respons ke Flutter tetap satu kontrak. OpenAI memakai Chat Completions dengan `json_schema` strict untuk recommend/diagnose, `max_completion_tokens` 2048 untuk JSON dan 800 untuk chat; `reasoning_effort` hanya dikirim bila secret opsional diisi. HTTP 429 dan 5xx OpenAI dicoba ulang satu kali selama waktu masih tersedia.
 - **Pembaruan 10-H:** `recommend` menerima `preferences` opsional: `dose_g` 5-60 dengan maksimal satu desimal, `pouring_count` 1-5 yang sama dengan payload, dan `wish` 1-200 karakter setelah trim. Key asing atau nilai salah menghasilkan `400 invalid_input`; objek kosong setara tidak dikirim. Keluaran yang melanggar kunci dosis (toleransi 0,05 g) atau jumlah pouring ditolak dan dicoba ulang sekali, tanpa memaksa dosis. Wish hanya data rasa, bukan instruksi, dan tidak dicatat di log. Tanpa preferences, perilaku lama tetap.
+- **Pembaruan 2026-11-13:** `recommend` menerima `current_plan` opsional berisi pengaturan dan tahap yang sedang tampil. Server memvalidasi rencana ini; klien lama tanpa field tetap diterima. Prompt membandingkan rencana saat ini dan menjelaskan perubahan tahap di `note` bila ada alasan, tanpa memaksa perubahan.
 
 ### Sisi Flutter
 - **Pembaruan 10-F:** `pouring_count` pada payload rekomendasi adalah preferensi. Keluaran AI memuat `pouring_count` 1-5 dan jumlah tahap yang sama; bila berbeda dari preferensi, `note` menjelaskan alasannya. Kartu Saran AI menampilkan perubahan Pouring, menyorot Jumlah pouring, dan Kembalikan memulihkan rencana lama. Aturan lama yang mengikat jumlah tahap ke input diganti oleh aturan keluaran ini.
+- Rencana tahap yang sedang tampil ikut dikirim saat meminta rekomendasi. Kartu Saran AI menampilkan jumlah tahap yang berubah dan, saat detail dibuka, perbandingan target air, durasi, serta waktu mulai; bila sama, kartu menyatakannya.
 - Klien AI di `lib/data/remote/ai_client.dart`.
 - **Atur Seduh:** tombol "Rekomendasikan dengan AI" membuka lembar "Sebelum AI menyarankan" (opsional: dosis, jumlah pouring, keinginan), lalu mengirim profil biji, riwayat singkat, dan preferensi yang diisi. Lewati mengirim tanpa preferensi; menutup lembar membatalkan. Saran yang melanggar dosis atau pouring terkunci ditolak juga di aplikasi dan diganti pengaturan cadangan. Hasil mengisi form dan tetap dapat diubah.
 - **Hasil:** tombol "Minta Diagnosa AI" aktif bila skor dan minimal satu tag terisi. Hasil tampil sebagai kartu diagnosa, kemungkinan penyebab, saran, dan catatan.
@@ -87,7 +89,7 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 - Tidak mencatat password, token session, secret, atau isi lengkap data pribadi di log.
 
 ## Boleh menyentuh
-`supabase/` (functions dan migrations), `lib/data/sync/`, bagian sinkronisasi pada `lib/data/repositories/`, `lib/data/remote/ai_client.dart`, layar Atur Seduh dan Hasil (hanya tombol dan kartu AI), layar Profil (status dan tombol sinkron), dialog konflik/pemulihan, `lib/core/config/`.
+`supabase/` (functions dan migrations), `lib/data/sync/`, bagian sinkronisasi pada `lib/data/repositories/`, `lib/data/remote/ai_client.dart`, layar Atur Seduh dan Hasil (hanya tombol dan kartu AI), layar Profil (status dan tombol sinkron), dialog konflik/pemulihan, `lib/core/config/`. Untuk perbaikan tahap rekomendasi 2026-11-13, pemilik juga mengizinkan `lib/features/brew/ai_brew.dart`, `lib/features/brew/state/brew_setup_controller.dart`, tes terkait di `test/features/brew/`, serta `docs/ARCHITECTURE.md`, `docs/features/05-sync-ai.md`, `docs/PROGRESS.md`, dan `docs/DECISIONS.md`.
 
 ## Acceptance criteria
 

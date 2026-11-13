@@ -210,6 +210,26 @@ function brew(value: unknown, diagnosis: boolean): value is Row {
   return value.stages == null || Array.isArray(value.stages) && value.stages.length <= 5 && value.stages.every((item, index) => stage(item, index + 1));
 }
 
+function recommendationPlan(value: unknown, withNote: boolean): value is Row {
+  if (!record(value) || !only(value, withNote
+    ? ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages", "note"]
+    : ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages"]) ||
+    !number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) || !integer(value.water_temp_c, 80, 100) ||
+    !choice(value.grind, grinds) || withNote && !text(value.note) || !Array.isArray(value.stages) ||
+    !integer(value.pouring_count, 1, 5) || value.stages.length !== value.pouring_count) return false;
+  let end = 0;
+  let water = 0;
+  for (let i = 0; i < value.stages.length; i++) {
+    const item = value.stages[i];
+    if (!record(item) || !only(item, ["name", "start_s", "duration_s", "water_cum_g"]) || item.name !== stageNames[i] ||
+      !integer(item.start_s, end, 3600) || !integer(item.duration_s, 1, 3600) ||
+      !number(item.water_cum_g, water + Number.EPSILON, 1200)) return false;
+    end = item.start_s + item.duration_s;
+    water = item.water_cum_g;
+  }
+  return Math.abs(water - value.dose_g * value.ratio) <= 1;
+}
+
 export function validateInput(value: unknown): AiInput | null {
   if (!record(value) || !only(value, ["type", "payload"]) || (value.type !== "recommend" && value.type !== "diagnose" && value.type !== "chat") || !record(value.payload)) return null;
   const type = value.type;
@@ -220,9 +240,10 @@ export function validateInput(value: unknown): AiInput | null {
     (clean.messages as Row[]).forEach((message) => { message.content = (message.content as string).trim(); });
     return { type, payload: clean };
   }
-  if (!only(payload, type === "recommend" ? ["bean", "history", "pouring_count", "preferences"] : ["bean", "brew", "history"]) || !bean(payload.bean) ||
+  if (!only(payload, type === "recommend" ? ["bean", "history", "pouring_count", "preferences", "current_plan"] : ["bean", "brew", "history"]) || !bean(payload.bean) ||
     !Array.isArray(payload.history) || payload.history.length > 5 || !payload.history.every((item) => brew(item, false))) return null;
   if (type === "recommend" ? !integer(payload.pouring_count, 1, 5) : !brew(payload.brew, true)) return null;
+  if (type === "recommend" && payload.current_plan !== undefined && !recommendationPlan(payload.current_plan, false)) return null;
   if (type === "recommend" && payload.preferences !== undefined) {
     const preferences = payload.preferences;
     if (!record(preferences) || !only(preferences, ["dose_g", "pouring_count", "wish"]) ||
@@ -252,21 +273,10 @@ export function validateInput(value: unknown): AiInput | null {
 export function validateOutput(type: AiType, value: unknown, preferences?: Row): Row | null {
   if (!record(value)) return null;
   if (type === "recommend") {
-    if (!only(value, ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages", "note"]) ||
-      !number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) || !integer(value.water_temp_c, 80, 100) || !choice(value.grind, grinds) ||
-      !text(value.note) || !Array.isArray(value.stages) || !integer(value.pouring_count, 1, 5) || value.stages.length !== value.pouring_count) return null;
+    if (!recommendationPlan(value, true)) return null;
     if ((preferences?.dose_g !== undefined && Math.abs(value.dose_g - (preferences.dose_g as number)) > 0.05 + 1e-9) ||
       (preferences?.pouring_count !== undefined && value.pouring_count !== preferences.pouring_count)) return null;
-    let end = 0;
-    let water = 0;
-    for (let i = 0; i < value.stages.length; i++) {
-      const item = value.stages[i];
-      if (!record(item) || !only(item, ["name", "start_s", "duration_s", "water_cum_g"]) || item.name !== stageNames[i] ||
-        !integer(item.start_s, end, 3600) || !integer(item.duration_s, 1, 3600) || !number(item.water_cum_g, water + Number.EPSILON, 1200)) return null;
-      end = item.start_s + item.duration_s;
-      water = item.water_cum_g;
-    }
-    return Math.abs(water - value.dose_g * value.ratio) <= 1 ? value : null;
+    return value;
   }
   if (!only(value, ["diagnosis", "likely_causes", "suggestions", "note"]) || !text(value.diagnosis) || !text(value.note) ||
     !Array.isArray(value.likely_causes) || value.likely_causes.length < 1 || value.likely_causes.length > 5 || !value.likely_causes.every((item) => text(item)) ||

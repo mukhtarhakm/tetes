@@ -1,5 +1,10 @@
 # PROGRESS: Tetes
 
+## 2026-11-13 - Perbaikan rincian tahap rekomendasi AI
+- Atur Seduh mengirim `current_plan` (dosis, rasio, suhu, gilingan, jumlah pouring, waktu dan air kumulatif tiap tahap) ke Edge Function `ai`. Server memvalidasinya dan tetap menerima klien lama tanpa field itu. Prompt meminta AI membandingkan rencana saat ini dan tidak mengubah tahap tanpa alasan.
+- Kartu Saran AI kini membandingkan tahap secara langsung: jumlah tahap berubah ditampilkan, detail memuat target air, durasi, serta waktu mulai sebelum/sesudah, dan tahap yang tetap sama disebut jelas. Respons AI yang valid tetap mengisi form; tidak ada perubahan otomatis yang dipaksakan.
+- 23 tes server lulus lewat shim Node, 29 tes Flutter terfokus lulus, dan `flutter analyze --no-pub` bersih. Deploy Edge Function, build APK baru, dan uji HP masih menunggu.
+
 ## 2026-11-13 - Perbaikan jawaban Tanya Barista
 - Prompt chat kini memperlakukan pesan terakhir pengguna sebagai pertanyaan V60 yang perlu dijawab. Tanpa konteks biji, AI diminta memberi panduan umum dan meminta detail bila perlu; riwayat serta konteks tetap hanya bahan pendukung. Prompt rekomendasi dan diagnosa tidak berubah.
 - Tes server untuk prompt chat Gemini dan OpenAI serta alur kuota lulus (22 tes melalui shim Node). Deploy Edge Function dan uji jawaban di HP asli masih menunggu.
