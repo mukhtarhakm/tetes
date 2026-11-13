@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-11-13 - Perbaikan jawaban Tanya Barista
+- Prompt chat kini memperlakukan pesan terakhir pengguna sebagai pertanyaan V60 yang perlu dijawab. Tanpa konteks biji, AI diminta memberi panduan umum dan meminta detail bila perlu; riwayat serta konteks tetap hanya bahan pendukung. Prompt rekomendasi dan diagnosa tidak berubah.
+- Tes server untuk prompt chat Gemini dan OpenAI serta alur kuota lulus (22 tes melalui shim Node). Deploy Edge Function dan uji jawaban di HP asli masih menunggu.
+
 ## 2026-10-27 - Fitur 10-H, preferensi opsional sebelum rekomendasi AI
 - Server: Edge Function `ai` menerima preferensi rekomendasi opsional, membersihkan wish, dan menolak keluaran yang melanggar kunci dosis atau jumlah pouring dalam alur retry yang ada. Prompt lama dipertahankan untuk payload tanpa preferensi. Seluruh 21 tes AI lulus lewat shim Node karena Deno tidak tersedia.
 - Flutter: tombol "Rekomendasikan dengan AI" membuka lembar bawah "Sebelum AI menyarankan" (`ai_preferences_sheet.dart`) berisi kolom Dosis kopi, chip Jumlah pouring ("Biar AI pilih" atau 1-5), dan kolom Keinginanmu maksimal 200 karakter. Semua opsional; Lewati meminta saran tanpa preferensi, menutup lembar membatalkan. `AiRecommendPreferences` dikirim hanya bila berisi, dan aplikasi ikut menolak saran yang melanggar kunci. Kartu Saran AI menampilkan ringkasan preferensi.
