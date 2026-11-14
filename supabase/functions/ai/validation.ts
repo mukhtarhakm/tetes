@@ -96,10 +96,19 @@ export function normalizeOutput(type: AiType, value: unknown): unknown {
       Number.isFinite(output.dose_g) && Number.isFinite(output.ratio) && output.stages.length) {
       const last = output.stages[output.stages.length - 1];
       const total = output.dose_g * output.ratio;
-      if (record(last) && (output.stages.length === 1 ||
-        (record(output.stages[output.stages.length - 2]) &&
-          typeof output.stages[output.stages.length - 2].water_cum_g === "number" &&
-          output.stages[output.stages.length - 2].water_cum_g < total))) {
+      if (record(last) && total > 0 && total <= 1200) {
+        let nextWater = total;
+        for (let index = output.stages.length - 2; index >= 0; index--) {
+          const stage = output.stages[index];
+          if (!record(stage) || !number(stage.water_cum_g, 0, 1200)) break;
+          if (stage.water_cum_g >= nextWater) {
+            const priorStage = output.stages[index - 1];
+            const prior = record(priorStage) ? priorStage.water_cum_g : 0;
+            const lower = typeof prior === "number" && prior > 0 && prior < nextWater ? prior : 0;
+            stage.water_cum_g = (lower + nextWater) / 2;
+          }
+          nextWater = stage.water_cum_g;
+        }
         output.stages[output.stages.length - 1] = { ...last, water_cum_g: total };
       }
     }

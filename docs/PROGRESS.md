@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-11-14 - Perbaikan air kumulatif rekomendasi 4 pouring
+- Uji HP sekitar 08.23 tetap menghasilkan cadangan. Log fungsi `ai` menunjukkan kedua keluaran OpenAI selesai normal, tetapi ditolak pada `stages[3].water_cum_g`: air kumulatif tahap terakhir 4 pouring tidak sah.
+- Normalisasi server kini menempatkan tahap sebelumnya di antara air tahap lebih awal dan total bila sudah mencapai/melewati tahap berikutnya, lalu memastikan tahap terakhir tepat dosis × rasio. Nilai tahap sebelumnya yang nonangka atau di luar batas tetap ditolak. Tes 4 dan 5 pouring mencakup koreksi air kumulatif; deploy dan uji HP menunggu.
+
 ## 2026-11-14 - Selaraskan air kumulatif 4 pouring
 - Uji HP sekitar 08.11 menunjukkan respons `200` dari fungsi `ai`, tetapi rencana 4 pouring masih ditolak Flutter; 5 pouring berikutnya berhasil. Log server tidak menyimpan isi respons, jadi nilai yang ditolak Flutter belum diketahui pasti.
 - Server sebelumnya dapat menerima air kumulatif dua tahap yang sama karena `water + Number.EPSILON` membulat kembali ke `water` pada nilai seperti 100 g. Flutter menuntut kenaikan ketat. Pemeriksaan server sekarang memakai perbandingan ketat yang sama; tes 4 pouring dengan air kumulatif berulang ditambahkan. Deploy dan uji HP menunggu.

@@ -102,7 +102,7 @@ Deno.test("teks panjang selesai pada batas kalimat atau kata", () => {
     finishUserText("Saran pertama. " + "ulang ".repeat(250), 1200) !== "Saran pertama.") throw new Error("chat text boundary failed");
 });
 
-Deno.test("normalisasi recommend membulatkan waktu dan air akhir tanpa menerima air sebelumnya yang berlebih", () => {
+Deno.test("normalisasi recommend membulatkan waktu dan memperbaiki air kumulatif", () => {
   const value = structuredClone(validRecommend);
   value.stages[0].duration_s = 40.4;
   value.stages[1].start_s = 39.6;
@@ -111,7 +111,10 @@ Deno.test("normalisasi recommend membulatkan waktu dan air akhir tanpa menerima 
   if (!validateOutput("recommend", normalized) || (normalized as typeof value).stages[1].start_s !== 40 ||
     (normalized as typeof value).stages[2].water_cum_g !== 240) throw new Error("normalization failed");
   value.stages[1].water_cum_g = 241;
-  if (validateOutput("recommend", normalizeOutput("recommend", value))) throw new Error("excess prior water accepted");
+  if (validateOutput("recommend", value)) throw new Error("excess prior water accepted without normalization");
+  const corrected = normalizeOutput("recommend", value) as typeof value;
+  if (!validateOutput("recommend", corrected) || corrected.stages[1].water_cum_g !== 142.5 ||
+    corrected.stages[2].water_cum_g !== 240) throw new Error("excess prior water not corrected");
 });
 
 Deno.test("lima pouring mengikuti batas rencana Flutter", () => {
@@ -141,14 +144,23 @@ Deno.test("lima pouring mengikuti batas rencana Flutter", () => {
   if (recommendationFailureField(wrongName) !== "stages[3].name" || validateOutput("recommend", wrongName)) throw new Error("stage name failure not reported");
   const excessWater = structuredClone(normalized);
   excessWater.stages[3].water_cum_g = 271;
-  if (recommendationFailureField(normalizeOutput("recommend", excessWater)) !== "stages[4].water_cum_g") throw new Error("water failure not reported");
+  if (recommendationFailureField(excessWater) !== "stages[4].water_cum_g") throw new Error("water failure not reported");
+  const correctedFive = normalizeOutput("recommend", excessWater) as typeof five;
+  if (!validateOutput("recommend", correctedFive) || correctedFive.stages[3].water_cum_g !== 212.5 ||
+    correctedFive.stages[4].water_cum_g !== 270) throw new Error("five pours were not corrected");
   const four = { ...structuredClone(normalized), pouring_count: 4, stages: structuredClone(normalized.stages.slice(0, 4)) };
-  four.stages[2].water_cum_g = four.stages[1].water_cum_g;
+  four.stages[2].water_cum_g = 270;
   four.stages[3].water_cum_g = 270;
-  const repeatedWater = normalizeOutput("recommend", four);
-  if (validateOutput("recommend", repeatedWater) || recommendationFailureField(repeatedWater) !== "stages[2].water_cum_g") {
-    throw new Error("four pours with repeated cumulative water accepted");
+  if (validateOutput("recommend", four) || recommendationFailureField(four) !== "stages[3].water_cum_g") throw new Error("four pours with no final water accepted");
+  const correctedFour = normalizeOutput("recommend", four) as typeof four;
+  if (!validateOutput("recommend", correctedFour) || correctedFour.stages[2].water_cum_g !== 185 ||
+    correctedFour.stages[3].water_cum_g !== 270) throw new Error("four pours were not corrected");
+  four.stages[2].water_cum_g = four.stages[1].water_cum_g;
+  if (validateOutput("recommend", four) || !validateOutput("recommend", normalizeOutput("recommend", four))) {
+    throw new Error("repeated cumulative water was not corrected");
   }
+  four.stages[1].water_cum_g = 1300;
+  if (validateOutput("recommend", normalizeOutput("recommend", four))) throw new Error("out-of-range intermediate water accepted");
   const fractional = structuredClone(validRecommend);
   fractional.dose_g = 15.5;
   fractional.ratio = 16.1;
