@@ -210,26 +210,45 @@ function brew(value: unknown, diagnosis: boolean): value is Row {
   return value.stages == null || Array.isArray(value.stages) && value.stages.length <= 5 && value.stages.every((item, index) => stage(item, index + 1));
 }
 
-function recommendationPlan(value: unknown, withNote: boolean): value is Row {
-  if (!record(value) || !only(value, withNote
+function recommendationPlanFailure(value: unknown, withNote: boolean): string | null {
+  if (!record(value)) return "object";
+  if (!only(value, withNote
     ? ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages", "note"]
-    : ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages"]) ||
-    !number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) ||
-    Math.abs(value.ratio * 10 - Math.round(value.ratio * 10)) > 0.0000001 ||
-    !integer(value.water_temp_c, 80, 100) ||
-    !choice(value.grind, grinds) || withNote && !text(value.note) || !Array.isArray(value.stages) ||
-    !integer(value.pouring_count, 1, 5) || value.stages.length !== value.pouring_count) return false;
+    : ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages"])) return "keys";
+  if (!number(value.dose_g, 5, 60)) return "dose_g";
+  if (!number(value.ratio, 10, 20) ||
+    Math.abs(value.ratio * 10 - Math.round(value.ratio * 10)) > 0.0000001) return "ratio";
+  if (!integer(value.water_temp_c, 80, 100)) return "water_temp_c";
+  if (!choice(value.grind, grinds)) return "grind";
+  if (withNote && !text(value.note)) return "note";
+  if (!integer(value.pouring_count, 1, 5)) return "pouring_count";
+  if (!Array.isArray(value.stages) || value.stages.length !== value.pouring_count) return "stages";
   let end = 0;
   let water = 0;
   for (let i = 0; i < value.stages.length; i++) {
     const item = value.stages[i];
-    if (!record(item) || !only(item, ["name", "start_s", "duration_s", "water_cum_g"]) || item.name !== stageNames[i] ||
-      !integer(item.start_s, end, end) || !integer(item.duration_s, 5, 120) ||
-      !number(item.water_cum_g, water + Number.EPSILON, 1200)) return false;
+    if (!record(item) || !only(item, ["name", "start_s", "duration_s", "water_cum_g"])) return `stages[${i}].keys`;
+    if (item.name !== stageNames[i]) return `stages[${i}].name`;
+    if (!integer(item.start_s, end, end)) return `stages[${i}].start_s`;
+    if (!integer(item.duration_s, 5, 120)) return `stages[${i}].duration_s`;
+    if (!number(item.water_cum_g, water + Number.EPSILON, 1200)) return `stages[${i}].water_cum_g`;
     end = item.start_s + item.duration_s;
     water = item.water_cum_g;
   }
-  return Math.abs(water - value.dose_g * value.ratio) <= 0.000001;
+  return Math.abs(water - value.dose_g * value.ratio) <= 0.000001 ? null : `stages[${value.stages.length - 1}].water_cum_g`;
+}
+
+function recommendationPlan(value: unknown, withNote: boolean): value is Row {
+  return recommendationPlanFailure(value, withNote) === null;
+}
+
+export function recommendationFailureField(value: unknown, preferences?: Row): string | null {
+  const field = recommendationPlanFailure(value, true);
+  if (field) return field;
+  const output = value as Row;
+  if (preferences?.dose_g !== undefined && Math.abs((output.dose_g as number) - (preferences.dose_g as number)) > 0.05 + 1e-9) return "dose_g";
+  if (preferences?.pouring_count !== undefined && output.pouring_count !== preferences.pouring_count) return "pouring_count";
+  return null;
 }
 
 export function validateInput(value: unknown): AiInput | null {
@@ -275,9 +294,7 @@ export function validateInput(value: unknown): AiInput | null {
 export function validateOutput(type: AiType, value: unknown, preferences?: Row): Row | null {
   if (!record(value)) return null;
   if (type === "recommend") {
-    if (!recommendationPlan(value, true)) return null;
-    if ((preferences?.dose_g !== undefined && Math.abs(value.dose_g - (preferences.dose_g as number)) > 0.05 + 1e-9) ||
-      (preferences?.pouring_count !== undefined && value.pouring_count !== preferences.pouring_count)) return null;
+    if (recommendationFailureField(value, preferences)) return null;
     return value;
   }
   if (!only(value, ["diagnosis", "likely_causes", "suggestions", "note"]) || !text(value.diagnosis) || !text(value.note) ||

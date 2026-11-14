@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-11-14 - Diagnosis kegagalan rekomendasi 4 dan 5 pouring
+- Setelah deploy perbaikan sebelumnya, uji HP untuk 4 dan 5 pouring masih menghasilkan pengaturan cadangan. Log Edge Function pukul 07.47 dan 07.48 menunjukkan OpenAI mengembalikan JSON lengkap (HTTP 200, `finish_reason: stop`), tetapi kedua percobaan ditolak validator server (`schema_error`, lalu `ai_invalid_output` 502). Log lama hanya menyebut `field: unknown`, sehingga aturan yang gagal belum dapat dipastikan.
+- Validator sekarang melaporkan nama field atau aturan tahap yang gagal tanpa mencatat isi resep. Percobaan kedua menyebut aturan itu dalam prompt agar model dapat memperbaikinya. Batas validasi dan fallback tetap sama. 24 tes server lulus melalui shim Node; deploy dan uji ulang di HP menunggu.
+
 ## 2026-11-14 - Perbaikan saran AI 5 pouring
 - Uji HP pemilik menunjukkan saran 3 pouring bisa mempertahankan rencana terbaik, tetapi saran 5 pouring beberapa kali berakhir dengan "Saran AI tidak dapat dipakai". Pesan itu berasal dari validasi rencana Flutter setelah respons server diterima.
 - Server kini menormalisasi rasio ke satu desimal, waktu mulai tahap menjadi berurutan, dan air akhir tepat ke dosis × rasio; validasi durasi 5-120 detik dan total air mengikuti batas Flutter. Prompt dan skema penyedia AI ikut diselaraskan. Klien Flutter dan APK tidak berubah.

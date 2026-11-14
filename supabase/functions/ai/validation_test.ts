@@ -1,4 +1,4 @@
-import { finishUserText, normalizeOutput, openAiResponseSchema, parseOutput, responseSchemas, validateInput, validateOutput } from "./validation.ts";
+import { finishUserText, normalizeOutput, openAiResponseSchema, parseOutput, recommendationFailureField, responseSchemas, validateInput, validateOutput } from "./validation.ts";
 import { userFacingTextRule } from "./prompt_rules.ts";
 
 const validRecommend = {
@@ -133,8 +133,15 @@ Deno.test("lima pouring mengikuti batas rencana Flutter", () => {
   for (const duration of [4, 121]) {
     const invalid = structuredClone(five);
     invalid.stages[2].duration_s = duration;
-    if (validateOutput("recommend", normalizeOutput("recommend", invalid))) throw new Error("invalid duration accepted");
+    const output = normalizeOutput("recommend", invalid);
+    if (validateOutput("recommend", output) || recommendationFailureField(output) !== "stages[2].duration_s") throw new Error("invalid duration accepted or misreported");
   }
+  const wrongName = structuredClone(normalized);
+  wrongName.stages[3].name = "pouring_3";
+  if (recommendationFailureField(wrongName) !== "stages[3].name" || validateOutput("recommend", wrongName)) throw new Error("stage name failure not reported");
+  const excessWater = structuredClone(normalized);
+  excessWater.stages[3].water_cum_g = 271;
+  if (recommendationFailureField(normalizeOutput("recommend", excessWater)) !== "stages[4].water_cum_g") throw new Error("water failure not reported");
   const fractional = structuredClone(validRecommend);
   fractional.dose_g = 15.5;
   fractional.ratio = 16.1;
@@ -210,7 +217,8 @@ Deno.test("jumlah tahap salah memicu retry tanpa menambah ai_usage", async () =>
     if (response.status !== 200 || usageCalls !== 1 || modelCalls !== 2 || !parseOutput("recommend", JSON.stringify(result))) {
       throw new Error(`retry flow failed: status=${response.status}, usage=${usageCalls}, model=${modelCalls}`);
     }
-    if (prompts.length !== 2 || prompts.some((prompt) => !prompt.includes("hanyalah isian layar saat ini, bukan batas") || !prompt.includes("alasan") || !prompt.includes("pouring_count output") || !prompt.includes("DATA.current_plan adalah rencana") || !prompt.includes(userFacingTextRule)) ||
+    if (prompts.length !== 2 || !prompts[1].includes("Jawaban sebelumnya tidak sah pada stages; perbaiki") ||
+      prompts.some((prompt) => !prompt.includes("hanyalah isian layar saat ini, bukan batas") || !prompt.includes("alasan") || !prompt.includes("pouring_count output") || !prompt.includes("DATA.current_plan adalah rencana") || !prompt.includes(userFacingTextRule)) ||
       prompts.some((prompt) => prompt.includes("DATA.preferences")) ||
       mimeTypes.some((mimeType) => mimeType !== "application/json") ||
       configs.some((config) => JSON.stringify(config.responseSchema) !== JSON.stringify(responseSchemas.recommend) || config.maxOutputTokens !== 1024 || Object.hasOwn(config, "thinkingConfig"))) {
@@ -342,6 +350,8 @@ Deno.test("OpenAI memilih secret sendiri, retry 429, dan menolak keluaran tidak 
     const error = await response.json();
     if (response.status !== 502 || error.error.code !== "ai_invalid_output" || modelCalls !== 4 ||
       requests.slice(2).some((request) => request.body.reasoning_effort !== "minimal") ||
+      !JSON.stringify(requests[3].body.messages).includes("Jawaban sebelumnya tidak sah pada water_temp_c; perbaiki") ||
+      !logs.some((log) => log.provider === "openai" && log.failure_kind === "schema_error" && log.field === "water_temp_c") ||
       !logs.some((log) => log.provider === "openai" && log.finish_reason === "length" && log.candidate_count === 1 && log.part_count === 1)) {
       throw new Error("invalid output, reasoning effort, or metadata failed");
     }
