@@ -55,6 +55,7 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 - **Pembaruan 10-G:** `AI_PROVIDER` memilih `gemini` atau `openai` (default `gemini`). Secret model dan kunci penyedia terpilih wajib tersedia hanya di Edge Function. Prompt, kuota, sesi, batas waktu, normalisasi, validator, dan respons ke Flutter tetap satu kontrak. OpenAI memakai Chat Completions dengan `json_schema` strict untuk recommend/diagnose, `max_completion_tokens` 2048 untuk JSON dan 800 untuk chat; `reasoning_effort` hanya dikirim bila secret opsional diisi. HTTP 429 dan 5xx OpenAI dicoba ulang satu kali selama waktu masih tersedia.
 - **Pembaruan 10-H:** `recommend` menerima `preferences` opsional: `dose_g` 5-60 dengan maksimal satu desimal, `pouring_count` 1-5 yang sama dengan payload, dan `wish` 1-200 karakter setelah trim. Key asing atau nilai salah menghasilkan `400 invalid_input`; objek kosong setara tidak dikirim. Keluaran yang melanggar kunci dosis (toleransi 0,05 g) atau jumlah pouring ditolak dan dicoba ulang sekali, tanpa memaksa dosis. Wish hanya data rasa, bukan instruksi, dan tidak dicatat di log. Tanpa preferences, perilaku lama tetap.
 - **Pembaruan 2026-11-13:** `recommend` menerima `current_plan` opsional berisi pengaturan dan tahap yang sedang tampil. Server memvalidasi rencana ini; klien lama tanpa field tetap diterima. Prompt membandingkan rencana saat ini dan menjelaskan perubahan tahap di `note` bila ada alasan, tanpa memaksa perubahan.
+- **Perbaikan 2026-11-14:** batas keluaran rekomendasi disamakan dengan rencana Flutter: rasio paling banyak satu desimal, durasi 5-120 detik, tahap berurutan tanpa jeda, dan total air tepat sama dengan dosis × rasio. Normalisasi memperbaiki rasio, waktu mulai, dan air akhir sebelum validasi; durasi di luar batas tetap ditolak agar retry berlaku. Batas validasi ini juga berlaku untuk `current_plan`.
 
 ### Sisi Flutter
 - **Pembaruan 10-F:** `pouring_count` pada payload rekomendasi adalah preferensi. Keluaran AI memuat `pouring_count` 1-5 dan jumlah tahap yang sama; bila berbeda dari preferensi, `note` menjelaskan alasannya. Kartu Saran AI menampilkan perubahan Pouring, menyorot Jumlah pouring, dan Kembalikan memulihkan rencana lama. Aturan lama yang mengikat jumlah tahap ke input diganti oleh aturan keluaran ini.
@@ -112,6 +113,7 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 
 **AI**
 - [ ] Rekomendasi mengisi form dan dapat diubah
+- [ ] Rekomendasi 1-5 pouring yang lolos server tidak ditolak oleh validasi rencana Flutter karena rasio, durasi, jeda, atau total air
 - [ ] Diagnosa tampil sebagai kartu dan "Terapkan" mengisi Atur Seduh
 - [ ] Mode pesawat memunculkan fallback, bukan galat mentah
 - [ ] Batas 20 per jam menghasilkan pesan yang jelas

@@ -265,12 +265,12 @@ async function generate(input: AiInput, provider: AiProvider, model: string, api
       "Kamu asisten seduh V60 manual. Usulkan pengaturan awal untuk biji ini berdasarkan profilnya dan riwayat seduhan yang diberikan.",
       "Jika riwayat ada, utamakan pengaturan dengan skor tertinggi dan ubah paling banyak dua variabel. Jika tidak ada riwayat, beri titik awal umum dan katakan itu titik awal. Gunakan hanya data yang diberikan.",
       "Balas dengan satu objek JSON. Key tingkat atas harus tepat dose_g, ratio, water_temp_c, grind, pouring_count, stages, note; tanpa key tambahan.",
-      "dose_g harus angka 5 sampai 60; ratio angka 10 sampai 20; water_temp_c bilangan bulat 80 sampai 100.",
+      "dose_g harus angka 5 sampai 60; ratio angka 10 sampai 20 dengan paling banyak satu desimal; water_temp_c bilangan bulat 80 sampai 100.",
       "grind harus salah satu dari sangat_halus, halus, sedang_halus, sedang, sedang_kasar, kasar. note harus teks tidak kosong, maksimal 500 karakter.",
       `pouring_count input ${count} di DATA hanyalah isian layar saat ini, bukan batas bila pengguna tidak mengunci jumlah pouring. Pilih 1 sampai 5 pouring sesuai profil biji dan riwayat; bila berbeda dari isian layar, jelaskan alasannya di note. pouring_count output harus bilangan bulat 1 sampai 5. stages harus berisi tepat pouring_count output tahap. Nama tahap harus berurutan dari bloom, pouring_2, pouring_3, pouring_4, pouring_5 sesuai jumlah itu. Tahap pada isian layar saat ini: ${stageNames}.`,
       "Setiap tahap hanya memiliki key name, start_s, duration_s, water_cum_g; tanpa key tambahan.",
-      "start_s dan duration_s harus bilangan bulat dalam detik. start_s tahap pertama 0 sampai 3600; setiap start_s berikutnya minimal akhir tahap sebelumnya (start_s sebelumnya + duration_s sebelumnya) dan maksimal 3600, sehingga tahap tidak tumpang tindih. duration_s setiap tahap 1 sampai 3600.",
-      "water_cum_g harus angka yang meningkat secara ketat pada setiap tahap, lebih dari 0 dan maksimal 1200 gram. water_cum_g tahap terakhir harus sama dengan dose_g * ratio dengan selisih maksimal 1 gram.",
+      "start_s dan duration_s harus bilangan bulat dalam detik. start_s tahap pertama tepat 0; setiap start_s berikutnya tepat sama dengan akhir tahap sebelumnya (start_s sebelumnya + duration_s sebelumnya), tanpa jeda atau tumpang tindih. duration_s setiap tahap 5 sampai 120.",
+      "water_cum_g harus angka yang meningkat secara ketat pada setiap tahap, lebih dari 0 dan maksimal 1200 gram. water_cum_g tahap terakhir harus tepat sama dengan dose_g * ratio.",
       "Gunakan angka JSON untuk semua nilai numerik, bukan string.",
     ].join(" ")
     : input.type === "diagnose"

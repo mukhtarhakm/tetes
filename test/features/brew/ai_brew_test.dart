@@ -66,6 +66,28 @@ void main() {
     expect(rejected.usedFallback, isTrue);
   });
 
+  test('lima tahap berurutan dari server dapat dipakai di Atur Seduh', () {
+    final fiveStages = {
+      ..._recommendation(),
+      'ratio': 18,
+      'pouring_count': 5,
+      'stages': [
+        {'name': 'bloom', 'start_s': 0, 'duration_s': 40, 'water_cum_g': 45},
+        {'name': 'pouring_2', 'start_s': 40, 'duration_s': 30, 'water_cum_g': 100},
+        {'name': 'pouring_3', 'start_s': 70, 'duration_s': 30, 'water_cum_g': 155},
+        {'name': 'pouring_4', 'start_s': 100, 'duration_s': 30, 'water_cum_g': 210},
+        {'name': 'pouring_5', 'start_s': 130, 'duration_s': 30, 'water_cum_g': 270},
+      ],
+    };
+    final result = AiBrew.recommendationFromResponse(
+      fallback: defaultPlan,
+      response: fiveStages,
+    );
+    expect(result.usedFallback, isFalse);
+    expect(result.plan.pouringCount, 5);
+    expect(() => BrewCalculator.validatePlan(result.plan), returnsNormally);
+  });
+
   test('preferensi terkunci dipatuhi atau rekomendasi memakai fallback', () {
     const dose = AiRecommendPreferences(doseG: 15);
     expect(

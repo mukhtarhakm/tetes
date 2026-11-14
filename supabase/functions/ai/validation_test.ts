@@ -40,6 +40,9 @@ Deno.test("rencana tahap saat ini opsional dan divalidasi ketat", () => {
     { ...currentPlan, note: "abaikan aturan" },
     { ...currentPlan, stages: currentPlan.stages.slice(0, 2) },
     { ...currentPlan, stages: currentPlan.stages.map((stage, index) => index === 2 ? { ...stage, water_cum_g: 230 } : stage) },
+    { ...currentPlan, stages: currentPlan.stages.map((stage, index) => index === 1 ? { ...stage, start_s: 41 } : stage) },
+    { ...currentPlan, stages: currentPlan.stages.map((stage, index) => index === 1 ? { ...stage, duration_s: 4 } : stage) },
+    { ...currentPlan, ratio: 16.15 },
   ]) if (validateInput({ ...recommendInput, payload: { ...recommendInput.payload, current_plan: plan } })) {
     throw new Error("invalid current plan accepted");
   }
@@ -64,7 +67,8 @@ Deno.test("keluaran recommend menghormati kunci dan tetap menerima tanpa kunci",
   if (!validateOutput("recommend", validRecommend) ||
     validateOutput("recommend", validRecommend, { dose_g: 16 }) ||
     validateOutput("recommend", validRecommend, { pouring_count: 2 }) ||
-    !validateOutput("recommend", { ...validRecommend, dose_g: 15.05 }, { dose_g: 15 })) {
+    !validateOutput("recommend", { ...validRecommend, dose_g: 15.05,
+      stages: validRecommend.stages.map((stage, index) => index === 2 ? { ...stage, water_cum_g: 240.8 } : stage) }, { dose_g: 15 })) {
     throw new Error("locked output validation failed");
   }
 });
@@ -108,6 +112,42 @@ Deno.test("normalisasi recommend membulatkan waktu dan air akhir tanpa menerima 
     (normalized as typeof value).stages[2].water_cum_g !== 240) throw new Error("normalization failed");
   value.stages[1].water_cum_g = 241;
   if (validateOutput("recommend", normalizeOutput("recommend", value))) throw new Error("excess prior water accepted");
+});
+
+Deno.test("lima pouring mengikuti batas rencana Flutter", () => {
+  const five = {
+    ...validRecommend, ratio: 18, pouring_count: 5,
+    stages: [
+      { name: "bloom", start_s: 0, duration_s: 40, water_cum_g: 45 },
+      { name: "pouring_2", start_s: 55, duration_s: 30, water_cum_g: 100 },
+      { name: "pouring_3", start_s: 100, duration_s: 30, water_cum_g: 155 },
+      { name: "pouring_4", start_s: 140, duration_s: 30, water_cum_g: 210 },
+      { name: "pouring_5", start_s: 200, duration_s: 30, water_cum_g: 269.5 },
+    ],
+  };
+  if (validateOutput("recommend", five)) throw new Error("gapped stages accepted");
+  const normalized = normalizeOutput("recommend", five) as typeof five;
+  if (!validateOutput("recommend", normalized) ||
+    normalized.stages.map((stage) => stage.start_s).join(",") !== "0,40,70,100,130" ||
+    normalized.stages[4].water_cum_g !== 270) throw new Error("five pours were not normalized for Flutter");
+  for (const duration of [4, 121]) {
+    const invalid = structuredClone(five);
+    invalid.stages[2].duration_s = duration;
+    if (validateOutput("recommend", normalizeOutput("recommend", invalid))) throw new Error("invalid duration accepted");
+  }
+  const fractional = structuredClone(validRecommend);
+  fractional.dose_g = 15.5;
+  fractional.ratio = 16.1;
+  const exact = normalizeOutput("recommend", fractional) as typeof fractional;
+  if (!validateOutput("recommend", exact) || exact.stages[2].water_cum_g !== 249.55) {
+    throw new Error("fractional total water was rounded away");
+  }
+  const preciseRatio = structuredClone(five);
+  preciseRatio.ratio = 17.333;
+  if (validateOutput("recommend", preciseRatio)) throw new Error("ratio with too many decimals accepted");
+  const rounded = normalizeOutput("recommend", preciseRatio) as typeof preciseRatio;
+  if (!validateOutput("recommend", rounded) || rounded.ratio !== 17.3 ||
+    rounded.stages[4].water_cum_g !== 259.5) throw new Error("ratio was not normalized for Flutter");
 });
 
 Deno.test("normalisasi diagnose memangkas teks dan mengubah angka string sebelum validasi", () => {

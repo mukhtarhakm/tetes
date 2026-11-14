@@ -28,7 +28,7 @@ export const responseSchemas = {
       stages: { type: "ARRAY", minItems: 1, maxItems: 5, items: {
         type: "OBJECT", required: ["name", "start_s", "duration_s", "water_cum_g"],
         properties: { name: { type: "STRING", enum: stageNames }, start_s: numeric("NUMBER", 0, 3600),
-          duration_s: numeric("NUMBER", 1, 3600), water_cum_g: numeric("NUMBER", 0, 1200) },
+          duration_s: numeric("NUMBER", 5, 120), water_cum_g: numeric("NUMBER", 0, 1200) },
       } },
     },
   },
@@ -79,15 +79,15 @@ export function normalizeOutput(type: AiType, value: unknown): unknown {
   if (type === "recommend") {
     const output = { ...value };
     if (typeof output.note === "string") output.note = finishUserText(output.note, 500);
+    if (typeof output.ratio === "number" && Number.isFinite(output.ratio) &&
+      output.ratio >= 10 && output.ratio <= 20) output.ratio = Math.round(output.ratio * 10) / 10;
     if (!Array.isArray(output.stages)) return output;
     let end = 0;
     output.stages = output.stages.map((stage: unknown, index: number) => {
       if (!record(stage)) return stage;
       const next = { ...stage };
-      if (typeof next.start_s === "number" && Number.isFinite(next.start_s)) {
-        const rounded = Math.round(next.start_s);
-        next.start_s = index === 0 ? rounded : Math.max(rounded, end);
-      }
+      if (typeof next.start_s === "number" && Number.isFinite(next.start_s) &&
+        next.start_s >= 0 && next.start_s <= 3600) next.start_s = index === 0 ? 0 : end;
       if (typeof next.duration_s === "number" && Number.isFinite(next.duration_s)) next.duration_s = Math.round(next.duration_s);
       if (typeof next.start_s === "number" && typeof next.duration_s === "number") end = next.start_s + next.duration_s;
       return next;
@@ -95,7 +95,7 @@ export function normalizeOutput(type: AiType, value: unknown): unknown {
     if (typeof output.dose_g === "number" && typeof output.ratio === "number" &&
       Number.isFinite(output.dose_g) && Number.isFinite(output.ratio) && output.stages.length) {
       const last = output.stages[output.stages.length - 1];
-      const total = Math.round(output.dose_g * output.ratio * 10) / 10;
+      const total = output.dose_g * output.ratio;
       if (record(last) && (output.stages.length === 1 ||
         (record(output.stages[output.stages.length - 2]) &&
           typeof output.stages[output.stages.length - 2].water_cum_g === "number" &&
@@ -214,7 +214,9 @@ function recommendationPlan(value: unknown, withNote: boolean): value is Row {
   if (!record(value) || !only(value, withNote
     ? ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages", "note"]
     : ["dose_g", "ratio", "water_temp_c", "grind", "pouring_count", "stages"]) ||
-    !number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) || !integer(value.water_temp_c, 80, 100) ||
+    !number(value.dose_g, 5, 60) || !number(value.ratio, 10, 20) ||
+    Math.abs(value.ratio * 10 - Math.round(value.ratio * 10)) > 0.0000001 ||
+    !integer(value.water_temp_c, 80, 100) ||
     !choice(value.grind, grinds) || withNote && !text(value.note) || !Array.isArray(value.stages) ||
     !integer(value.pouring_count, 1, 5) || value.stages.length !== value.pouring_count) return false;
   let end = 0;
@@ -222,12 +224,12 @@ function recommendationPlan(value: unknown, withNote: boolean): value is Row {
   for (let i = 0; i < value.stages.length; i++) {
     const item = value.stages[i];
     if (!record(item) || !only(item, ["name", "start_s", "duration_s", "water_cum_g"]) || item.name !== stageNames[i] ||
-      !integer(item.start_s, end, 3600) || !integer(item.duration_s, 1, 3600) ||
+      !integer(item.start_s, end, end) || !integer(item.duration_s, 5, 120) ||
       !number(item.water_cum_g, water + Number.EPSILON, 1200)) return false;
     end = item.start_s + item.duration_s;
     water = item.water_cum_g;
   }
-  return Math.abs(water - value.dose_g * value.ratio) <= 1;
+  return Math.abs(water - value.dose_g * value.ratio) <= 0.000001;
 }
 
 export function validateInput(value: unknown): AiInput | null {

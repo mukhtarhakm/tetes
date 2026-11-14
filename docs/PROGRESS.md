@@ -1,5 +1,10 @@
 # PROGRESS: Tetes
 
+## 2026-11-14 - Perbaikan saran AI 5 pouring
+- Uji HP pemilik menunjukkan saran 3 pouring bisa mempertahankan rencana terbaik, tetapi saran 5 pouring beberapa kali berakhir dengan "Saran AI tidak dapat dipakai". Pesan itu berasal dari validasi rencana Flutter setelah respons server diterima.
+- Server kini menormalisasi rasio ke satu desimal, waktu mulai tahap menjadi berurutan, dan air akhir tepat ke dosis × rasio; validasi durasi 5-120 detik dan total air mengikuti batas Flutter. Prompt dan skema penyedia AI ikut diselaraskan. Klien Flutter dan APK tidak berubah.
+- 24 tes AI server lulus lewat shim Node, termasuk kasus 5 pouring, jeda antar tahap, durasi di luar batas, dan rasio pecahan. Seluruh 12 tes Flutter terkait lulus; `flutter analyze --no-pub` bersih. Deploy fungsi `ai` dan uji ulang di HP masih menunggu.
+
 ## 2026-11-13 - Perbaikan rincian tahap rekomendasi AI
 - Atur Seduh mengirim `current_plan` (dosis, rasio, suhu, gilingan, jumlah pouring, waktu dan air kumulatif tiap tahap) ke Edge Function `ai`. Server memvalidasinya dan tetap menerima klien lama tanpa field itu. Prompt meminta AI membandingkan rencana saat ini dan tidak mengubah tahap tanpa alasan.
 - Kartu Saran AI kini membandingkan tahap secara langsung: jumlah tahap berubah ditampilkan, detail memuat target air, durasi, serta waktu mulai sebelum/sesudah, dan tahap yang tetap sama disebut jelas. Respons AI yang valid tetap mengisi form; tidak ada perubahan otomatis yang dipaksakan.
