@@ -641,7 +641,7 @@ class BrewRepository {
       WHERE br.user_id = ? AND br.bean_id = ? AND b.user_id = ?
         AND br.status = 'aktif'
       ORDER BY CASE WHEN b.best_brew_id = br.id THEN 0 ELSE 1 END,
-        br.brewed_at_utc DESC, br.seq DESC
+        br.taste_score DESC, br.brewed_at_utc DESC, br.seq DESC
       LIMIT 5
     ''',
       [userId, beanId, userId],

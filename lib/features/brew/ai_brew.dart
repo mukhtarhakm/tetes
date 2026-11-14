@@ -174,7 +174,25 @@ abstract final class AiBrew {
     AiRecommendPreferences? preferences,
   }) => {
     'bean': _bean(bean),
-    'history': history.take(5).map(_historyBrew).toList(),
+    'history': history
+        .take(5)
+        .map(
+          (detail) => {
+            ..._historyBrew(detail),
+            'stages': [
+              for (final stage in detail.stages)
+                {
+                  'position': stage.position,
+                  'name': stage.name.databaseValue,
+                  'target_start_s': stage.targetStartS,
+                  'target_duration_s': stage.targetDurationS,
+                  'target_water_cum_g': stage.targetWaterCumG,
+                  'target_pour_g': stage.targetPourG,
+                },
+            ],
+          },
+        )
+        .toList(),
     'current_plan': {
       'dose_g': currentPlan.doseG,
       'ratio': currentPlan.ratio,

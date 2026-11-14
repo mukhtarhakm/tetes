@@ -48,6 +48,17 @@ Deno.test("rencana tahap saat ini opsional dan divalidasi ketat", () => {
   }
 });
 
+Deno.test("riwayat recommend menerima target tahap seduhan terbaik", () => {
+  const history = [{ dose_g: 15, ratio: 16, water_temp_c: 92, grind: "sedang", taste_score: 5, taste_tags: "manis",
+    stages: [{ position: 1, name: "bloom", target_start_s: 0, target_duration_s: 40,
+      target_water_cum_g: 45, target_pour_g: 45 }] }];
+  const payload = { ...recommendInput.payload, history };
+  if (!validateInput({ ...recommendInput, payload }) ||
+    validateInput({ ...recommendInput, payload: { ...payload, history: [{ ...history[0], stages: [{ ...history[0].stages[0], target_water_cum_g: 1300 }] }] } })) {
+    throw new Error("history stages were not validated");
+  }
+});
+
 Deno.test("preferensi recommend opsional, tervalidasi, dan wish dibersihkan", () => {
   if (!validateInput(recommendInput) || !validateInput({ ...recommendInput, payload: { ...recommendInput.payload, preferences: {} } })) {
     throw new Error("legacy or empty preferences rejected");
@@ -115,6 +126,27 @@ Deno.test("normalisasi recommend membulatkan waktu dan memperbaiki air kumulatif
   const corrected = normalizeOutput("recommend", value) as typeof value;
   if (!validateOutput("recommend", corrected) || corrected.stages[1].water_cum_g !== 142.5 ||
     corrected.stages[2].water_cum_g !== 240) throw new Error("excess prior water not corrected");
+});
+
+Deno.test("bloom eksperimen dua sampai tiga kali dosis tanpa mengubah rencana lama", () => {
+  const small = structuredClone(validRecommend);
+  small.stages[0].water_cum_g = 15;
+  if (validateOutput("recommend", small)) throw new Error("undersized bloom accepted");
+  const corrected = normalizeOutput("recommend", small) as typeof small;
+  if (!validateOutput("recommend", corrected) || corrected.stages[0].water_cum_g !== 30 ||
+    corrected.stages[1].water_cum_g !== 140 || corrected.stages[2].water_cum_g !== 240) throw new Error("bloom was not corrected");
+  const large = structuredClone(validRecommend);
+  large.stages[0].water_cum_g = 100;
+  large.stages[1].water_cum_g = 40;
+  const adjusted = normalizeOutput("recommend", large) as typeof large;
+  if (!validateOutput("recommend", adjusted) || adjusted.stages[0].water_cum_g !== 45 ||
+    adjusted.stages[1].water_cum_g !== 142.5) throw new Error("later pouring was not adjusted after bloom");
+  const one = { ...validRecommend, pouring_count: 1, stages: [{ name: "bloom", start_s: 0, duration_s: 40, water_cum_g: 240 }] };
+  if (!validateOutput("recommend", one) || !validateInput({ ...recommendInput,
+    payload: { ...recommendInput.payload, current_plan: { ...currentPlan,
+      stages: currentPlan.stages.map((stage, index) => index === 0 ? { ...stage, water_cum_g: 15 } : stage) } } })) {
+    throw new Error("one pouring or historical plan was rejected");
+  }
 });
 
 Deno.test("lima pouring mengikuti batas rencana Flutter", () => {
@@ -237,7 +269,7 @@ Deno.test("jumlah tahap salah memicu retry tanpa menambah ai_usage", async () =>
       throw new Error(`retry flow failed: status=${response.status}, usage=${usageCalls}, model=${modelCalls}`);
     }
     if (prompts.length !== 2 || !prompts[1].includes("Jawaban sebelumnya tidak sah pada stages; perbaiki") ||
-      prompts.some((prompt) => !prompt.includes("hanyalah isian layar saat ini, bukan batas") || !prompt.includes("alasan") || !prompt.includes("pouring_count output") || !prompt.includes("DATA.current_plan adalah rencana") || !prompt.includes(userFacingTextRule)) ||
+      prompts.some((prompt) => !prompt.includes("hanyalah isian layar saat ini, bukan batas") || !prompt.includes("eksperimen") || !prompt.includes("pola tahap") || !prompt.includes("2 sampai 3 kali dose_g") || !prompt.includes("pouring_count output") || !prompt.includes("DATA.current_plan adalah rencana") || !prompt.includes(userFacingTextRule)) ||
       prompts.some((prompt) => prompt.includes("DATA.preferences")) ||
       mimeTypes.some((mimeType) => mimeType !== "application/json") ||
       configs.some((config) => JSON.stringify(config.responseSchema) !== JSON.stringify(responseSchemas.recommend) || config.maxOutputTokens !== 1024 || Object.hasOwn(config, "thinkingConfig"))) {

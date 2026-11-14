@@ -434,7 +434,7 @@ void main() {
   );
 
   test(
-    'riwayat AI hanya best dan empat seduhan aktif terbaru milik user',
+    'riwayat AI memilih best dan empat skor tertinggi milik user',
     () async {
       final beanId = await _createBean(beanRepository);
       final plan = BrewCalculator.createDefault(beanId: beanId);
@@ -450,7 +450,7 @@ void main() {
           await brewRepository.save(
             userId: 'user-1',
             result: result,
-            tasteScore: index == 0 ? 5 : 3,
+            tasteScore: index == 0 ? 5 : (index == 1 || index == 2 ? 4 : 3),
             tasteTags: [RoasteryNoteTag.manis],
             actualWaterG: List.filled(plan.stages.length, null),
             notes: index == 0 ? 'Seduhan terbaik' : null,
@@ -465,10 +465,10 @@ void main() {
       );
       expect(history.map((detail) => detail.item.id), [
         ids[0],
+        ids[2],
+        ids[1],
         ids[7],
         ids[5],
-        ids[4],
-        ids[3],
       ]);
       expect(history.first.notes, 'Seduhan terbaik');
       expect(history.first.stages, hasLength(plan.stages.length));

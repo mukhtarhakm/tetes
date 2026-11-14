@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-11-14 - Eksplorasi AI dari beberapa seduhan bagus
+- Atur Seduh tetap memuat pengaturan terbaik sebagai titik awal. Riwayat untuk rekomendasi kini memilih satu seduhan yang ditandai terbaik dan empat seduhan aktif berskor tertinggi lain pada biji terpilih; target waktu dan air tiap tahap ikut dikirim. Diagnosa tetap memakai riwayat ringkas.
+- Prompt meminta satu eksperimen seduh yang beralasan, bukan menyalin rencana awal. Untuk 2-5 pouring, bloom saran dibatasi 2-3 kali dosis, dan air tahap berikutnya dirapikan sambil menjaga total. Preferensi dosis/jumlah pouring tetap dikunci. Deploy, APK baru, dan uji HP menunggu.
+
 ## 2026-11-14 - Perbaikan air kumulatif rekomendasi 4 pouring
 - Uji HP sekitar 08.23 tetap menghasilkan cadangan. Log fungsi `ai` menunjukkan kedua keluaran OpenAI selesai normal, tetapi ditolak pada `stages[3].water_cum_g`: air kumulatif tahap terakhir 4 pouring tidak sah.
 - Normalisasi server kini menempatkan tahap sebelumnya di antara air tahap lebih awal dan total bila sudah mencapai/melewati tahap berikutnya, lalu memastikan tahap terakhir tepat dosis × rasio. Nilai tahap sebelumnya yang nonangka atau di luar batas tetap ditolak. Tes 4 dan 5 pouring mencakup koreksi air kumulatif; deploy dan uji HP menunggu.

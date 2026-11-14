@@ -213,6 +213,9 @@ void main() {
     expect(history, hasLength(5));
     expect(history.first['taste_tags'], 'asam');
     expect(history.first['notes'], 'Riwayat');
+    final stages = history.first['stages'] as List<Map<String, Object?>>;
+    expect(stages.single['target_water_cum_g'], 240);
+    expect(stages.single['target_pour_g'], 240);
     expect((payload['bean'] as Map)['species'], 'arabika');
   });
 
@@ -325,5 +328,16 @@ BrewDetailData _history(int index) => BrewDetailData(
   createdAt: '2026-10-21T00:00:00Z',
   roasteryNotesTags: const [],
   isBeanArchived: false,
-  stages: const [],
+  stages: [
+    BrewDetailStage(
+      id: 'stage-$index',
+      brewId: 'brew-$index',
+      position: 1,
+      name: BrewStageName.bloom,
+      targetStartS: 0,
+      targetDurationS: 40,
+      targetWaterCumG: 240,
+      targetPourG: 240,
+    ),
+  ],
 );

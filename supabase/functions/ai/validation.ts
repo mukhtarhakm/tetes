@@ -97,17 +97,18 @@ export function normalizeOutput(type: AiType, value: unknown): unknown {
       const last = output.stages[output.stages.length - 1];
       const total = output.dose_g * output.ratio;
       if (record(last) && total > 0 && total <= 1200) {
-        let nextWater = total;
-        for (let index = output.stages.length - 2; index >= 0; index--) {
+        const bloom = output.stages[0];
+        if (output.stages.length > 1 && record(bloom) && number(bloom.water_cum_g, 0, 1200)) {
+          bloom.water_cum_g = Math.min(output.dose_g * 3, Math.max(output.dose_g * 2, bloom.water_cum_g));
+        }
+        let previousWater = 0;
+        for (let index = 0; index < output.stages.length - 1; index++) {
           const stage = output.stages[index];
           if (!record(stage) || !number(stage.water_cum_g, 0, 1200)) break;
-          if (stage.water_cum_g >= nextWater) {
-            const priorStage = output.stages[index - 1];
-            const prior = record(priorStage) ? priorStage.water_cum_g : 0;
-            const lower = typeof prior === "number" && prior > 0 && prior < nextWater ? prior : 0;
-            stage.water_cum_g = (lower + nextWater) / 2;
+          if (stage.water_cum_g <= previousWater || stage.water_cum_g >= total) {
+            stage.water_cum_g = previousWater + (total - previousWater) / (output.stages.length - index);
           }
-          nextWater = stage.water_cum_g;
+          previousWater = stage.water_cum_g;
         }
         output.stages[output.stages.length - 1] = { ...last, water_cum_g: total };
       }
@@ -241,6 +242,8 @@ function recommendationPlanFailure(value: unknown, withNote: boolean): string | 
     if (!integer(item.start_s, end, end)) return `stages[${i}].start_s`;
     if (!integer(item.duration_s, 5, 120)) return `stages[${i}].duration_s`;
     if (!number(item.water_cum_g, 0, 1200) || item.water_cum_g <= water) return `stages[${i}].water_cum_g`;
+    if (withNote && i === 0 && value.stages.length > 1 &&
+      (item.water_cum_g < value.dose_g * 2 || item.water_cum_g > value.dose_g * 3)) return `stages[${i}].water_cum_g`;
     end = item.start_s + item.duration_s;
     water = item.water_cum_g;
   }

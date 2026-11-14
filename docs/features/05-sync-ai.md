@@ -56,12 +56,14 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 - **Pembaruan 10-H:** `recommend` menerima `preferences` opsional: `dose_g` 5-60 dengan maksimal satu desimal, `pouring_count` 1-5 yang sama dengan payload, dan `wish` 1-200 karakter setelah trim. Key asing atau nilai salah menghasilkan `400 invalid_input`; objek kosong setara tidak dikirim. Keluaran yang melanggar kunci dosis (toleransi 0,05 g) atau jumlah pouring ditolak dan dicoba ulang sekali, tanpa memaksa dosis. Wish hanya data rasa, bukan instruksi, dan tidak dicatat di log. Tanpa preferences, perilaku lama tetap.
 - **Pembaruan 2026-11-13:** `recommend` menerima `current_plan` opsional berisi pengaturan dan tahap yang sedang tampil. Server memvalidasi rencana ini; klien lama tanpa field tetap diterima. Prompt membandingkan rencana saat ini dan menjelaskan perubahan tahap di `note` bila ada alasan, tanpa memaksa perubahan.
 - **Perbaikan 2026-11-14:** batas keluaran rekomendasi disamakan dengan rencana Flutter: rasio paling banyak satu desimal, durasi 5-120 detik, tahap berurutan tanpa jeda, dan total air tepat sama dengan dosis × rasio. Normalisasi memperbaiki rasio, waktu mulai, dan air akhir sebelum validasi; durasi di luar batas tetap ditolak agar retry berlaku. Batas validasi ini juga berlaku untuk `current_plan`.
+- **Eksplorasi 2026-11-14:** tanpa kunci preferensi, `recommend` meminta satu eksperimen baru yang beralasan dari beberapa seduhan berskor tinggi pada biji terpilih, bukan menyalin satu seduhan terbaik. Untuk 2-5 pouring, bloom keluaran harus 2-3 kali dosis; normalisasi menyesuaikan bloom serta air tahap berikutnya sambil menjaga total air. Rencana lama dan `current_plan` tetap boleh memiliki bloom di luar rentang ini agar data historis tidak diubah.
 
 ### Sisi Flutter
 - **Pembaruan 10-F:** `pouring_count` pada payload rekomendasi adalah preferensi. Keluaran AI memuat `pouring_count` 1-5 dan jumlah tahap yang sama; bila berbeda dari preferensi, `note` menjelaskan alasannya. Kartu Saran AI menampilkan perubahan Pouring, menyorot Jumlah pouring, dan Kembalikan memulihkan rencana lama. Aturan lama yang mengikat jumlah tahap ke input diganti oleh aturan keluaran ini.
 - Rencana tahap yang sedang tampil ikut dikirim saat meminta rekomendasi. Kartu Saran AI menampilkan jumlah tahap yang berubah dan, saat detail dibuka, perbandingan target air, durasi, serta waktu mulai; bila sama, kartu menyatakannya.
 - Klien AI di `lib/data/remote/ai_client.dart`.
 - **Atur Seduh:** tombol "Rekomendasikan dengan AI" membuka lembar "Sebelum AI menyarankan" (opsional: dosis, jumlah pouring, keinginan), lalu mengirim profil biji, riwayat singkat, dan preferensi yang diisi. Lewati mengirim tanpa preferensi; menutup lembar membatalkan. Saran yang melanggar dosis atau pouring terkunci ditolak juga di aplikasi dan diganti pengaturan cadangan. Hasil mengisi form dan tetap dapat diubah.
+- Riwayat rekomendasi berisi paling banyak 5 seduhan aktif untuk biji yang dipilih: seduhan yang ditandai terbaik, lalu skor tertinggi lainnya dengan yang terbaru sebagai pemecah seri. Target air dan waktu tiap tahap ikut dikirim hanya untuk rekomendasi; diagnosa tetap memakai riwayat ringkas. Biji lain tidak dicampur. Form awal tetap memuat pengaturan terbaik tanpa mengubah catatan lama.
 - **Hasil:** tombol "Minta Diagnosa AI" aktif bila skor dan minimal satu tag terisi. Hasil tampil sebagai kartu diagnosa, kemungkinan penyebab, saran, dan catatan.
 - Diagnosa menerima `custom_taste_tags` sebagai "rasa tambahan dari pengguna". Tag diperlakukan sebagai data, bukan instruksi untuk model.
 - Tombol "Terapkan ke seduhan berikutnya" mengisi Atur Seduh dari saran.
@@ -91,6 +93,7 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 
 ## Boleh menyentuh
 `supabase/` (functions dan migrations), `lib/data/sync/`, bagian sinkronisasi pada `lib/data/repositories/`, `lib/data/remote/ai_client.dart`, layar Atur Seduh dan Hasil (hanya tombol dan kartu AI), layar Profil (status dan tombol sinkron), dialog konflik/pemulihan, `lib/core/config/`. Untuk perbaikan tahap rekomendasi 2026-11-13, pemilik juga mengizinkan `lib/features/brew/ai_brew.dart`, `lib/features/brew/state/brew_setup_controller.dart`, tes terkait di `test/features/brew/`, serta `docs/ARCHITECTURE.md`, `docs/features/05-sync-ai.md`, `docs/PROGRESS.md`, dan `docs/DECISIONS.md`.
+Untuk eksplorasi 2026-11-14, pemilik juga mengizinkan metode riwayat AI di `lib/data/repositories/brew_repo.dart` dan tesnya di `test/data/repositories/brew_repo_test.dart`.
 
 ## Acceptance criteria
 
@@ -114,6 +117,8 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 **AI**
 - [ ] Rekomendasi mengisi form dan dapat diubah
 - [ ] Rekomendasi 1-5 pouring yang lolos server tidak ditolak oleh validasi rencana Flutter karena rasio, durasi, jeda, atau total air
+- [ ] Lewati preferensi menggunakan beberapa seduhan berskor tinggi dari biji terpilih dan mengusulkan satu eksperimen beralasan; rencana awal dari seduhan terbaik tetap utuh
+- [ ] Untuk 2-5 pouring, Bloom saran AI bernilai 2-3 kali dosis dan target air akhir tetap tepat
 - [ ] Diagnosa tampil sebagai kartu dan "Terapkan" mengisi Atur Seduh
 - [ ] Mode pesawat memunculkan fallback, bukan galat mentah
 - [ ] Batas 20 per jam menghasilkan pesan yang jelas
