@@ -61,6 +61,7 @@ Dua perangkat aktif bersamaan tidak digabung otomatis. Perangkat baru atau terti
 ### Sisi Flutter
 - **Pembaruan 10-F:** `pouring_count` pada payload rekomendasi adalah preferensi. Keluaran AI memuat `pouring_count` 1-5 dan jumlah tahap yang sama; bila berbeda dari preferensi, `note` menjelaskan alasannya. Kartu Saran AI menampilkan perubahan Pouring, menyorot Jumlah pouring, dan Kembalikan memulihkan rencana lama. Aturan lama yang mengikat jumlah tahap ke input diganti oleh aturan keluaran ini.
 - Rencana tahap yang sedang tampil ikut dikirim saat meminta rekomendasi. Kartu Saran AI menampilkan jumlah tahap yang berubah dan, saat detail dibuka, perbandingan target air, durasi, serta waktu mulai; bila sama, kartu menyatakannya.
+- Kartu tahap seduh yang berbeda dari rencana sebelum saran AI menampilkan tanda `AI` di samping nama tahap, mengikuti tanda pada parameter utama. Tahap yang tidak berubah tidak ditandai. Tanda hilang ketika tahap itu diedit manual atau ketika parameter yang membangun ulang tahap diubah.
 - Klien AI di `lib/data/remote/ai_client.dart`.
 - **Atur Seduh:** tombol "Rekomendasikan dengan AI" membuka lembar "Sebelum AI menyarankan" (opsional: dosis, jumlah pouring, keinginan), lalu mengirim profil biji, riwayat singkat, dan preferensi yang diisi. Lewati mengirim tanpa preferensi; menutup lembar membatalkan. Saran yang melanggar dosis atau pouring terkunci ditolak juga di aplikasi dan diganti pengaturan cadangan. Hasil mengisi form dan tetap dapat diubah.
 - Riwayat rekomendasi berisi paling banyak 5 seduhan aktif untuk biji yang dipilih: seduhan yang ditandai terbaik, lalu skor tertinggi lainnya dengan yang terbaru sebagai pemecah seri. Target air dan waktu tiap tahap ikut dikirim hanya untuk rekomendasi; diagnosa tetap memakai riwayat ringkas. Biji lain tidak dicampur. Form awal tetap memuat pengaturan terbaik tanpa mengubah catatan lama.
@@ -119,6 +120,7 @@ Untuk eksplorasi 2026-11-14, pemilik juga mengizinkan metode riwayat AI di `lib/
 - [ ] Rekomendasi 1-5 pouring yang lolos server tidak ditolak oleh validasi rencana Flutter karena rasio, durasi, jeda, atau total air
 - [ ] Lewati preferensi menggunakan beberapa seduhan berskor tinggi dari biji terpilih dan mengusulkan satu eksperimen beralasan; rencana awal dari seduhan terbaik tetap utuh
 - [ ] Untuk 2-5 pouring, Bloom saran AI bernilai 2-3 kali dosis dan target air akhir tetap tepat
+- [ ] Tanda `AI` hanya ada pada kartu tahap yang diubah saran dan hilang setelah tahap itu diedit manual
 - [ ] Diagnosa tampil sebagai kartu dan "Terapkan" mengisi Atur Seduh
 - [ ] Mode pesawat memunculkan fallback, bukan galat mentah
 - [ ] Batas 20 per jam menghasilkan pesan yang jelas

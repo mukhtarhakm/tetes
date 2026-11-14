@@ -469,7 +469,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     final key = 'duration_$stageIndex';
     final error = BrewValidation.duration(value);
     if (error != null) {
-      _setFieldError(key, error);
+      _setFieldError(key, error, aiStageIndex: stageIndex);
       return;
     }
     final plan = _current.plan;
@@ -478,6 +478,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     }
     _applyPlanChange(
       fieldKey: key,
+      aiStageIndex: stageIndex,
       change: () => BrewCalculator.updateDuration(
         plan,
         stageIndex: stageIndex,
@@ -490,7 +491,11 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     final value = _parseDouble(input);
     final key = 'target_$stageIndex';
     if (value == null || !value.isFinite || value <= 0) {
-      _setFieldError(key, 'Target air harus lebih dari 0 gram.');
+      _setFieldError(
+        key,
+        'Target air harus lebih dari 0 gram.',
+        aiStageIndex: stageIndex,
+      );
       return;
     }
     final plan = _current.plan;
@@ -499,6 +504,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     }
     _applyPlanChange(
       fieldKey: key,
+      aiStageIndex: stageIndex,
       change: () => BrewCalculator.updateTargetPour(
         plan,
         stageIndex: stageIndex,
@@ -541,6 +547,7 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
     required BrewPlan Function() change,
     String? fieldKey,
     AiPlanField? aiField,
+    int? aiStageIndex,
     String? notice,
     bool clearStageErrors = false,
   }) {
@@ -556,26 +563,40 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
           (key, _) => key.startsWith('duration_') || key.startsWith('target_'),
         );
       }
+      var suggestion = current.aiSuggestion;
+      if (aiField != null) suggestion = suggestion?.markEdited(aiField);
+      if (aiStageIndex != null) {
+        suggestion = suggestion?.markStageEdited(aiStageIndex);
+      }
+      if (clearStageErrors) suggestion = suggestion?.markStagesEdited();
       state = AsyncData(
         current.copyWith(
           plan: nextPlan,
           isAiLoading: false,
           fieldErrors: errors,
           notice: notice,
-          aiSuggestion: aiField == null
-              ? current.aiSuggestion
-              : current.aiSuggestion?.markEdited(aiField),
+          aiSuggestion: suggestion,
         ),
       );
       _revision++;
     } on BrewPlanException catch (error) {
       if (fieldKey != null) {
-        _setFieldError(fieldKey, error.message, aiField: aiField);
+        _setFieldError(
+          fieldKey,
+          error.message,
+          aiField: aiField,
+          aiStageIndex: aiStageIndex,
+        );
       }
     }
   }
 
-  void _setFieldError(String key, String message, {AiPlanField? aiField}) {
+  void _setFieldError(
+    String key,
+    String message, {
+    AiPlanField? aiField,
+    int? aiStageIndex,
+  }) {
     _revision++;
     final current = _current;
     state = AsyncData(
@@ -583,7 +604,9 @@ class BrewSetupController extends AsyncNotifier<BrewSetupState> {
         isAiLoading: false,
         fieldErrors: {...current.fieldErrors, key: message},
         notice: null,
-        aiSuggestion: aiField == null
+        aiSuggestion: aiStageIndex != null
+            ? current.aiSuggestion?.markStageEdited(aiStageIndex)
+            : aiField == null
             ? current.aiSuggestion
             : current.aiSuggestion?.markEdited(aiField),
       ),

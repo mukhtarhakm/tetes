@@ -51,6 +51,34 @@ void main() {
     expect(AiBrew.recommendationChanges(original, original), isEmpty);
   });
 
+  test(
+    'tanda AI tahap hanya untuk tahap berubah dan hilang setelah diedit',
+    () {
+      final recommended = BrewCalculator.updateDuration(
+        original,
+        stageIndex: 2,
+        durationSeconds: original.stages[2].durationSeconds + 5,
+      );
+      final suggestion = AppliedAiSuggestion(
+        before: original,
+        recommended: recommended,
+        note: 'Uji tahap terakhir.',
+        hasHistory: true,
+      );
+
+      expect(suggestion.highlightsStage(0, recommended), isFalse);
+      expect(suggestion.highlightsStage(2, recommended), isTrue);
+      expect(
+        suggestion.markStageEdited(2).highlightsStage(2, recommended),
+        isFalse,
+      );
+      expect(
+        suggestion.markStagesEdited().highlightsStage(2, recommended),
+        isFalse,
+      );
+    },
+  );
+
   test('Kembalikan memakai rencana lama beserta tahap yang disunting', () {
     final before = BrewCalculator.updateDuration(
       original,

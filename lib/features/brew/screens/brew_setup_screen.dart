@@ -379,6 +379,7 @@ class _BrewForm extends StatelessWidget {
             child: _StageCard(
               plan: plan,
               stageIndex: index,
+              fromAi: state.aiSuggestion?.highlightsStage(index, plan) ?? false,
               errors: state.fieldErrors,
               controller: controller,
             ),
@@ -532,12 +533,7 @@ class _AiSuggestionCardState extends State<_AiSuggestionCard> {
     ) {
       final before = index < beforeStages.length ? beforeStages[index] : null;
       final after = index < afterStages.length ? afterStages[index] : null;
-      if (before?.startSeconds == after?.startSeconds &&
-          before?.durationSeconds == after?.durationSeconds &&
-          (before == null ||
-              after == null ||
-              formatNumber(before.targetPourG) ==
-                  formatNumber(after.targetPourG))) {
+      if (!suggestion.stageChangedAt(index)) {
         continue;
       }
       stageChanges.add(
@@ -640,12 +636,14 @@ class _StageCard extends StatelessWidget {
   const _StageCard({
     required this.plan,
     required this.stageIndex,
+    required this.fromAi,
     required this.errors,
     required this.controller,
   });
 
   final BrewPlan plan;
   final int stageIndex;
+  final bool fromAi;
   final Map<String, String> errors;
   final BrewSetupController controller;
 
@@ -661,11 +659,22 @@ class _StageCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Text(stage.name.label, style: textTheme.titleLarge),
+                child: Wrap(
+                  spacing: AppSpacing.s8,
+                  runSpacing: AppSpacing.s8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(stage.name.label, style: textTheme.titleLarge),
+                    if (fromAi)
+                      const StatusPill(
+                        label: 'AI',
+                        variant: StatusPillVariant.synced,
+                      ),
+                  ],
+                ),
               ),
               Text(
                 'Mulai ${formatClock(stage.startSeconds)}',

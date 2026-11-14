@@ -1,3 +1,4 @@
+import '../../core/utils/display_format.dart';
 import '../beans/bean_model.dart';
 import '../journal/journal_model.dart';
 import 'brew_calculator.dart';
@@ -93,6 +94,7 @@ class AppliedAiSuggestion {
     required this.note,
     required this.hasHistory,
     this.editedFields = const {},
+    this.editedStages = const {},
     this.preferences,
   });
 
@@ -101,6 +103,7 @@ class AppliedAiSuggestion {
   final String note;
   final bool hasHistory;
   final Set<AiPlanField> editedFields;
+  final Set<int> editedStages;
   final AiRecommendPreferences? preferences;
 
   List<AiPlanChange> get changes =>
@@ -110,12 +113,63 @@ class AppliedAiSuggestion {
       changes.any((change) => change.field == field) &&
       !editedFields.contains(field);
 
+  bool stageChangedAt(int index) {
+    if (index < 0 ||
+        (index >= before.stages.length && index >= recommended.stages.length)) {
+      return false;
+    }
+    final oldStage = index < before.stages.length ? before.stages[index] : null;
+    final newStage = index < recommended.stages.length
+        ? recommended.stages[index]
+        : null;
+    return !_sameStage(oldStage, newStage);
+  }
+
+  bool highlightsStage(int index, BrewPlan currentPlan) =>
+      index >= 0 &&
+      index < recommended.stages.length &&
+      index < currentPlan.stages.length &&
+      stageChangedAt(index) &&
+      !editedStages.contains(index) &&
+      _sameStage(recommended.stages[index], currentPlan.stages[index]);
+
+  static bool _sameStage(BrewStage? first, BrewStage? second) =>
+      first?.startSeconds == second?.startSeconds &&
+      first?.durationSeconds == second?.durationSeconds &&
+      (first == null ||
+          second == null ||
+          formatNumber(first.targetPourG) == formatNumber(second.targetPourG));
+
   AppliedAiSuggestion markEdited(AiPlanField field) => AppliedAiSuggestion(
     before: before,
     recommended: recommended,
     note: note,
     hasHistory: hasHistory,
     editedFields: {...editedFields, field},
+    editedStages: editedStages,
+    preferences: preferences,
+  );
+
+  AppliedAiSuggestion markStageEdited(int index) => AppliedAiSuggestion(
+    before: before,
+    recommended: recommended,
+    note: note,
+    hasHistory: hasHistory,
+    editedFields: editedFields,
+    editedStages: {...editedStages, index},
+    preferences: preferences,
+  );
+
+  AppliedAiSuggestion markStagesEdited() => AppliedAiSuggestion(
+    before: before,
+    recommended: recommended,
+    note: note,
+    hasHistory: hasHistory,
+    editedFields: editedFields,
+    editedStages: {
+      ...editedStages,
+      for (var index = 0; index < recommended.stages.length; index++) index,
+    },
     preferences: preferences,
   );
 

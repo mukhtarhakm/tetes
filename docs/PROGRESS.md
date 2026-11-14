@@ -1,5 +1,8 @@
 # PROGRESS: Tetes
 
+## 2026-11-14 - Tanda AI pada tahap seduh
+- Kartu tahap yang berubah karena rekomendasi diberi tanda `AI` di samping nama, mengikuti tanda parameter utama. Tahap yang tidak berubah tidak ditandai; edit manual atau pembuatan ulang tahap menghilangkan tanda terkait. Tes model dan widget lulus, termasuk layout 320 px dengan teks 1,3×; analisis `lib` dan `test` bersih. Uji HP menunggu.
+
 ## 2026-11-14 - Diagnostik fallback rekomendasi di HP
 - Setelah APK eksplorasi dan fungsi `ai` terbaru dipasang, tombol rekomendasi menampilkan fallback umum. APK diagnostik lokal menunjukkan `ArgumentError` di `_HttpClient._openUrl` saat `AiClient` membuka fungsi `ai`.
 - Penyebab: APK dari arsip commit bersih dibangun tanpa `--dart-define-from-file=env/app.json`, sehingga `AppConfig.supabaseUrl` kosong. Konfigurasi lokal sudah diperiksa mengarah ke proyek yang benar; APK dibangun ulang dengan flag tersebut dan berhasil dipasang di HP. Pemilik melaporkan kartu Saran AI muncul saat uji ulang. Pencatatan diagnostik sementara telah dilepas dan tidak di-push.

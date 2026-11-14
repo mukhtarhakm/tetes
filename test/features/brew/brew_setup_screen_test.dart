@@ -141,6 +141,54 @@ void main() {
     );
   });
 
+  testWidgets(
+    'tanda AI muncul hanya pada kartu tahap berubah lalu hilang saat diedit',
+    (tester) async {
+      final bean = _bean();
+      final before = BrewCalculator.createDefault(beanId: bean.id);
+      final recommended = BrewCalculator.updateDuration(
+        before,
+        stageIndex: 2,
+        durationSeconds: before.stages[2].durationSeconds + 5,
+      );
+      await tester.pumpWidget(
+        _app(
+          () async => BrewSetupState(
+            beans: [bean],
+            selectedBeanId: bean.id,
+            plan: recommended,
+            aiSuggestion: AppliedAiSuggestion(
+              before: before,
+              recommended: recommended,
+              note: 'Uji tahap terakhir.',
+              hasHistory: true,
+            ),
+          ),
+          initialBeanId: bean.id,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final lastCard = find.byWidgetPredicate(
+        (widget) =>
+            widget is AppCard && widget.backgroundColor == AppColors.stage3,
+      );
+      expect(
+        find.descendant(of: lastCard, matching: find.text('AI')),
+        findsOneWidget,
+      );
+      expect(find.text('AI'), findsOneWidget);
+
+      final duration = find.byKey(const ValueKey('duration-bean-1-2'));
+      await tester.ensureVisible(duration);
+      await tester.enterText(
+        duration,
+        '${before.stages[2].durationSeconds + 10}',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('AI'), findsNothing);
+    },
+  );
+
   testWidgets('kartu AI menyebut tahap tetap sama bila tidak berubah', (
     tester,
   ) async {
@@ -212,11 +260,25 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final bean = _bean();
-    final plan = BrewCalculator.createDefault(beanId: bean.id);
+    final before = BrewCalculator.createDefault(beanId: bean.id);
+    final plan = BrewCalculator.updateDuration(
+      before,
+      stageIndex: 2,
+      durationSeconds: before.stages[2].durationSeconds + 5,
+    );
     await tester.pumpWidget(
       _app(
-        () async =>
-            BrewSetupState(beans: [bean], selectedBeanId: bean.id, plan: plan),
+        () async => BrewSetupState(
+          beans: [bean],
+          selectedBeanId: bean.id,
+          plan: plan,
+          aiSuggestion: AppliedAiSuggestion(
+            before: before,
+            recommended: plan,
+            note: 'Uji tahap terakhir.',
+            hasHistory: true,
+          ),
+        ),
         initialBeanId: bean.id,
         textScale: 1.3,
       ),
