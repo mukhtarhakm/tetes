@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-11-14 - Diagnostik fallback rekomendasi di HP
+- Setelah APK eksplorasi dan fungsi `ai` terbaru dipasang, tombol rekomendasi menampilkan fallback umum. APK diagnostik lokal menunjukkan `ArgumentError` di `_HttpClient._openUrl` saat `AiClient` membuka fungsi `ai`.
+- Penyebab: APK dari arsip commit bersih dibangun tanpa `--dart-define-from-file=env/app.json`, sehingga `AppConfig.supabaseUrl` kosong. Konfigurasi lokal sudah diperiksa mengarah ke proyek yang benar; APK dibangun ulang dengan flag tersebut dan berhasil dipasang di HP. Pemilik melaporkan kartu Saran AI muncul saat uji ulang. Pencatatan diagnostik sementara telah dilepas dan tidak di-push.
+
 ## 2026-11-14 - Eksplorasi AI dari beberapa seduhan bagus
 - Atur Seduh tetap memuat pengaturan terbaik sebagai titik awal. Riwayat untuk rekomendasi kini memilih satu seduhan yang ditandai terbaik dan empat seduhan aktif berskor tertinggi lain pada biji terpilih; target waktu dan air tiap tahap ikut dikirim. Diagnosa tetap memakai riwayat ringkas.
 - Prompt meminta satu eksperimen seduh yang beralasan, bukan menyalin rencana awal. Untuk 2-5 pouring, bloom saran dibatasi 2-3 kali dosis, dan air tahap berikutnya dirapikan sambil menjaga total. Preferensi dosis/jumlah pouring tetap dikunci. Deploy, APK baru, dan uji HP menunggu.
