@@ -142,6 +142,13 @@ Deno.test("lima pouring mengikuti batas rencana Flutter", () => {
   const excessWater = structuredClone(normalized);
   excessWater.stages[3].water_cum_g = 271;
   if (recommendationFailureField(normalizeOutput("recommend", excessWater)) !== "stages[4].water_cum_g") throw new Error("water failure not reported");
+  const four = { ...structuredClone(normalized), pouring_count: 4, stages: structuredClone(normalized.stages.slice(0, 4)) };
+  four.stages[2].water_cum_g = four.stages[1].water_cum_g;
+  four.stages[3].water_cum_g = 270;
+  const repeatedWater = normalizeOutput("recommend", four);
+  if (validateOutput("recommend", repeatedWater) || recommendationFailureField(repeatedWater) !== "stages[2].water_cum_g") {
+    throw new Error("four pours with repeated cumulative water accepted");
+  }
   const fractional = structuredClone(validRecommend);
   fractional.dose_g = 15.5;
   fractional.ratio = 16.1;

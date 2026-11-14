@@ -231,7 +231,7 @@ function recommendationPlanFailure(value: unknown, withNote: boolean): string | 
     if (item.name !== stageNames[i]) return `stages[${i}].name`;
     if (!integer(item.start_s, end, end)) return `stages[${i}].start_s`;
     if (!integer(item.duration_s, 5, 120)) return `stages[${i}].duration_s`;
-    if (!number(item.water_cum_g, water + Number.EPSILON, 1200)) return `stages[${i}].water_cum_g`;
+    if (!number(item.water_cum_g, 0, 1200) || item.water_cum_g <= water) return `stages[${i}].water_cum_g`;
     end = item.start_s + item.duration_s;
     water = item.water_cum_g;
   }

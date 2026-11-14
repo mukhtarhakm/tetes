@@ -1,5 +1,9 @@
 # PROGRESS: Tetes
 
+## 2026-11-14 - Selaraskan air kumulatif 4 pouring
+- Uji HP sekitar 08.11 menunjukkan respons `200` dari fungsi `ai`, tetapi rencana 4 pouring masih ditolak Flutter; 5 pouring berikutnya berhasil. Log server tidak menyimpan isi respons, jadi nilai yang ditolak Flutter belum diketahui pasti.
+- Server sebelumnya dapat menerima air kumulatif dua tahap yang sama karena `water + Number.EPSILON` membulat kembali ke `water` pada nilai seperti 100 g. Flutter menuntut kenaikan ketat. Pemeriksaan server sekarang memakai perbandingan ketat yang sama; tes 4 pouring dengan air kumulatif berulang ditambahkan. Deploy dan uji HP menunggu.
+
 ## 2026-11-14 - Diagnosis kegagalan rekomendasi 4 dan 5 pouring
 - Setelah deploy perbaikan sebelumnya, uji HP untuk 4 dan 5 pouring masih menghasilkan pengaturan cadangan. Log Edge Function pukul 07.47 dan 07.48 menunjukkan OpenAI mengembalikan JSON lengkap (HTTP 200, `finish_reason: stop`), tetapi kedua percobaan ditolak validator server (`schema_error`, lalu `ai_invalid_output` 502). Log lama hanya menyebut `field: unknown`, sehingga aturan yang gagal belum dapat dipastikan.
 - Validator sekarang melaporkan nama field atau aturan tahap yang gagal tanpa mencatat isi resep. Percobaan kedua menyebut aturan itu dalam prompt agar model dapat memperbaikinya. Batas validasi dan fallback tetap sama. 24 tes server lulus melalui shim Node; deploy dan uji ulang di HP menunggu.
